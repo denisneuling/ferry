@@ -37,6 +37,9 @@ type LoginOptions struct {
 	// Timeout bounds the TCP connection, the negotiation and the session
 	// setup together. Zero means 10 seconds.
 	Timeout time.Duration
+	// CallTimeout bounds each SMB call of the session; one the server does
+	// not answer within it ends the session (call.go). Zero means a minute.
+	CallTimeout time.Duration
 }
 
 const defaultLoginTimeout = 10 * time.Second
@@ -95,7 +98,11 @@ func Login(ctx context.Context, opts LoginOptions, cred Credentials) (*Session, 
 		return nil, &Error{Kind: KindGuest}
 	}
 	_ = tcp.SetDeadline(time.Time{})
-	return &Session{s: s, conn: tcp, op: make(chan struct{}, 1), mounts: map[string]*smb2.Share{}}, nil
+	callTimeout := opts.CallTimeout
+	if callTimeout <= 0 {
+		callTimeout = defaultCallTimeout
+	}
+	return &Session{s: s, conn: tcp, callTimeout: callTimeout, op: make(chan struct{}, 1), mounts: map[string]*smb2.Share{}}, nil
 }
 
 // Session is one authenticated SMB session on its own connection. It is safe
@@ -103,8 +110,9 @@ func Login(ctx context.Context, opts LoginOptions, cred Credentials) (*Session, 
 // again, which it does not have. Once the connection is gone, every call
 // returns KindSessionLost and Lost reports true.
 type Session struct {
-	s    *smb2.Session
-	conn net.Conn
+	s           *smb2.Session
+	conn        net.Conn
+	callTimeout time.Duration
 
 	// op admits one SMB request at a time on this session. go-smb2 cannot
 	// be trusted with concurrent requests: when its credit balance runs
@@ -222,11 +230,12 @@ type Share struct {
 // The server may list shares the user cannot open. Shares does not try them:
 // whether a share opens is decided when it is opened, by the server.
 func (s *Session) Shares(ctx context.Context) ([]Share, error) {
-	if err := s.begin(ctx); err != nil {
+	c, err := s.start(ctx)
+	if err != nil {
 		return nil, err
 	}
-	defer s.release()
-	infos, err := s.s.WithContext(ctx).ListShares()
+	defer c.end()
+	infos, err := s.s.WithContext(c.ctx).ListShares()
 	if err != nil {
 		return nil, s.fail(err)
 	}
@@ -241,8 +250,9 @@ func (s *Session) Shares(ctx context.Context) ([]Share, error) {
 	return out, nil
 }
 
-// mount returns the tree connect for a share, making it on first use. The
-// caller holds the request slot.
+// mount returns the tree connect for a share, making it on first use, bound
+// to ctx — a call's, never a request's (call.go). The caller holds the
+// request slot.
 func (s *Session) mount(ctx context.Context, name string) (*smb2.Share, error) {
 	if !validShareName(name) {
 		return nil, &Error{Kind: KindInvalidPath}
@@ -283,11 +293,12 @@ func (s *Session) ReadDir(ctx context.Context, share, p string, max int) ([]Entr
 	if err != nil {
 		return nil, err
 	}
-	if err := s.begin(ctx); err != nil {
+	c, err := s.start(ctx)
+	if err != nil {
 		return nil, err
 	}
-	defer s.release()
-	m, err := s.mount(ctx, share)
+	defer c.end()
+	m, err := s.mount(c.ctx, share)
 	if err != nil {
 		return nil, err
 	}
@@ -303,6 +314,10 @@ func (s *Session) ReadDir(ctx context.Context, share, p string, max int) ([]Entr
 
 	var out []Entry
 	for {
+		if err := c.canceled(); err != nil {
+			return nil, err
+		}
+		c.kick()
 		batch, err := f.Readdir(256)
 		for _, fi := range batch {
 			if fi.Name() == "." || fi.Name() == ".." {
@@ -327,45 +342,19 @@ func (s *Session) ReadDir(ctx context.Context, share, p string, max int) ([]Entr
 
 // File is an open file for reading: an io.ReadSeekCloser with ReadAt, for
 // http.ServeContent and Range requests.
+//
+// go-smb2 binds a file to one context for all its calls, Close included. A
+// File's is its own, detached from the request that opened it (call.go):
+// the request's end stops a download between reads, never inside one, and
+// the handle can always be closed — a video's every seek aborts a download.
+// Each call on the file has the call timeout's watchdog.
 type File struct {
 	f       *smb2.File
 	sess    *Session
-	ctx     context.Context
-	release func() // ends the file's own context (handleContext)
+	parent  context.Context    // the opening request's: checked between reads
+	cancel  context.CancelFunc // ends the file's own context
 	Size    int64
 	ModTime time.Time
-}
-
-// closeGrace is how long a file's handle outlives the request that opened
-// it, so that it can still be closed on the server after the request ended.
-const closeGrace = 10 * time.Second
-
-// handleContext is the context an open file is bound to. go-smb2 binds a
-// file to the context of the share it was opened through, for every later
-// call — Close included. Bound to the request's context, a download the
-// client aborts (every seek in a video does) could not close its handle, and
-// the handles would pile up on the server until logoff. So the file gets a
-// context of its own that ends closeGrace after the request's does: long
-// enough to close cleanly, short enough that a call the server never answers
-// still ends. stop ends it at once.
-func handleContext(ctx context.Context) (hctx context.Context, stop func()) {
-	hctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	var timer *time.Timer
-	var mu sync.Mutex
-	unwatch := context.AfterFunc(ctx, func() {
-		mu.Lock()
-		defer mu.Unlock()
-		timer = time.AfterFunc(closeGrace, cancel)
-	})
-	return hctx, func() {
-		unwatch()
-		mu.Lock()
-		if timer != nil {
-			timer.Stop()
-		}
-		mu.Unlock()
-		cancel()
-	}
 }
 
 // Open opens a file for reading. A folder is KindIsDir.
@@ -381,49 +370,64 @@ func (s *Session) Open(ctx context.Context, share, p string) (*File, error) {
 		return nil, err
 	}
 	defer s.release()
-	m, err := s.mount(ctx, share)
+	fctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	var f *smb2.File
+	var fi os.FileInfo
+	err = s.watch(cancel, func() error {
+		m, err := s.mount(fctx, share)
+		if err != nil {
+			return err
+		}
+		if f, err = m.OpenFile(sp, os.O_RDONLY, 0); err != nil {
+			return s.fail(err)
+		}
+		if fi, err = f.Stat(); err != nil {
+			_ = f.Close()
+			return s.fail(err)
+		}
+		if fi.IsDir() {
+			_ = f.Close()
+			return &Error{Kind: KindIsDir}
+		}
+		return nil
+	})
 	if err != nil {
+		cancel()
 		return nil, err
 	}
-	hctx, stop := handleContext(ctx)
-	f, err := m.WithContext(hctx).OpenFile(sp, os.O_RDONLY, 0)
-	if err != nil {
-		stop()
-		return nil, s.fail(err)
-	}
-	fi, err := f.Stat()
-	if err != nil {
-		_ = f.Close()
-		stop()
-		return nil, s.fail(err)
-	}
-	if fi.IsDir() {
-		_ = f.Close()
-		stop()
-		return nil, &Error{Kind: KindIsDir}
-	}
-	return &File{f: f, sess: s, ctx: ctx, release: stop, Size: fi.Size(), ModTime: fi.ModTime()}, nil
+	return &File{f: f, sess: s, parent: ctx, cancel: cancel, Size: fi.Size(), ModTime: fi.ModTime()}, nil
 }
 
-// The file's methods take the session's request slot for each call, with the
-// context the file was opened with: a download is one HTTP request, and its
-// context is the one that should end it.
-
-func (f *File) Read(p []byte) (int, error) {
-	if err := f.sess.begin(f.ctx); err != nil {
-		return 0, err
+// step runs one call on the file: the session's request slot taken under the
+// opening request's context — so a request that ended stops here, before the
+// call — and the call itself under the file's own, watched.
+func (f *File) step(parent context.Context, call func() error) error {
+	if err := f.sess.begin(parent); err != nil {
+		return err
 	}
 	defer f.sess.release()
-	n, err := f.f.Read(p)
+	return f.sess.watch(f.cancel, call)
+}
+
+func (f *File) Read(p []byte) (n int, err error) {
+	serr := f.step(f.parent, func() error {
+		n, err = f.f.Read(p)
+		return nil
+	})
+	if serr != nil {
+		return 0, serr
+	}
 	return n, f.err(err)
 }
 
-func (f *File) ReadAt(p []byte, off int64) (int, error) {
-	if err := f.sess.begin(f.ctx); err != nil {
-		return 0, err
+func (f *File) ReadAt(p []byte, off int64) (n int, err error) {
+	serr := f.step(f.parent, func() error {
+		n, err = f.f.ReadAt(p, off)
+		return nil
+	})
+	if serr != nil {
+		return 0, serr
 	}
-	defer f.sess.release()
-	n, err := f.f.ReadAt(p, off)
 	return n, f.err(err)
 }
 
@@ -462,27 +466,32 @@ func (f *File) WriteTo(w io.Writer) (int64, error) {
 
 // Seek only moves the offset; it sends nothing for io.SeekStart and
 // io.SeekCurrent, but io.SeekEnd asks the server for the size.
-func (f *File) Seek(offset int64, whence int) (int64, error) {
-	if err := f.sess.begin(f.ctx); err != nil {
-		return 0, err
+func (f *File) Seek(offset int64, whence int) (n int64, err error) {
+	serr := f.step(f.parent, func() error {
+		n, err = f.f.Seek(offset, whence)
+		return nil
+	})
+	if serr != nil {
+		return 0, serr
 	}
-	defer f.sess.release()
-	n, err := f.f.Seek(offset, whence)
 	return n, f.err(err)
 }
 
-// Close closes the handle on the server. It works for closeGrace after the
-// opening request's context ended (handleContext), so an aborted download
-// still closes its handle.
+// closeWait bounds how long Close waits for the session's request slot.
+const closeWait = 10 * time.Second
+
+// Close closes the handle on the server, also after the opening request
+// ended: the file's context is its own, so an aborted download still closes
+// its handle.
 func (f *File) Close() error {
-	defer f.release()
-	ctx, cancel := context.WithTimeout(context.Background(), closeGrace)
+	defer f.cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), closeWait)
 	defer cancel()
-	if err := f.sess.begin(ctx); err != nil {
-		return err
+	var err error
+	if serr := f.step(ctx, func() error { err = f.f.Close(); return nil }); serr != nil {
+		return serr
 	}
-	defer f.sess.release()
-	return f.err(f.f.Close())
+	return f.err(err)
 }
 
 // err keeps io.EOF as it is — readers depend on it — and classifies the rest.

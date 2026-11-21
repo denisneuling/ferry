@@ -264,7 +264,7 @@ func (a *API) Login(w http.ResponseWriter, r *http.Request, _ v1.LoginParams) {
 
 	user, domain := splitUser(req.Username)
 	start := time.Now()
-	conn, err := a.login(r.Context(), smb.LoginOptions{Server: a.cfg.SMBServer, Timeout: a.cfg.LoginTimeout},
+	conn, err := a.login(r.Context(), smb.LoginOptions{Server: a.cfg.SMBServer, Timeout: a.cfg.LoginTimeout, CallTimeout: a.cfg.RequestTimeout},
 		smb.Credentials{User: user, Password: req.Password, Domain: domain})
 	// The password is not needed again. Go cannot wipe a string, but nothing
 	// below holds a reference to it.

@@ -8,13 +8,13 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	smb2 "github.com/cloudsoda/go-smb2"
 )
 
-// The operations that change a share. Each takes the session's request slot
-// for its whole run, under the caller's context.
+// The operations that change a share. Each is a call (call.go): the request
+// slot for its whole run, go-smb2 under a context the request does not
+// reach.
 
 // Stat returns the entry at a path. The share's root is a folder named "".
 func (s *Session) Stat(ctx context.Context, share, p string) (Entry, error) {
@@ -22,11 +22,12 @@ func (s *Session) Stat(ctx context.Context, share, p string) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	if err := s.begin(ctx); err != nil {
+	c, err := s.start(ctx)
+	if err != nil {
 		return Entry{}, err
 	}
-	defer s.release()
-	m, err := s.mount(ctx, share)
+	defer c.end()
+	m, err := s.mount(c.ctx, share)
 	if err != nil {
 		return Entry{}, err
 	}
@@ -54,11 +55,12 @@ func (s *Session) Mkdir(ctx context.Context, share, p string) (Entry, error) {
 	if sp == "" {
 		return Entry{}, &Error{Kind: KindExists}
 	}
-	if err := s.begin(ctx); err != nil {
+	c, err := s.start(ctx)
+	if err != nil {
 		return Entry{}, err
 	}
-	defer s.release()
-	m, err := s.mount(ctx, share)
+	defer c.end()
+	m, err := s.mount(c.ctx, share)
 	if err != nil {
 		return Entry{}, err
 	}
@@ -81,11 +83,12 @@ func (s *Session) Remove(ctx context.Context, share, p string, recursive bool, m
 		// The share's root is not deleted through ferry, recursively or not.
 		return &Error{Kind: KindAccessDenied}
 	}
-	if err := s.begin(ctx); err != nil {
+	c, err := s.start(ctx)
+	if err != nil {
 		return err
 	}
-	defer s.release()
-	m, err := s.mount(ctx, share)
+	defer c.end()
+	m, err := s.mount(c.ctx, share)
 	if err != nil {
 		return err
 	}
@@ -102,13 +105,14 @@ func (s *Session) Remove(ctx context.Context, share, p string, recursive bool, m
 	// Collect first, so that a tree beyond the bound is refused whole rather
 	// than deleted in part.
 	var order []string
-	if err := s.walk(ctx, m, sp, 0, max, &order); err != nil {
+	if err := s.walk(c, m, sp, 0, max, &order); err != nil {
 		return err
 	}
 	for _, q := range order {
-		if err := ctx.Err(); err != nil {
-			return classify(err)
+		if err := c.canceled(); err != nil {
+			return err
 		}
+		c.kick()
 		if err := m.Remove(q); err != nil {
 			return s.fail(err)
 		}
@@ -121,13 +125,14 @@ const maxDepth = 64
 
 // walk appends every path below dir, children before their folder, and dir
 // itself last.
-func (s *Session) walk(ctx context.Context, m *smb2.Share, dir string, depth, max int, order *[]string) error {
+func (s *Session) walk(c *call, m *smb2.Share, dir string, depth, max int, order *[]string) error {
 	if depth > maxDepth {
 		return &Error{Kind: KindLimit}
 	}
-	if err := ctx.Err(); err != nil {
-		return classify(err)
+	if err := c.canceled(); err != nil {
+		return err
 	}
+	c.kick()
 	f, err := m.Open(dir)
 	if err != nil {
 		return s.fail(err)
@@ -155,7 +160,7 @@ func (s *Session) walk(ctx context.Context, m *smb2.Share, dir string, depth, ma
 		}
 		child := dir + `\` + fi.Name()
 		if fi.IsDir() {
-			if err := s.walk(ctx, m, child, depth+1, max, order); err != nil {
+			if err := s.walk(c, m, child, depth+1, max, order); err != nil {
 				return err
 			}
 			continue
@@ -195,11 +200,12 @@ func (s *Session) Rename(ctx context.Context, share, from, to string, overwrite 
 	if strings.HasPrefix(strings.ToLower(st)+`\`, strings.ToLower(sf)+`\`) {
 		return Entry{}, &Error{Kind: KindInvalidPath}
 	}
-	if err := s.begin(ctx); err != nil {
+	c, err := s.start(ctx)
+	if err != nil {
 		return Entry{}, err
 	}
-	defer s.release()
-	m, err := s.mount(ctx, share)
+	defer c.end()
+	m, err := s.mount(c.ctx, share)
 	if err != nil {
 		return Entry{}, err
 	}
@@ -254,49 +260,54 @@ func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, over
 		return Entry{}, &Error{Kind: KindIsDir}
 	}
 	tmp := tempName(sp)
-	// The temporary file is bound to a context that outlives the request's
-	// briefly, so that an upload the client aborts can still close and
-	// remove it (handleContext).
-	hctx, stop := handleContext(ctx)
+	// The temporary file's own context, which the request's end does not
+	// reach (call.go): an upload the client aborts can still close and
+	// remove it, and no write is cut off in the middle.
+	fctx, fcancel := context.WithCancel(context.WithoutCancel(ctx))
+	defer fcancel()
 
 	// Fail early, before the body is read, when the target may not be
 	// written; then create the temporary file.
-	f, err := func() (*smb2.File, error) {
+	var f *smb2.File
+	err = func() error {
 		if err := s.begin(ctx); err != nil {
-			return nil, err
+			return err
 		}
 		defer s.release()
-		m, err := s.mount(ctx, share)
-		if err != nil {
-			return nil, err
-		}
-		if err := s.refuseExisting(m, sp, overwrite); err != nil {
-			return nil, err
-		}
-		f, err := m.WithContext(hctx).OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-		if err != nil {
-			return nil, s.fail(err)
-		}
-		return f, nil
+		return s.watch(fcancel, func() error {
+			m, err := s.mount(fctx, share)
+			if err != nil {
+				return err
+			}
+			if err := s.refuseExisting(m, sp, overwrite); err != nil {
+				return err
+			}
+			if f, err = m.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644); err != nil {
+				return s.fail(err)
+			}
+			return nil
+		})
 	}()
 	if err != nil {
-		stop()
 		return Entry{}, err
 	}
-	defer stop()
 
 	cleanup := func() {
-		// A fresh context: the request's may be what ended the upload.
-		cctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		// The slot under a fresh context: the request's may be what ended
+		// the upload.
+		cctx, cancel := context.WithTimeout(context.Background(), closeWait)
 		defer cancel()
 		if s.begin(cctx) != nil {
 			return
 		}
 		defer s.release()
-		_ = f.Close()
-		if m, err := s.mount(cctx, share); err == nil {
-			_ = m.Remove(tmp)
-		}
+		_ = s.watch(fcancel, func() error {
+			_ = f.Close()
+			if m, err := s.mount(fctx, share); err == nil {
+				_ = m.Remove(tmp)
+			}
+			return nil
+		})
 	}
 
 	buf := make([]byte, UploadChunk)
@@ -309,7 +320,7 @@ func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, over
 				cleanup()
 				return Entry{}, &Error{Kind: KindLimit}
 			}
-			if werr := s.writeChunk(ctx, f, buf[:n]); werr != nil {
+			if werr := s.writeChunk(ctx, fcancel, f, buf[:n]); werr != nil {
 				cleanup()
 				return Entry{}, werr
 			}
@@ -323,7 +334,7 @@ func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, over
 		}
 	}
 
-	e, err := s.finishUpload(ctx, share, f, tmp, sp, overwrite)
+	e, err := s.finishUpload(ctx, fctx, fcancel, share, f, tmp, sp, overwrite)
 	if err != nil {
 		cleanup()
 		return Entry{}, err
@@ -333,40 +344,50 @@ func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, over
 
 // finishUpload closes the temporary file and renames it to the real name,
 // checking once more that the target may be written.
-func (s *Session) finishUpload(ctx context.Context, share string, f *smb2.File, tmp, sp string, overwrite bool) (Entry, error) {
+func (s *Session) finishUpload(ctx, fctx context.Context, fcancel context.CancelFunc, share string, f *smb2.File, tmp, sp string, overwrite bool) (Entry, error) {
 	if err := s.begin(ctx); err != nil {
 		return Entry{}, err
 	}
 	defer s.release()
-	if err := f.Close(); err != nil {
-		return Entry{}, s.fail(err)
-	}
-	m, err := s.mount(ctx, share)
-	if err != nil {
-		return Entry{}, err
-	}
-	if err := s.refuseExisting(m, sp, overwrite); err != nil {
-		return Entry{}, err
-	}
-	if err := m.Rename(tmp, sp); err != nil {
-		return Entry{}, s.fail(err)
-	}
-	return s.stat(m, sp)
+	var e Entry
+	err := s.watch(fcancel, func() error {
+		if err := f.Close(); err != nil {
+			return s.fail(err)
+		}
+		m, err := s.mount(fctx, share)
+		if err != nil {
+			return err
+		}
+		if err := s.refuseExisting(m, sp, overwrite); err != nil {
+			return err
+		}
+		if err := m.Rename(tmp, sp); err != nil {
+			return s.fail(err)
+		}
+		e, err = s.stat(m, sp)
+		return err
+	})
+	return e, err
 }
 
-func (s *Session) writeChunk(ctx context.Context, f *smb2.File, b []byte) error {
+// writeChunk writes b to the temporary file: the slot under the request's
+// context — an upload whose client went away stops here — and the writes
+// under the file's own, watched.
+func (s *Session) writeChunk(ctx context.Context, fcancel context.CancelFunc, f *smb2.File, b []byte) error {
 	if err := s.begin(ctx); err != nil {
 		return err
 	}
 	defer s.release()
-	for len(b) > 0 {
-		n, err := f.Write(b)
-		if err != nil {
-			return s.fail(err)
+	return s.watch(fcancel, func() error {
+		for len(b) > 0 {
+			n, err := f.Write(b)
+			if err != nil {
+				return s.fail(err)
+			}
+			b = b[n:]
 		}
-		b = b[n:]
-	}
-	return nil
+		return nil
+	})
 }
 
 // tempName is the temporary name of an upload, in the target's folder. It

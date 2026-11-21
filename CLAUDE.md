@@ -52,6 +52,11 @@ is English.
   sandbox` and `X-Content-Type-Options: nosniff`, and HTML, SVG and anything
   else active is served as an inert type. The interface renders file names,
   share comments and text previews as text, never as HTML.
+- **go-smb2 never sees a request's context.** A context that ends inside an
+  SMB call corrupts the connection (docs/spike.md). Every call goes through
+  `internal/smb/call.go`: the request slot under the request's context, the
+  SMB call under a detached one with a watchdog. A client that leaves stops
+  an operation between steps, never inside one.
 - **One SMB connection per browser session.** Identities never share a
   connection, a tree connect or a file handle; a dropped connection ends the
   session instead of reconnecting, because reconnecting would need the

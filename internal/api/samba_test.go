@@ -5,6 +5,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -16,7 +17,9 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	v1 "github.com/metapatrol/ferry/api/v1"
 	"github.com/metapatrol/ferry/internal/smb"
@@ -355,5 +358,58 @@ func TestThumbnail(t *testing.T) {
 	res = h.do(t, "GET", "/api/v1/shares/alex/thumbnail?path="+q(dir+"/photo.jpg"), nil, nil, c)
 	if res.StatusCode != 413 || problemCode(t, res) != "too_large" {
 		t.Fatalf("over the memory budget: %d", res.StatusCode)
+	}
+}
+
+// A login that fails, sent with the cookie of a running session, leaves that
+// session alone: only a successful login replaces it.
+func TestFailedLoginKeepsTheSession(t *testing.T) {
+	h := sambaHarness(t)
+	c := h.login(t, "alex", alexPassword)
+	body, _ := json.Marshal(v1.LoginRequest{Username: "alex", Password: "wrong"})
+	if res := h.do(t, "POST", "/api/v1/login", bytes.NewReader(body), ferryReq, c); res.StatusCode != 401 {
+		t.Fatalf("wrong password: %d", res.StatusCode)
+	}
+	if res := h.do(t, "GET", "/api/v1/me", nil, nil, c); res.StatusCode != 200 {
+		t.Fatalf("the session after a failed login: %d", res.StatusCode)
+	}
+}
+
+// A browser abandons requests all the time — thumbnails scrolled away, a
+// folder left before its listing came, a video seeked. Each such request
+// ends in the middle of its SMB call; the session must outlive all of them.
+func TestAbortedRequestsKeepTheSession(t *testing.T) {
+	h := sambaHarness(t)
+	c := h.login(t, "alex", alexPassword)
+	paths := []string{
+		"/api/v1/shares/alex/entries",
+		"/api/v1/shares/alex/content?path=big.bin",
+		"/api/v1/shares/alex/content?path=hello.txt",
+		"/api/v1/shares/alex/thumbnail?path=hello.txt",
+		"/api/v1/shares",
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 800; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(i%7)*300*time.Microsecond)
+			defer cancel()
+			req, _ := http.NewRequestWithContext(ctx, "GET", h.srv.URL+paths[i%len(paths)], nil)
+			req.AddCookie(c)
+			if res, err := h.srv.Client().Do(req); err == nil {
+				_, _ = io.CopyN(io.Discard, res.Body, 2<<20)
+				_ = res.Body.Close()
+			}
+		}()
+		if i%25 == 0 {
+			wg.Wait()
+		}
+	}
+	wg.Wait()
+	for i := 0; i < 10; i++ {
+		if res := h.do(t, "GET", "/api/v1/shares/alex/entries", nil, nil, c); res.StatusCode != 200 {
+			t.Fatalf("the session after aborted requests: %d", res.StatusCode)
+		}
 	}
 }

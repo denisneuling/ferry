@@ -95,6 +95,32 @@ for the whole file, and browsing interleaves with it. Worth fixing upstream
 (clamp `OutputBufferLength` to the granted payload size), after which the
 slot can go.
 
+### A request the browser abandons kills the session — a go-smb2 race, worked around
+
+Found in the interface, where a session now and then ended with a 401 after
+quick browsing. A browser abandons requests all the time — thumbnails
+scrolled away, a folder left before its listing came, a video seeked — and
+each such request's context ended in the middle of its SMB call. go-smb2
+encodes every request into one buffer its connection shares; when the
+context ends after the packet went to the writer goroutine but before the
+write is done, the call returns and releases the connection's lock while
+the writer still sends from that buffer, and the next request overwrites
+it. Samba sees a duplicate message ID (`smb2_validate_sequence_number:
+duplicate message_id`) and drops the connection; ferry, which never
+reconnects, ends the session.
+
+ferry's answer (`internal/smb/call.go`): go-smb2 never sees the request's
+context. A call waits for the session's request slot under it, then runs
+under a context of its own; a client that goes away stops the operation
+between steps — between two 1 MiB reads of a download — never inside one.
+Open files have their own context the same way. What may still end a step is
+a watchdog: a call the server does not answer within the call timeout
+(`FERRY_REQUEST_TIMEOUT`). A connection cancelled mid-request cannot be
+trusted, so the session is then ended deliberately. Without the change,
+`TestCancelledCallsKeepTheSession` (400 SMB calls cancelled at random
+moments) fails every time and `TestAbortedRequestsKeepTheSession` (aborted
+HTTP requests) with the 401 seen in the browser; with it, both pass.
+
 ### Throughput depends on the read size
 
 One SMB READ per call: 32 KiB reads reach ~400 MB/s on loopback, 1 MiB reads

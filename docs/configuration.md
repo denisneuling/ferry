@@ -43,7 +43,7 @@ session setup and kept nowhere.
 | `FERRY_THUMBNAIL_MAX_PIXELS` | `50000000` | The most pixels an image may have to be decoded — checked from its header before decoding, so a small file claiming a huge image cannot exhaust memory. |
 | `FERRY_THUMBNAIL_MEMORY` | `320Mi` | The memory all thumbnails in the making may take together, by ferry's estimate from each image's header — which is above every measured peak. Thumbnails wait until theirs fit; one that alone exceeds it is `413`. The largest single use of memory in ferry: see [operations.md](operations.md#memory) for the measurements and for sizing the container's limit. |
 | `FERRY_THUMBNAIL_CONCURRENCY` | `2` | Thumbnails decoded at once, whatever the memory allows: the CPU bound. A 12-megapixel photo takes about a quarter of a second of one core. |
-| `FERRY_REQUEST_TIMEOUT` | `60s` | Every API request but uploads and downloads. |
+| `FERRY_REQUEST_TIMEOUT` | `60s` | Every API request but uploads and downloads; and each single SMB call, of transfers too. A call the SMB server does not answer within it ends the session: a connection cancelled in the middle of a request cannot be trusted (docs/spike.md). |
 | `FERRY_STALL_TIMEOUT` | `60s` | An upload or download ends when no bytes move for this long, in either direction — whether the client or the SMB server stopped. Its total duration is not bounded. |
 
 ## Logging
