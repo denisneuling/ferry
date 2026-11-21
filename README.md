@@ -18,6 +18,7 @@
 <p align="center">
   <a href="CONCEPT.md">Concept</a> ·
   <a href="docs/configuration.md">Configuration</a> ·
+  <a href="docs/operations.md">Operations</a> ·
   <a href="api/openapi/ferry-v1.yaml">API</a> ·
   <a href="docs/mockup/index.html">Mockup</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·

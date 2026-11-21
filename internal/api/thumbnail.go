@@ -56,21 +56,39 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		return
 	}
 
-	// Read the whole image at once: a buffer of the file's size, filled by
-	// the file's own 1 MiB reads (io.Copy takes File.WriteTo).
-	var buf bytes.Buffer
-	buf.Grow(int(f.Size))
-	if _, err := io.Copy(&buf, io.LimitReader(f, a.cfg.ThumbnailMaxBytes+1)); err != nil {
+	// What the thumbnail will cost is known from the header and the file's
+	// size, before the file is read: the memory budget covers the source
+	// buffer too, so many requests at once cannot hold many large buffers.
+	head := make([]byte, min(f.Size, thumb.HeaderBytes))
+	if _, err := io.ReadFull(f, head); err != nil {
 		a.fail(w, r, err)
 		return
 	}
-	if int64(buf.Len()) > a.cfg.ThumbnailMaxBytes {
-		probTooLarge.write(w)
+	cost, err := thumb.Estimate(head, f.Size, a.cfg.ThumbnailMaxPixels)
+	if err == nil && cost > a.cfg.ThumbnailMemory {
+		err = thumb.ErrTooLarge
+	}
+	if err != nil {
+		a.thumbProblem(w, err)
+		return
+	}
+	if err := a.thumbMemory.Acquire(ctx, cost); err != nil {
+		probUnreachable.write(w)
+		return
+	}
+	defer a.thumbMemory.Release(cost)
+
+	// The rest of the image: into a buffer of the file's size, filled by the
+	// file's own 1 MiB reads (io.Copy takes File.WriteTo).
+	buf := bytes.NewBuffer(make([]byte, 0, f.Size))
+	buf.Write(head)
+	if _, err := io.Copy(buf, io.LimitReader(f, f.Size-int64(len(head)))); err != nil {
+		a.fail(w, r, err)
 		return
 	}
 
-	// Decoding is the one thing here that costs memory and CPU in earnest;
-	// only so many run at once, and the rest wait within the request's time.
+	// Decoding also costs CPU: only so many run at once, whatever the memory
+	// allows, and the rest wait within the request's time.
 	select {
 	case a.thumbs <- struct{}{}:
 	case <-ctx.Done():
@@ -79,20 +97,24 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	}
 	out, err := thumb.Make(buf.Bytes(), size, a.cfg.ThumbnailMaxPixels)
 	<-a.thumbs
-	switch {
-	case errors.Is(err, thumb.ErrUnsupported):
-		probNotAnImage.write(w)
-		return
-	case errors.Is(err, thumb.ErrTooLarge):
-		probTooLarge.write(w)
-		return
-	case err != nil:
-		a.log.Warn("thumbnail failed", errAttrs(err)...)
-		probInternal.write(w)
+	if err != nil {
+		a.thumbProblem(w, err)
 		return
 	}
 	h.Set("Content-Type", "image/jpeg")
 	h.Set("Content-Length", strconv.Itoa(len(out)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(out)
+}
+
+func (a *API) thumbProblem(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, thumb.ErrUnsupported):
+		probNotAnImage.write(w)
+	case errors.Is(err, thumb.ErrTooLarge):
+		probTooLarge.write(w)
+	default:
+		a.log.Warn("thumbnail failed", errAttrs(err)...)
+		probInternal.write(w)
+	}
 }

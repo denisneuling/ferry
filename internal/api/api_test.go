@@ -36,6 +36,7 @@ func testConfig() config.Config {
 		ThumbnailMaxBytes:    8 << 20,
 		ThumbnailMaxPixels:   50_000_000,
 		ThumbnailConcurrency: 2,
+		ThumbnailMemory:      320 << 20,
 	}
 }
 

@@ -347,4 +347,13 @@ func TestThumbnail(t *testing.T) {
 	if res.StatusCode != 413 || problemCode(t, res) != "too_large" {
 		t.Fatalf("over the byte bound: %d", res.StatusCode)
 	}
+
+	// An image whose estimated cost exceeds the memory budget is refused
+	// before it is read.
+	h.api.cfg.ThumbnailMaxBytes = 8 << 20
+	h.api.cfg.ThumbnailMemory = 1 << 20
+	res = h.do(t, "GET", "/api/v1/shares/alex/thumbnail?path="+q(dir+"/photo.jpg"), nil, nil, c)
+	if res.StatusCode != 413 || problemCode(t, res) != "too_large" {
+		t.Fatalf("over the memory budget: %d", res.StatusCode)
+	}
 }

@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/semaphore"
+
 	v1 "github.com/metapatrol/ferry/api/v1"
 	"github.com/metapatrol/ferry/internal/config"
 	"github.com/metapatrol/ferry/internal/session"
@@ -36,21 +38,24 @@ type API struct {
 	login     LoginFunc
 	log       *slog.Logger
 	version   string
-	// thumbs admits FERRY_THUMBNAIL_CONCURRENCY thumbnail decodes at once.
-	thumbs chan struct{}
+	// thumbs admits FERRY_THUMBNAIL_CONCURRENCY thumbnail decodes at once;
+	// thumbMemory holds them within FERRY_THUMBNAIL_MEMORY together.
+	thumbs      chan struct{}
+	thumbMemory *semaphore.Weighted
 }
 
 // New makes the API. login is smb.Login outside tests.
 func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.Logger, version string) *API {
 	return &API{
-		cfg:       cfg,
-		sessions:  sessions,
-		byAddress: session.NewLimiter(cfg.LoginRatePerAddress, 10000, nil),
-		byUser:    session.NewLimiter(cfg.LoginRatePerUser, 10000, nil),
-		login:     login,
-		log:       log,
-		version:   version,
-		thumbs:    make(chan struct{}, max(1, cfg.ThumbnailConcurrency)),
+		cfg:         cfg,
+		sessions:    sessions,
+		byAddress:   session.NewLimiter(cfg.LoginRatePerAddress, 10000, nil),
+		byUser:      session.NewLimiter(cfg.LoginRatePerUser, 10000, nil),
+		login:       login,
+		log:         log,
+		version:     version,
+		thumbs:      make(chan struct{}, max(1, cfg.ThumbnailConcurrency)),
+		thumbMemory: semaphore.NewWeighted(max(1, cfg.ThumbnailMemory)),
 	}
 }
 

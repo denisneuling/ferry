@@ -44,13 +44,15 @@ type Config struct {
 	StallTimeout time.Duration
 
 	MaxUpload int64 // FERRY_MAX_UPLOAD, bytes; 0: no limit
-	// Thumbnails bound what one costs and how many are made at once: the
-	// bytes read (FERRY_THUMBNAIL_MAX_BYTES), the pixels decoded
-	// (FERRY_THUMBNAIL_MAX_PIXELS) and the decodes in parallel
-	// (FERRY_THUMBNAIL_CONCURRENCY). A 12-megapixel photo takes about 30 MB
-	// and a quarter of a second of one core.
+	// Thumbnails bound what one costs and what all cost together: the bytes
+	// read (FERRY_THUMBNAIL_MAX_BYTES), the pixels decoded
+	// (FERRY_THUMBNAIL_MAX_PIXELS), the memory all thumbnails in the making
+	// may take, by their estimates (FERRY_THUMBNAIL_MEMORY), and the decodes
+	// in parallel (FERRY_THUMBNAIL_CONCURRENCY). docs/operations.md has the
+	// measurements.
 	ThumbnailMaxBytes    int64
 	ThumbnailMaxPixels   int
+	ThumbnailMemory      int64
 	ThumbnailConcurrency int
 	MaxListing           int // FERRY_MAX_LISTING: entries in one folder, and in a recursive delete
 
@@ -92,6 +94,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		MaxListing:           10000,
 		ThumbnailMaxBytes:    64 << 20,
 		ThumbnailMaxPixels:   50_000_000,
+		ThumbnailMemory:      320 << 20,
 		ThumbnailConcurrency: 2,
 		LoginRatePerAddress:  10,
 		LoginRatePerUser:     5,
@@ -173,6 +176,13 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			fail("FERRY_THUMBNAIL_MAX_BYTES", fmt.Errorf("%q is not a positive byte count like 64Mi", v))
 		}
 		c.ThumbnailMaxBytes = n
+	}
+	if v := getenv("FERRY_THUMBNAIL_MEMORY"); v != "" {
+		n, err := parseBytes(v)
+		if err != nil || n == 0 {
+			fail("FERRY_THUMBNAIL_MEMORY", fmt.Errorf("%q is not a positive byte count like 320Mi", v))
+		}
+		c.ThumbnailMemory = n
 	}
 	for _, s := range strings.Split(getenv("FERRY_TRUSTED_PROXIES"), ",") {
 		if s = strings.TrimSpace(s); s == "" {

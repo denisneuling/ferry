@@ -30,6 +30,49 @@ var (
 	ErrTooLarge = errors.New("thumb: the image is too large")
 )
 
+// HeaderBytes is how much of a file Estimate needs: enough for the header
+// of every format Make reads, and for the metadata a camera writes before a
+// JPEG's frame header.
+const HeaderBytes = 1 << 20
+
+// Estimate returns how much memory making a thumbnail of a file of size
+// bytes takes at most, from its first bytes (head, up to HeaderBytes): the
+// file itself, the decoded image — its pixels times the bytes per pixel of
+// its colour model, 4:4:4 assumed for JPEG — and a margin for the reduced
+// copy and the encoder. It refuses what Make would refuse, the same way, so
+// the cost is known before the file is read. TestMemoryAtTheLimit checks it
+// against measured peaks.
+func Estimate(head []byte, size int64, maxPixels int) (int64, error) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(head))
+	if err != nil {
+		return 0, ErrUnsupported
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxPixels/cfg.Height {
+		return 0, ErrTooLarge
+	}
+	decoded := int64(cfg.Width) * int64(cfg.Height) * bytesPerPixel(cfg.ColorModel)
+	return size + decoded + decoded/4 + 16<<20, nil
+}
+
+func bytesPerPixel(m color.Model) int64 {
+	switch m {
+	case color.GrayModel, color.AlphaModel:
+		return 1
+	case color.Gray16Model, color.Alpha16Model:
+		return 2
+	case color.YCbCrModel:
+		return 3 // 4:4:4; 4:2:0 needs half of it
+	case color.NYCbCrAModel:
+		return 4
+	case color.RGBAModel, color.NRGBAModel, color.CMYKModel:
+		return 4
+	}
+	if _, ok := m.(color.Palette); ok {
+		return 1
+	}
+	return 8 // 16-bit RGBA, and anything unknown
+}
+
 // Make returns a JPEG of the image in src that fits in a size×size square,
 // upright, never larger than the original. Images with transparency are put
 // on white.
@@ -61,17 +104,18 @@ func Make(src []byte, size, maxPixels int) ([]byte, error) {
 		tw, th = th, tw
 	}
 
-	// A JPEG is first reduced by whole blocks on its own planes: averaging
-	// k×k pixels is cheap and does not alias, and it leaves CatmullRom a
-	// small image to finish. On a 12-megapixel photo that halves the time
-	// (BenchmarkPhoto).
-	if y, ok := img.(*image.YCbCr); ok {
-		if k := min(w/(2*tw), h/(2*th)); orientation >= 5 {
-			if k2 := min(b.Dx()/(2*th), b.Dy()/(2*tw)); k2 >= 2 {
-				img = boxYCbCr(y, k2)
-			}
-		} else if k >= 2 {
+	// The image is first reduced by whole blocks: averaging k×k pixels is
+	// cheap and does not alias, and it leaves CatmullRom a small image to
+	// finish. That matters for memory as much as for time: CatmullRom keeps
+	// a buffer of 32 bytes per pixel of the target's width times the
+	// source's height, over 100 MB for a 50-megapixel source; after the
+	// reduction it is a few. tw×th is the thumbnail in the source's
+	// orientation here.
+	if k := min(b.Dx()/(2*tw), b.Dy()/(2*th)); k >= 2 {
+		if y, ok := img.(*image.YCbCr); ok {
 			img = boxYCbCr(y, k)
+		} else {
+			img = boxRGBA(img, k)
 		}
 		b = img.Bounds()
 	}
@@ -87,6 +131,73 @@ func Make(src []byte, size, maxPixels int) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// boxRGBA shrinks any image by an integer factor k into premultiplied RGBA,
+// averaging k×k blocks. Every type the decoders produce is read from its
+// pixel array: going through At would allocate a colour per pixel, which at
+// 50 megapixels is hundreds of megabytes of garbage. Anything else falls
+// back to At.
+func boxRGBA(src image.Image, k int) *image.RGBA {
+	sb := src.Bounds()
+	w, h := sb.Dx()/k, sb.Dy()/k
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	n := uint32(k * k)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var r, g, bl, a uint32
+			for dy := 0; dy < k; dy++ {
+				sy := sb.Min.Y + y*k + dy
+				for dx := 0; dx < k; dx++ {
+					sx := sb.Min.X + x*k + dx
+					switch s := src.(type) {
+					case *image.NRGBA:
+						i := s.PixOffset(sx, sy)
+						pa := uint32(s.Pix[i+3])
+						r += uint32(s.Pix[i]) * pa / 255
+						g += uint32(s.Pix[i+1]) * pa / 255
+						bl += uint32(s.Pix[i+2]) * pa / 255
+						a += pa
+					case *image.RGBA:
+						i := s.PixOffset(sx, sy)
+						r += uint32(s.Pix[i])
+						g += uint32(s.Pix[i+1])
+						bl += uint32(s.Pix[i+2])
+						a += uint32(s.Pix[i+3])
+					case *image.Gray:
+						v := uint32(s.Pix[s.PixOffset(sx, sy)])
+						r, g, bl, a = r+v, g+v, bl+v, a+255
+					case *image.NRGBA64:
+						// The high bytes are enough for a thumbnail.
+						i := s.PixOffset(sx, sy)
+						pa := uint32(s.Pix[i+6])
+						r += uint32(s.Pix[i]) * pa / 255
+						g += uint32(s.Pix[i+2]) * pa / 255
+						bl += uint32(s.Pix[i+4]) * pa / 255
+						a += pa
+					case *image.RGBA64:
+						i := s.PixOffset(sx, sy)
+						r += uint32(s.Pix[i])
+						g += uint32(s.Pix[i+2])
+						bl += uint32(s.Pix[i+4])
+						a += uint32(s.Pix[i+6])
+					case *image.Gray16:
+						v := uint32(s.Pix[s.PixOffset(sx, sy)])
+						r, g, bl, a = r+v, g+v, bl+v, a+255
+					case *image.Paletted:
+						cr, cg, cb, ca := s.Palette[s.Pix[s.PixOffset(sx, sy)]].RGBA()
+						r, g, bl, a = r+cr>>8, g+cg>>8, bl+cb>>8, a+ca>>8
+					default:
+						cr, cg, cb, ca := src.At(sx, sy).RGBA()
+						r, g, bl, a = r+cr>>8, g+cg>>8, bl+cb>>8, a+ca>>8
+					}
+				}
+			}
+			i := dst.PixOffset(x, y)
+			dst.Pix[i], dst.Pix[i+1], dst.Pix[i+2], dst.Pix[i+3] = byte(r/n), byte(g/n), byte(bl/n), byte(a/n)
+		}
+	}
+	return dst
 }
 
 // boxYCbCr shrinks a YCbCr image by an integer factor k, averaging k×k
