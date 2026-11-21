@@ -17,6 +17,7 @@
 
 <p align="center">
   <a href="CONCEPT.md">Concept</a> ·
+  <a href="docs/interface.md">Interface</a> ·
   <a href="docs/configuration.md">Configuration</a> ·
   <a href="docs/operations.md">Operations</a> ·
   <a href="docs/samba.md">Samba</a> ·
@@ -28,9 +29,9 @@
 
 ---
 
-> **Status:** early development. The design is settled ([CONCEPT.md](CONCEPT.md))
-> and the interface's look is approved ([docs/mockup/](docs/mockup/index.html));
-> the service is being built. There is no release yet.
+> **Status:** early development, no release yet. The service and its
+> interface work against Samba ([CONCEPT.md](CONCEPT.md) §9, milestones 1–3);
+> metrics, traces and the Helm chart (milestone 4) are next.
 
 ## Why
 
@@ -94,18 +95,17 @@ SMB2/3; TLS termination (the gateway in front does it).
 ## Quick start
 
 ```sh
-make dev-samba               # a test Samba on :4445 (podman; CONTAINER=docker)
-make test-samba lint         # the tests against it, and the linters
-make run                     # ferry on :8095 against it: log in as alex / alex-test-password
+make dev-nas            # a mock household NAS with sample files on :4455 (podman; CONTAINER=docker)
+make ui-build run-nas   # ferry with its interface on http://localhost:8095: alex / alex-nas-demo
 ```
 
 ```sh
-curl -s localhost:8095/api/v1/info
+make test-samba lint ui-test ui-lint   # the tests (against `make dev-samba`) and the linters
 ```
 
-The interface is not built in yet; the API is at `/api/v1`
-([api/openapi/ferry-v1.yaml](api/openapi/ferry-v1.yaml)), configured as in
-[docs/configuration.md](docs/configuration.md).
+The API is [api/openapi/ferry-v1.yaml](api/openapi/ferry-v1.yaml), the
+settings are in [docs/configuration.md](docs/configuration.md), the
+interface is described in [docs/interface.md](docs/interface.md).
 
 ## Contributing
 

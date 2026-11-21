@@ -16,6 +16,7 @@ import (
 	"github.com/metapatrol/ferry/internal/api"
 	"github.com/metapatrol/ferry/internal/config"
 	"github.com/metapatrol/ferry/internal/session"
+	"github.com/metapatrol/ferry/internal/ui"
 )
 
 // Server is ferry's HTTP side.
@@ -32,12 +33,8 @@ type Server struct {
 func New(cfg config.Config, sessions *session.Table, a *api.API, log *slog.Logger) *Server {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", a.Handler())
-	// The interface is served here from milestone 3 on; until then the root
-	// says what this is.
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte("ferry: the interface is not built into this binary yet; the API is at /api/v1\n"))
-	})
+	// Everything else is the interface, and its routes.
+	mux.Handle("/", ui.Handler())
 
 	ops := http.NewServeMux()
 	ops.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {

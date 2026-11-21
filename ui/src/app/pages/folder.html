@@ -1,0 +1,313 @@
+<header class="top">
+  <div class="heading">
+    <nav class="crumbs" aria-label="Where you are" i18n-aria-label="@@crumbs">
+      <a routerLink="/" i18n="@@shares">Shares</a>
+      @if (browser.path()) {
+        <f-icon name="right" [size]="14" />
+        <button type="button" (click)="go('')">{{ browser.share() }}</button>
+        @for (c of crumbs(); track c.path) {
+          <f-icon name="right" [size]="14" />
+          <button type="button" (click)="go(c.path)">{{ c.name }}</button>
+        }
+      }
+    </nav>
+    <h1>{{ browser.title() }}</h1>
+    <div class="meta">
+      @if (browser.entries()) {
+        <ng-container i18n="@@count">{count(), plural, =1 {1 item} other {{{ count() }} items}}</ng-container>
+        @if (browser.filter()) {
+          · <ng-container i18n="@@matching">{{ browser.visible().length }} matching</ng-container>
+        }
+      }
+    </div>
+  </div>
+  <div class="tools">
+    <label class="search">
+      <f-icon name="search" [size]="17" />
+      <span class="sr-only" i18n="@@search.label">Search this folder</span>
+      <input
+        #search
+        type="search"
+        [value]="browser.filter()"
+        (input)="setFilter(search.value)"
+        placeholder="Search this folder"
+        i18n-placeholder="@@search.ph"
+      />
+    </label>
+    <div class="seg" role="group" aria-label="View" i18n-aria-label="@@view">
+      <button
+        type="button"
+        [class.on]="prefs.view() === 'grid'"
+        [attr.aria-pressed]="prefs.view() === 'grid'"
+        (click)="prefs.view.set('grid')"
+        title="Tiles"
+        i18n-title="@@view.grid"
+      >
+        <f-icon name="grid" [size]="17" />
+      </button>
+      <button
+        type="button"
+        [class.on]="prefs.view() === 'list'"
+        [attr.aria-pressed]="prefs.view() === 'list'"
+        (click)="prefs.view.set('list')"
+        title="List"
+        i18n-title="@@view.list"
+      >
+        <f-icon name="list" [size]="17" />
+      </button>
+    </div>
+    <button class="btn" type="button" (click)="actions.mkdir()">
+      <f-icon name="folderPlus" [size]="17" /><ng-container i18n="@@newFolder">New folder</ng-container>
+    </button>
+    <button class="btn primary" type="button" (click)="pick()">
+      <f-icon name="upload" [size]="17" /><ng-container i18n="@@upload">Upload</ng-container>
+    </button>
+    <input #picker type="file" multiple hidden (change)="picked(picker)" />
+  </div>
+</header>
+
+@if (selecting()) {
+  <div class="selbar" role="toolbar" aria-label="Selection" i18n-aria-label="@@selection">
+    <b i18n="@@selected">{{ browser.selected().size }} selected</b>
+    <button type="button" (click)="actions.download(browser.selection())">
+      <f-icon name="download" [size]="17" /><span i18n="@@act.download">Download</span>
+    </button>
+    @if (browser.selected().size === 1) {
+      <button type="button" (click)="actions.rename(browser.selection()[0])">
+        <f-icon name="pencil" [size]="17" /><span i18n="@@act.rename">Rename</span>
+      </button>
+    }
+    <button type="button" (click)="actions.move(browser.selection())">
+      <f-icon name="move" [size]="17" /><span i18n="@@act.move">Move</span>
+    </button>
+    <button type="button" class="danger" (click)="actions.remove(browser.selection())">
+      <f-icon name="trash" [size]="17" /><span i18n="@@act.delete">Delete</span>
+    </button>
+    <button
+      type="button"
+      (click)="browser.clear()"
+      title="Clear selection"
+      i18n-title="@@clearSel"
+      aria-label="Clear selection"
+      i18n-aria-label="@@clearSel"
+    >
+      <f-icon name="x" />
+    </button>
+  </div>
+}
+
+<section class="content" [class.selecting]="selecting()">
+  @if (browser.error(); as err) {
+    <div class="error-pane">
+      <f-icon [name]="browser.errorCode() === 'access_denied' ? 'lock' : 'info'" [size]="48" [stroke]="1.3" />
+      @if (browser.errorCode() === 'access_denied') {
+        <b i18n="@@folder.denied">You have no access here</b>
+        <ng-container i18n="@@folder.deniedText"
+          >The NAS does not let your account open this. Ask whoever looks after the NAS if you need
+          it.</ng-container
+        >
+      } @else if (browser.errorCode() === 'not_found') {
+        <b i18n="@@folder.gone">This folder is not there</b>{{ err }}
+      } @else {
+        <b i18n="@@folder.error">This folder cannot be shown</b>{{ err }}
+      }
+      <br />
+      <button class="btn" type="button" (click)="up()">
+        <f-icon name="left" [size]="17" /><ng-container i18n="@@back">Back</ng-container>
+      </button>
+    </div>
+  } @else if (!browser.entries()) {
+    <p class="loading" i18n="@@loading">Loading…</p>
+  } @else if (!browser.visible().length) {
+    <div class="empty">
+      @if (browser.filter()) {
+        <f-icon name="search" [size]="56" [stroke]="1.2" />
+        <b i18n="@@empty.none">Nothing found</b>
+        <ng-container i18n="@@empty.noneText"
+          >No name in this folder contains “{{ browser.filter() }}”.</ng-container
+        >
+      } @else {
+        <f-icon name="folder" [size]="56" [stroke]="1.2" />
+        <b i18n="@@empty.empty">This folder is empty</b>
+        <ng-container i18n="@@empty.emptyText">Drag files here or use “Upload”.</ng-container>
+      }
+    </div>
+  } @else if (prefs.view() === 'grid') {
+    @if (browser.folders().length) {
+      <div class="section-label" i18n="@@sec.folders">Folders</div>
+      <div class="folders">
+        @for (e of browser.folders(); track e.name) {
+          <button
+            type="button"
+            class="folder"
+            [class.is-sel]="browser.selected().has(e.name)"
+            [attr.aria-pressed]="selecting() ? browser.selected().has(e.name) : null"
+            (click)="click(e, $event)"
+            (contextmenu)="contextMenu(e, $event)"
+            (pointerdown)="pointerDown(e, $event)"
+            (pointerup)="pointerEnd()"
+            (pointercancel)="pointerEnd()"
+            (pointerleave)="pointerEnd()"
+          >
+            <span class="fi"><f-icon name="folder" [size]="22" /></span>
+            <div>
+              <b>{{ e.name }}</b><small>{{ format.date(e.modified) }}</small>
+            </div>
+            <span
+              class="check"
+              (click)="check(e, $event)"
+              role="checkbox"
+              [attr.aria-checked]="browser.selected().has(e.name)"
+              aria-label="Select"
+              i18n-aria-label="@@select"
+              ><f-icon name="check" [size]="14" [stroke]="3"
+            /></span>
+          </button>
+        }
+      </div>
+    }
+    @if (browser.files().length) {
+      <div class="section-label" i18n="@@sec.files">Files</div>
+      <div class="grid">
+        @for (e of browser.files(); track e.name) {
+          <button
+            type="button"
+            class="tile"
+            [class.is-sel]="browser.selected().has(e.name)"
+            [attr.aria-pressed]="selecting() ? browser.selected().has(e.name) : null"
+            (click)="click(e, $event)"
+            (contextmenu)="contextMenu(e, $event)"
+            (pointerdown)="pointerDown(e, $event)"
+            (pointerup)="pointerEnd()"
+            (pointercancel)="pointerEnd()"
+            (pointerleave)="pointerEnd()"
+          >
+            @if (thumb(e); as src) {
+              <div class="pic"><img loading="lazy" [src]="src" alt="" (error)="thumbFailed(e)" /></div>
+            } @else {
+              <div class="pic"><f-icon [name]="icon(e)" [size]="34" [stroke]="1.4" /></div>
+            }
+            <span
+              class="check"
+              (click)="check(e, $event)"
+              role="checkbox"
+              [attr.aria-checked]="browser.selected().has(e.name)"
+              aria-label="Select"
+              i18n-aria-label="@@select"
+              ><f-icon name="check" [size]="14" [stroke]="3"
+            /></span>
+            <p class="name">{{ e.name }}</p>
+            <p class="sub">{{ format.date(e.modified) }} · {{ format.size(e.size) }}</p>
+          </button>
+        }
+      </div>
+    }
+  } @else {
+    <table class="table">
+      <thead>
+        <tr>
+          <th>
+            <button
+              type="button"
+              class="cb"
+              [class.is-sel]="browser.selected().size && browser.selected().size === browser.visible().length"
+              (click)="toggleAll()"
+              aria-label="Select all"
+              i18n-aria-label="@@selectAll"
+            >
+              <f-icon name="check" [size]="13" [stroke]="3" />
+            </button>
+          </th>
+          <th
+            [attr.aria-sort]="
+              browser.sort() === 'name' ? (browser.desc() ? 'descending' : 'ascending') : null
+            "
+          >
+            <button type="button" [class.on]="browser.sort() === 'name'" (click)="sortBy('name')">
+              <ng-container i18n="@@col.name">Name</ng-container
+              >{{ browser.sort() === 'name' ? (browser.desc() ? ' ↓' : ' ↑') : '' }}
+            </button>
+          </th>
+          <th
+            class="mod"
+            [attr.aria-sort]="
+              browser.sort() === 'modified' ? (browser.desc() ? 'descending' : 'ascending') : null
+            "
+          >
+            <button type="button" [class.on]="browser.sort() === 'modified'" (click)="sortBy('modified')">
+              <ng-container i18n="@@col.mod">Modified</ng-container
+              >{{ browser.sort() === 'modified' ? (browser.desc() ? ' ↓' : ' ↑') : '' }}
+            </button>
+          </th>
+          <th
+            [attr.aria-sort]="
+              browser.sort() === 'size' ? (browser.desc() ? 'descending' : 'ascending') : null
+            "
+          >
+            <button type="button" [class.on]="browser.sort() === 'size'" (click)="sortBy('size')">
+              <ng-container i18n="@@col.size">Size</ng-container
+              >{{ browser.sort() === 'size' ? (browser.desc() ? ' ↓' : ' ↑') : '' }}
+            </button>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (e of browser.visible(); track e.name) {
+          <tr
+            class="row"
+            [class.is-sel]="browser.selected().has(e.name)"
+            (click)="click(e, $event)"
+            (contextmenu)="contextMenu(e, $event)"
+            (dblclick)="open(e)"
+            (pointerdown)="pointerDown(e, $event)"
+            (pointerup)="pointerEnd()"
+            (pointercancel)="pointerEnd()"
+            (pointerleave)="pointerEnd()"
+          >
+            <td>
+              <span
+                class="cb"
+                (click)="check(e, $event)"
+                role="checkbox"
+                [attr.aria-checked]="browser.selected().has(e.name)"
+                aria-label="Select"
+                i18n-aria-label="@@select"
+                ><f-icon name="check" [size]="13" [stroke]="3"
+              /></span>
+            </td>
+            <td class="name">
+              <div>
+                @if (thumb(e); as src) {
+                  <span class="mini"><img loading="lazy" [src]="src" alt="" (error)="thumbFailed(e)" /></span>
+                } @else {
+                  <span class="mini" [class.dir]="e.type === 'folder'"><f-icon [name]="icon(e)" /></span>
+                }
+                <span>{{ e.name }}</span>
+              </div>
+            </td>
+            <td class="mod">{{ format.date(e.modified) }}</td>
+            <td>{{ e.type === 'folder' ? '' : format.size(e.size) }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
+
+<button class="fab" type="button" (click)="pick()" aria-label="Upload" i18n-aria-label="@@upload">
+  <f-icon name="upload" [size]="24" [stroke]="2" />
+</button>
+
+@if (dragging()) {
+  <div class="drop">
+    <div>
+      <f-icon name="upload" [size]="46" [stroke]="1.5" />
+      <b i18n="@@drop.title">Release to upload</b>
+      <ng-container i18n="@@drop.to">to “{{ browser.title() }}”</ng-container>
+    </div>
+  </div>
+}
+
+@if (menu(); as m) {
+  <f-menu [x]="m.x" [y]="m.y" [items]="m.items" (closed)="menu.set(null)" />
+}

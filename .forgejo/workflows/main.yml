@@ -163,6 +163,7 @@ jobs:
           SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-12)
           BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           podman --storage-driver=vfs build --tls-verify=false --network host \
+            --build-arg NODE_IMAGE="$REGISTRY/library/node:24-alpine" \
             --build-arg GO_IMAGE="$REGISTRY/library/golang:$GO_VERSION-alpine" \
             --build-arg VERSION="$COMMIT" \
             --build-arg COMMIT="$COMMIT" \

@@ -19,7 +19,10 @@ import (
 // contentCSP is the policy of every file ferry serves. `sandbox` puts the
 // document in a unique origin with scripts, forms and plugins off, so even a
 // file the browser renders cannot act in ferry's origin.
-const contentCSP = "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'"
+//
+// frame-ancestors 'self' lets ferry's own interface show a PDF in a frame;
+// no other site may frame a file.
+const contentCSP = "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'self'"
 
 // inlineTypes are the media types a browser may show itself, with
 // disposition=inline. Anything not listed — HTML, SVG, XML, scripts — goes as
@@ -126,6 +129,7 @@ func (a *API) GetContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 	}
 	h := w.Header()
 	h.Set("Content-Security-Policy", contentCSP)
+	h.Set("X-Frame-Options", "SAMEORIGIN")
 	h.Set("Content-Type", ctype)
 	h.Set("Content-Disposition", disposition(kind, name))
 	h.Set("ETag", tag)

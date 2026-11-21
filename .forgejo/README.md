@@ -6,14 +6,13 @@ learned about this Forgejo instance in one repository applies to the others.
 
 | workflow | runs on | does |
 |---|---|---|
-| `ci.yml` | pull requests, and pushes to develop | secret scan, lint (with the generated API code and the OpenAPI spec), tests with the race detector against a Samba the job starts |
+| `ci.yml` | pull requests, and pushes to develop | secret scan, lint (with the generated API code and the OpenAPI spec), the interface's lint, i18n check, tests and build, tests with the race detector against a Samba the job starts |
 | `main.yml` | pushes to main | the checks again; once releases are unlocked, the image from the commit and semantic-release |
 | `release.yml` | a `v*` tag, and `workflow_dispatch` | refuse while releases are locked; otherwise validate the tag, test, the tagged image, the Forgejo release, binaries |
 
 The repository starts with the Go service only. The jobs for the parts that
 follow are added with them, from websearch's workflows:
 
-- the interface's lint, i18n check, tests and build (`ui`), with `ui/`;
 - chart lint, render and docs (`helm`), and the charts in `release.yml`,
   with `charts/`.
 
@@ -22,7 +21,7 @@ follow are added with them, from websearch's workflows:
 A cheap check gates an expensive one:
 
     ci.yml       secret-scan ─┐
-                 lint ────────┴─> test
+                 lint ────────┴─> test, ui
 
     main.yml     config, secret-scan, lint ─> verify ─┬─> image
                                                      └─> semantic-release

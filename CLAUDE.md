@@ -67,8 +67,12 @@ is English.
   the table, timeouts and rate limits; `internal/api` translates and maps
   errors. No SMB in handlers beyond calling `internal/smb`.
 - The interface is ferry's own layout, "Hafen" from `docs/mockup/`, not the
-  metapatrol shell. Its fonts (Fraunces, DM Sans) are served by ferry itself;
-  nothing loads from a third-party origin at runtime.
+  metapatrol shell, and has its own small components (dialogs on the native
+  `<dialog>`, menu, toasts, lightbox) — no `@metapatrol/*` packages, so the
+  public repository builds with `npm ci` alone. Its global stylesheet
+  (`ui/src/styles.css`) keeps the mockup's rules nearly as they are, so the
+  two can be compared. The fonts (Fraunces, DM Sans, @fontsource) are served
+  by ferry itself; nothing loads from a third-party origin at runtime.
 - The interface speaks English and German (`@angular/localize`, as faber):
   every text marked (`i18n`, `` $localize ``), its German in the du-form in
   `ui/src/locale/messages.de.json`; `make ui-i18n` keeps the extracted texts
@@ -93,6 +97,8 @@ is English.
     make dev-nas run-nas         # the mock NAS with sample files, and ferry against it
     make dev-nas-check           # that the mock NAS is what hack/mock-nas/README.md says
     make generate-api lint-api   # after changing the spec
+    make ui-install ui-lint ui-i18n ui-test ui-build   # the interface (Node 24: nvm use 24)
+    make ui-start                # the interface with live reload on :4200, against run-nas
     make build-ferry             # the binary, into bin/
 
 The SMB tests skip without `FERRY_TEST_SMB_SERVER` (and

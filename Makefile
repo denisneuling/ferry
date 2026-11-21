@@ -34,6 +34,7 @@ RUN_LISTEN ?= :8095
 RUN_OPS_LISTEN ?= :8096
 
 .PHONY: build test test-samba lint clean build-all changelog release install-tools ci \
+	ui-install ui-build ui-lint ui-test ui-i18n ui-start \
 	run run-nas generate-api lint-api dev-samba dev-samba-stop dev-nas dev-nas-stop dev-nas-check secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -59,12 +60,13 @@ lint: lint-api
 clean:
 	rm -rf bin/
 
-# What CI checks on a pull request, in the order it checks it.
+# What CI checks on a pull request for the Go side, in the order it checks
+# it. The interface has its own job (ui-lint ui-i18n ui-test ui-build).
 ci: secret-scan lint test
 
 # ferry on http://localhost:8095 against the Samba from `make dev-samba`
 # (log in as alex / alex-test-password), health on :8096. The interface is
-# not built in yet; the API is at /api/v1.
+# there after `make ui-build`; for work on it, `make ui-start`.
 run:
 	FERRY_SMB_SERVER=$${FERRY_SMB_SERVER:-$(FERRY_TEST_SMB_SERVER)} \
 	FERRY_SERVER_NAME=$${FERRY_SERVER_NAME:-nas.example.lan} \
@@ -133,6 +135,36 @@ build-all:
 				-o bin/$$bin-linux-$$arch ./cmd/$$bin || exit 1; \
 		done; \
 	done
+
+# ── The interface (Angular, ui/) ─────────────────────────────────────────
+# Needs Node.js >= 22.22.3 (ui/.nvmrc: 24). No private registry and no token:
+# every package is public.
+
+ui-install:
+	cd ui && npm ci --no-audit --no-fund
+
+# Builds the interface into internal/ui/dist/app — once per language — which
+# is embedded into the binary. Build ferry afterwards.
+ui-build: ui-install
+	cd ui && npm run build
+
+ui-lint:
+	cd ui && npm run lint
+
+ui-test:
+	cd ui && npm test
+
+# The texts to translate, as extracted, must be committed as they are; a
+# German one missing fails ui-build.
+ui-i18n:
+	cd ui && npm run extract-i18n
+	cd ui && git diff --exit-code -- src/locale/messages.json \
+		|| { echo "ERROR: src/locale/messages.json is out of date: run make ui-i18n, add the German to messages.de.json"; exit 1; }
+
+# The interface with live reload on http://localhost:4200, against the ferry
+# of `make run` or `make run-nas`.
+ui-start:
+	cd ui && npm start -- --port 4200
 
 # ── Generated code ─────────────────────────────────────────────────────────
 

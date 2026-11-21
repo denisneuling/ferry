@@ -42,7 +42,9 @@ func TestHeadersAndRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = res.Body.Close()
-	if res.StatusCode != 200 || res.Header.Get("X-Frame-Options") != "DENY" || res.Header.Get("X-Content-Type-Options") != "nosniff" {
+	// Built or not, the interface's answers carry its CSP and the headers.
+	if res.Header.Get("X-Frame-Options") != "DENY" || res.Header.Get("X-Content-Type-Options") != "nosniff" ||
+		!strings.Contains(res.Header.Get("Content-Security-Policy"), "script-src 'self'") {
 		t.Fatalf("root: %d %v", res.StatusCode, res.Header)
 	}
 	res, err = http.Get(srv.URL + "/api/v1/info")
