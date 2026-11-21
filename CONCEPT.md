@@ -226,7 +226,10 @@ be tried without a backend.
   No usernames or paths as labels.
 - OTEL traces per request. SMB calls are spans, and their attributes carry
   neither credentials nor file names.
-- `charts/ferry-grafana-dashboard` as in the other projects.
+- The metrics are on the probe port, which the chart names `metrics` at the
+  Service; how they are scraped — and whether a dashboard shows them — is
+  the installation's choice. ferry ships no dashboard and no scrape
+  configuration.
 
 ---
 
@@ -268,7 +271,6 @@ internal/session/           session table, timeouts, rate limits
 internal/api/               REST handlers, problem responses, streaming
 ui/                         the interface
 charts/ferry/               Helm chart
-charts/ferry-grafana-dashboard/
 ```
 
 - **Tooling:**
@@ -301,8 +303,9 @@ Filestash for a week before Filestash goes.
 2. **Core.** The OpenAPI spec, the file API, sessions, limits, problem
    responses, tests against a Samba container.
 3. **Interface.** The screens of §5 in the chosen look, English and German.
-4. **Operations.** Metrics, traces, the Helm chart and the dashboard. Rollout on
-   the first deployment in parallel to Filestash.
+4. **Operations.** Metrics, traces, the Helm chart, and the public image and
+   chart on GitHub's registry. Rollout on the first deployment in parallel
+   to Filestash.
 5. **Later, if wanted:**
    - download a folder as a streamed ZIP;
    - a live, bounded filename search below a folder;

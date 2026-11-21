@@ -3,13 +3,13 @@
 # One job per phase: this instance serves no job logs over its API, so the name
 # of the job that goes red is the diagnosis.
 #
-#   gate -> validate -> test -> image -> notes -> binaries
+#   gate -> validate -> test -> image -> notes ─┬─> binaries
+#                                               └─> chart
 #
 # Releases are locked until the maintainer makes the first one deliberately:
 # `gate` fails unless the repository variable RELEASES_ENABLED is `true`, so a
 # tag pushed by hand publishes nothing either. See .forgejo/README.md,
-# *Releases are locked*. The charts join `notes` as a sibling of `binaries`
-# when they exist.
+# *Releases are locked*.
 #
 # No release is made until the image is pushed: `notes` creates the Forgejo
 # release, and a release for a version whose image does not exist is worse
@@ -251,3 +251,53 @@ jobs:
             echo "$BIN asset: HTTP $HTTP"
             echo "$HTTP" | grep -qE "^(200|201)$"
           done
+
+  chart:
+    needs: notes
+    runs-on: docker
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+      ZOT_URL: ${{ vars.ZOT_URL }}
+      ZOT_USERNAME: ${{ vars.ZOT_USERNAME }}
+      ZOT_TOKEN: ${{ secrets.ZOT_TOKEN }}
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - uses: https://data.forgejo.org/actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Package, push and attach the chart
+        run: |
+          set -eux
+          M=""
+          for t in jq curl; do command -v $t >/dev/null || M="$M $t"; done
+          [ -z "$M" ] || (apt-get update -qq && apt-get install -y -qq $M)
+
+          # get.helm.sh resets the connection from this runner; the module
+          # proxy answers, so helm is built rather than downloaded.
+          go install helm.sh/helm/v3/cmd/helm@v3.16.3
+          export PATH="$PATH:$(go env GOPATH)/bin"
+
+          VERSION="${TAG#v}"
+          REGISTRY=$(echo "$ZOT_URL" | sed 's|https://||')
+          set +x
+          echo "$ZOT_TOKEN" | helm registry login "$REGISTRY" \
+            --username "$ZOT_USERNAME" --password-stdin --insecure
+          set -x
+
+          RELEASE_ID=$(curl -k -sf -H "Authorization: token $AUTOMATION_TOKEN" \
+            "$FORGEJO_BASE_URL/api/v1/repos/$FORGEJO_REPO/releases/tags/$TAG" | jq -r '.id')
+          [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]
+
+          helm package charts/ferry --version "$VERSION" --app-version "$VERSION" -d /tmp/
+          CHART_TGZ=/tmp/ferry-$VERSION.tgz
+          helm push "$CHART_TGZ" "oci://$REGISTRY/charts/mdvc" --insecure-skip-tls-verify
+          HTTP=$(curl -k -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: token $AUTOMATION_TOKEN" -H "Content-Type: application/octet-stream" \
+            --data-binary "@$CHART_TGZ" \
+            "$FORGEJO_BASE_URL/api/v1/repos/$FORGEJO_REPO/releases/$RELEASE_ID/assets?name=$(basename $CHART_TGZ)")
+          echo "chart asset: HTTP $HTTP"
+          echo "$HTTP" | grep -qE "^(200|201)$"

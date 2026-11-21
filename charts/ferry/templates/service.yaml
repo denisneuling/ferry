@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ferry.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ferry.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "ferry.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+    # /metrics for Prometheus, and the probes. How the installation scrapes
+    # it — a ServiceMonitor, annotations, a static target — is its own choice.
+    - name: metrics
+      port: {{ .Values.service.metricsPort }}
+      targetPort: metrics
+      protocol: TCP

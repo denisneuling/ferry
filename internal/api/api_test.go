@@ -53,7 +53,7 @@ func newHarness(t testing.TB, cfg config.Config, login LoginFunc) *harness {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	tab := session.New(session.Options{IdleTimeout: cfg.IdleTimeout, Lifetime: cfg.SessionLifetime, MaxSessions: cfg.MaxSessions})
-	a := New(cfg, tab, login, log, "test")
+	a := New(cfg, tab, login, log, "test", nil)
 	srv := httptest.NewServer(a.Handler())
 	t.Cleanup(func() { srv.Close(); tab.CloseAll() })
 	return &harness{srv: srv, log: &buf, api: a, tab: tab}
@@ -261,7 +261,7 @@ func TestLogoutWithoutSession(t *testing.T) {
 func TestClientAddr(t *testing.T) {
 	cfg := testConfig()
 	cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("192.0.2.0/24")}
-	a := New(cfg, nil, nil, slog.Default(), "")
+	a := New(cfg, nil, nil, slog.Default(), "", nil)
 	cases := []struct{ remote, xff, want string }{
 		{"198.51.100.7:5000", "203.0.113.9", "198.51.100.7"},           // untrusted peer: its header is ignored
 		{"192.0.2.1:5000", "203.0.113.9", "203.0.113.9"},               // trusted proxy
@@ -284,7 +284,7 @@ func TestClientAddr(t *testing.T) {
 
 func TestSecureCookie(t *testing.T) {
 	cfg := testConfig()
-	a := New(cfg, nil, nil, slog.Default(), "")
+	a := New(cfg, nil, nil, slog.Default(), "", nil)
 	r := httptest.NewRequest("POST", "/", nil)
 	w := httptest.NewRecorder()
 	a.setCookie(w, r, "id")

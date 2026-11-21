@@ -7,9 +7,7 @@
 # The cheap checks gate the expensive ones:
 #
 #   secret-scan ─┐
-#   lint ────────┴─> test, ui
-#
-# The charts (helm) get their job when they exist; see .forgejo/README.md. `runs-on: docker` names a runner *label*, not an image.
+#   lint ────────┴─> test, ui, helm `runs-on: docker` names a runner *label*, not an image.
 name: ci
 
 # A ref is built once. Branch work is built through its pull request; develop
@@ -124,3 +122,32 @@ jobs:
         run: make ui-i18n
       - run: make ui-test
       - run: make ui-build
+
+  helm:
+    needs: [secret-scan, lint]
+    runs-on: docker
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+      - uses: https://data.forgejo.org/actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      # get.helm.sh resets the connection from this runner, so both tools come
+      # through the module proxy, which answers.
+      - name: Install helm and helm-docs
+        run: |
+          set -eu
+          HELM_DOCS=$(grep '^HELM_DOCS_VERSION' Makefile | cut -d= -f2 | tr -d ' ')
+          go install helm.sh/helm/v3/cmd/helm@v3.16.3
+          go install github.com/norwoodj/helm-docs/cmd/helm-docs@$HELM_DOCS
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Lint and render the chart
+        run: make helm-lint
+      - name: The chart README must be current
+        run: |
+          set -eu
+          make helm-docs
+          if ! git diff --exit-code -- charts/; then
+            echo "ERROR: the chart README is out of date. Run: make helm-docs"
+            exit 1
+          fi

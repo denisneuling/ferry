@@ -48,7 +48,9 @@ const defaultLoginTimeout = 10 * time.Second
 // credentials. It succeeds only if the server authenticated them as a named
 // user: a guest or anonymous session is closed again and reported as
 // KindGuest, however the server came to offer it.
-func Login(ctx context.Context, opts LoginOptions, cred Credentials) (*Session, error) {
+func Login(ctx context.Context, opts LoginOptions, cred Credentials) (_ *Session, err error) {
+	ctx, done := span(ctx, "smb.login")
+	defer func() { done(err) }()
 	// An empty user name asks for an anonymous session by definition. It is
 	// refused before the server is asked, so that no server configuration can
 	// turn it into a session.
@@ -230,7 +232,7 @@ type Share struct {
 // The server may list shares the user cannot open. Shares does not try them:
 // whether a share opens is decided when it is opened, by the server.
 func (s *Session) Shares(ctx context.Context) ([]Share, error) {
-	c, err := s.start(ctx)
+	c, err := s.start(ctx, "smb.shares")
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +295,7 @@ func (s *Session) ReadDir(ctx context.Context, share, p string, max int) ([]Entr
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.start(ctx)
+	c, err := s.start(ctx, "smb.readdir")
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +360,9 @@ type File struct {
 }
 
 // Open opens a file for reading. A folder is KindIsDir.
-func (s *Session) Open(ctx context.Context, share, p string) (*File, error) {
+func (s *Session) Open(ctx context.Context, share, p string) (_ *File, err error) {
+	ctx, done := span(ctx, "smb.open")
+	defer func() { done(err) }()
 	sp, err := CleanPath(p)
 	if err != nil {
 		return nil, err

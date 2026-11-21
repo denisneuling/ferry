@@ -1,0 +1,15 @@
+ferry logs people in to {{ .Values.smb.server }} with their own SMB accounts.
+
+{{- if .Values.ingress.enabled }}
+It is reachable at:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/
+{{- end }}
+{{- else }}
+To try it:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "ferry.fullname" . }} 8080:{{ .Values.service.port }}
+  open http://localhost:8080/
+{{- end }}
+
+Metrics are on the Service's port "metrics" ({{ .Values.service.metricsPort }}), path /metrics.
+Sessions live in memory: a restart or an upgrade logs everyone out.

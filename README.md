@@ -17,7 +17,9 @@
 
 <p align="center">
   <a href="CONCEPT.md">Concept</a> ·
+  <a href="docs/installation.md">Installation</a> ·
   <a href="docs/interface.md">Interface</a> ·
+  <a href="charts/ferry/README.md">Helm chart</a> ·
   <a href="docs/configuration.md">Configuration</a> ·
   <a href="docs/operations.md">Operations</a> ·
   <a href="docs/samba.md">Samba</a> ·
@@ -29,9 +31,9 @@
 
 ---
 
-> **Status:** early development, no release yet. The service and its
-> interface work against Samba ([CONCEPT.md](CONCEPT.md) §9, milestones 1–3);
-> metrics, traces and the Helm chart (milestone 4) are next.
+> **Status:** early development, no release yet. The service, its
+> interface, metrics, traces and the Helm chart are there
+> ([CONCEPT.md](CONCEPT.md) §9, milestones 1–4); the first release is next.
 
 ## Why
 
@@ -91,6 +93,15 @@ Not in scope: user, group, password or share administration (Samba's job);
 sharing links, guest access and public URLs; sync clients, WebDAV and apps;
 indexed search; editing documents in the browser; backends other than
 SMB2/3; TLS termination (the gateway in front does it).
+
+## Installation
+
+```sh
+helm install ferry oci://ghcr.io/metapatrol/charts/ferry --set smb.server=nas.example.lan
+```
+
+[docs/installation.md](docs/installation.md) has TLS, the trusted proxies,
+memory and running without Kubernetes.
 
 ## Quick start
 

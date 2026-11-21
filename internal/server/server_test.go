@@ -15,11 +15,19 @@ import (
 
 	"github.com/metapatrol/ferry/internal/api"
 	"github.com/metapatrol/ferry/internal/config"
+	"github.com/metapatrol/ferry/internal/metrics"
 	"github.com/metapatrol/ferry/internal/session"
 	"github.com/metapatrol/ferry/internal/smb"
 )
 
 func newTestServer(t *testing.T, smbServer string, log *slog.Logger) *httptest.Server {
+	srv, _ := newTestServers(t, smbServer, log)
+	return srv
+}
+
+// newTestServers starts the public listener and the operations listener,
+// with metrics.
+func newTestServers(t *testing.T, smbServer string, log *slog.Logger) (*httptest.Server, *httptest.Server) {
 	t.Helper()
 	cfg := config.Config{
 		SMBServer: smbServer, ServerName: "nas.example.lan",
@@ -29,10 +37,17 @@ func newTestServer(t *testing.T, smbServer string, log *slog.Logger) *httptest.S
 		MaxListing: 1000, LoginRatePerAddress: 100, LoginRatePerUser: 100, CookieSecure: "auto",
 	}
 	tab := session.New(session.Options{IdleTimeout: cfg.IdleTimeout, Lifetime: cfg.SessionLifetime, MaxSessions: cfg.MaxSessions})
-	s := New(cfg, tab, api.New(cfg, tab, smb.Login, log, "test"), log)
+	var a *api.API
+	m := metrics.New("test", "abc", metrics.Gauges{
+		Sessions:        tab.Len,
+		ThumbnailMemory: func() (int64, int64) { return a.ThumbnailMemory() },
+	})
+	a = api.New(cfg, tab, smb.Login, log, "test", m)
+	s := New(cfg, tab, a, m, log)
 	srv := httptest.NewServer(s.public.Handler)
-	t.Cleanup(func() { srv.Close(); tab.CloseAll() })
-	return srv
+	ops := httptest.NewServer(s.ops.Handler)
+	t.Cleanup(func() { srv.Close(); ops.Close(); tab.CloseAll() })
+	return srv, ops
 }
 
 func TestHeadersAndRoot(t *testing.T) {
@@ -66,7 +81,7 @@ func TestPathsNeverLogged(t *testing.T) {
 		t.Skip("FERRY_TEST_SMB_SERVER is not set (make dev-samba)")
 	}
 	var buf bytes.Buffer
-	srv := newTestServer(t, addr, slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	srv, ops := newTestServers(t, addr, slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	client := srv.Client()
 	ferry := map[string]string{"X-Ferry-Request": "1", "Content-Type": "application/json"}
 	do := func(method, path, body string, hdr map[string]string, cookie *http.Cookie) *http.Response {
@@ -115,6 +130,33 @@ func TestPathsNeverLogged(t *testing.T) {
 	}
 	// Ranged and stalled-style answers through the same stack.
 	do("GET", "/api/v1/shares/alex/content?path="+q("hello.txt"), "", map[string]string{"Range": "bytes=999-"}, c)
+
+	// The metrics: what happened is there, what it happened to is not.
+	res, err := http.Get(ops.URL + "/metrics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scrape, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	for _, want := range []string{
+		`ferry_logins_total{outcome="ok"} 1`,
+		`ferry_sessions 1`,
+		`ferry_http_requests_total{code="201",method="PUT",route="PUT /api/v1/shares/{share}/content"} 1`,
+		`ferry_transfer_bytes_total{direction="up"} 12`,
+		`ferry_smb_errors_total{kind="access_denied"}`,
+		`ferry_smb_errors_total{kind="not_found"}`,
+		`ferry_thumbnail_memory_limit_bytes`,
+		`ferry_build_info{commit="abc",version="test"} 1`,
+	} {
+		if !strings.Contains(string(scrape), want) {
+			t.Errorf("the metrics lack %s", want)
+		}
+	}
+	for _, secret := range []string{"Pfadwaechter", "alex", "Ordner"} {
+		if strings.Contains(string(scrape), secret) {
+			t.Errorf("%q appears in the metrics", secret)
+		}
+	}
 
 	log := buf.String()
 	if strings.Count(log, `"route":"`) < 15 {

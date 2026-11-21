@@ -17,9 +17,11 @@ import (
 
 	"github.com/metapatrol/ferry/internal/api"
 	"github.com/metapatrol/ferry/internal/config"
+	"github.com/metapatrol/ferry/internal/metrics"
 	"github.com/metapatrol/ferry/internal/server"
 	"github.com/metapatrol/ferry/internal/session"
 	"github.com/metapatrol/ferry/internal/smb"
+	"github.com/metapatrol/ferry/internal/tracing"
 )
 
 // Set at build time through -ldflags (Makefile, Dockerfile, release.yml).
@@ -80,11 +82,22 @@ func serve(args []string, stderr io.Writer) int {
 		Lifetime:    cfg.SessionLifetime,
 		MaxSessions: cfg.MaxSessions,
 	})
-	a := api.New(cfg, sessions, smb.Login, log, version)
-	srv := server.New(cfg, sessions, a, log)
+	var a *api.API
+	m := metrics.New(version, commit, metrics.Gauges{
+		Sessions:        sessions.Len,
+		ThumbnailMemory: func() (int64, int64) { return a.ThumbnailMemory() },
+	})
+	a = api.New(cfg, sessions, smb.Login, log, version, m)
+	srv := server.New(cfg, sessions, a, m, log)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	stopTracing, err := tracing.Init(ctx, version)
+	if err != nil {
+		log.Error("ferry cannot start", "err", err)
+		return 1
+	}
+	defer stopTracing()
 	if err := srv.Run(ctx); err != nil {
 		log.Error("ferry stopped", "err", err)
 		return 1

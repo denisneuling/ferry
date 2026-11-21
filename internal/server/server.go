@@ -4,6 +4,10 @@
 package server
 
 import (
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"context"
 	"errors"
 	"log/slog"
@@ -15,7 +19,9 @@ import (
 
 	"github.com/metapatrol/ferry/internal/api"
 	"github.com/metapatrol/ferry/internal/config"
+	"github.com/metapatrol/ferry/internal/metrics"
 	"github.com/metapatrol/ferry/internal/session"
+	"github.com/metapatrol/ferry/internal/tracing"
 	"github.com/metapatrol/ferry/internal/ui"
 )
 
@@ -28,9 +34,9 @@ type Server struct {
 	ops      *http.Server
 }
 
-// New wires the API onto the public listener and the probes onto the
-// operations listener.
-func New(cfg config.Config, sessions *session.Table, a *api.API, log *slog.Logger) *Server {
+// New wires the API onto the public listener, and the probes and the
+// metrics onto the operations listener. m may be nil.
+func New(cfg config.Config, sessions *session.Table, a *api.API, m *metrics.Metrics, log *slog.Logger) *Server {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", a.Handler())
 	// Everything else is the interface, and its routes.
@@ -41,12 +47,15 @@ func New(cfg config.Config, sessions *session.Table, a *api.API, log *slog.Logge
 		_, _ = w.Write([]byte("ok\n"))
 	})
 	ops.Handle("GET /readyz", newReadiness(cfg.SMBServer))
+	if m != nil {
+		ops.Handle("GET /metrics", m.Handler())
+	}
 
 	return &Server{
 		cfg:      cfg,
 		sessions: sessions,
 		log:      log,
-		public:   newHTTPServer(cfg.ListenAddr, recoverPanics(log, logRequests(log, securityHeaders(mux)))),
+		public:   newHTTPServer(cfg.ListenAddr, recoverPanics(log, observe(log, m, securityHeaders(mux)))),
 		ops:      newHTTPServer(cfg.OpsListenAddr, recoverPanics(log, ops)),
 	}
 }
@@ -147,18 +156,35 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 
 func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
-// logRequests logs one line per request: the route pattern — never the path
-// or the query, which carry share, folder and file names — the status, the
-// bytes and the time.
-func logRequests(log *slog.Logger, next http.Handler) http.Handler {
+// observe traces, counts and logs every request by its route pattern —
+// never by its path or query, which carry share, folder and file names: a
+// span named after the route, the request metrics, and a log line with the
+// status, the bytes and the time.
+func observe(log *slog.Logger, m *metrics.Metrics, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		ctx, span := tracing.Tracer().Start(r.Context(), "HTTP "+r.Method, trace.WithSpanKind(trace.SpanKindServer))
+		defer span.End()
+		r = r.WithContext(ctx)
 		rec := &statusRecorder{ResponseWriter: w}
 		next.ServeHTTP(rec, r)
 		route := r.Pattern
 		if route == "" {
 			route = "unmatched"
 		}
+		if rec.status == 0 {
+			rec.status = http.StatusOK
+		}
+		span.SetName(route)
+		span.SetAttributes(
+			attribute.String("http.request.method", r.Method),
+			attribute.String("http.route", route),
+			attribute.Int("http.response.status_code", rec.status),
+		)
+		if rec.status >= 500 {
+			span.SetStatus(codes.Error, http.StatusText(rec.status))
+		}
+		m.Request(r.Method, route, rec.status, time.Since(start))
 		log.Debug("request", "method", r.Method, "route", route, "status", rec.status,
 			"bytes", rec.bytes, "duration_ms", time.Since(start).Milliseconds())
 	})

@@ -8,6 +8,7 @@ The operations listener (`FERRY_OPS_LISTEN`, `:8081`) serves:
 |---|---|
 | `/healthz` | `200` while the process runs |
 | `/readyz` | `200` while the SMB server's port accepts a TCP connection, checked at most every five seconds; `503` otherwise |
+| `/metrics` | the Prometheus metrics below |
 
 `/readyz` failing takes ferry out of a Service's endpoints but does not
 restart it: the sessions it holds are worth keeping until the server is
@@ -95,4 +96,37 @@ not know — or the server maps wrong passwords to the guest account (`map to
 guest = Bad Password`) — and ferry refused the guest session the server
 offered.
 
-Metrics and traces follow with milestone 4.
+## Metrics
+
+On the operations listener, `/metrics`, for Prometheus to scrape; the chart
+names the Service port `metrics` and leaves the scraping to the
+installation. No label ever carries a user name, a share, a folder, a file
+name or a path: routes are patterns, errors are kinds from a fixed list
+(`TestPathsNeverLogged` scrapes the metrics too).
+
+| metric | type | labels | what |
+|---|---|---|---|
+| `ferry_sessions` | gauge | | sessions open now, each one SMB connection |
+| `ferry_logins_total` | counter | `outcome` | login attempts: `ok`, `auth`, `guest`, `unreachable`, `rate_limited`, `too_many_sessions`, `invalid`, `internal` |
+| `ferry_transfer_bytes_total` | counter | `direction` | file bytes `up` (uploads) and `down` (downloads and previews) |
+| `ferry_smb_errors_total` | counter | `kind` | SMB errors answered to a request: `access_denied`, `not_found`, `exists`, `busy`, `not_empty`, `not_dir`, `is_dir`, `invalid_path`, `limit`, `unreachable`, `session_lost`, `canceled`, `internal` |
+| `ferry_thumbnails_total` | counter | `outcome` | `made`, `not_modified`, `unsupported`, `too_large`, `failed` |
+| `ferry_thumbnail_memory_bytes` | gauge | | taken from the thumbnail budget now |
+| `ferry_thumbnail_memory_limit_bytes` | gauge | | the budget, `FERRY_THUMBNAIL_MEMORY` |
+| `ferry_http_requests_total` | counter | `method`, `route`, `code` | HTTP requests by route pattern, e.g. `GET /api/v1/shares/{share}/content` |
+| `ferry_http_request_duration_seconds` | histogram | `route` | their duration; a transfer counts until its last byte |
+| `ferry_build_info` | gauge | `version`, `commit` | always 1 |
+
+and the Go runtime's and the process's (`go_*`, `process_*`). Worth an
+alert: `guest` or `auth` logins rising fast (someone guessing), `session_lost`
+errors (the server dropping connections), memory near the limit.
+
+## Traces
+
+With `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`)
+set, ferry sends traces over OTLP/HTTP; the exporter reads the other
+standard `OTEL_*` variables as well. Every request is a span named by its
+route pattern, with its method and status; every SMB operation below it a
+span of its own (`smb.login`, `smb.readdir`, `smb.open`, `smb.upload`, …),
+marked failed with the error's kind. Like the metrics, spans name routes and
+operations, never what they act on: no URL, path, share, file or user name.

@@ -22,7 +22,7 @@ func (s *Session) Stat(ctx context.Context, share, p string) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	c, err := s.start(ctx)
+	c, err := s.start(ctx, "smb.stat")
 	if err != nil {
 		return Entry{}, err
 	}
@@ -55,7 +55,7 @@ func (s *Session) Mkdir(ctx context.Context, share, p string) (Entry, error) {
 	if sp == "" {
 		return Entry{}, &Error{Kind: KindExists}
 	}
-	c, err := s.start(ctx)
+	c, err := s.start(ctx, "smb.mkdir")
 	if err != nil {
 		return Entry{}, err
 	}
@@ -83,7 +83,7 @@ func (s *Session) Remove(ctx context.Context, share, p string, recursive bool, m
 		// The share's root is not deleted through ferry, recursively or not.
 		return &Error{Kind: KindAccessDenied}
 	}
-	c, err := s.start(ctx)
+	c, err := s.start(ctx, "smb.remove")
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (s *Session) Rename(ctx context.Context, share, from, to string, overwrite 
 	if strings.HasPrefix(strings.ToLower(st)+`\`, strings.ToLower(sf)+`\`) {
 		return Entry{}, &Error{Kind: KindInvalidPath}
 	}
-	c, err := s.start(ctx)
+	c, err := s.start(ctx, "smb.rename")
 	if err != nil {
 		return Entry{}, err
 	}
@@ -251,7 +251,9 @@ const UploadChunk = 1 << 20
 //
 // The request slot is taken per write, not for the whole upload: a slow
 // client must not hold up the same person's browsing.
-func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, overwrite bool, max int64) (Entry, error) {
+func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, overwrite bool, max int64) (_ Entry, err error) {
+	ctx, done := span(ctx, "smb.upload")
+	defer func() { done(err) }()
 	sp, err := CleanPath(p)
 	if err != nil {
 		return Entry{}, err

@@ -1,0 +1,142 @@
+{{- if not .Values.smb.server }}
+{{- fail "smb.server is required: the SMB server ferry logs people in to, e.g. nas.example.lan or nas.example.lan:445" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ferry.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ferry.labels" . | nindent 4 }}
+spec:
+  # One replica, deliberately: sessions live in the process's memory, and a
+  # second replica would not know them. A restart logs everyone out and loses
+  # nothing else.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ferry.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ferry.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # ferry never talks to the Kubernetes API.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: ferry
+          image: {{ include "ferry.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: [serve]
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: FERRY_LISTEN
+              value: ":8080"
+            - name: FERRY_OPS_LISTEN
+              value: ":8081"
+            - name: FERRY_SMB_SERVER
+              value: {{ .Values.smb.server | quote }}
+            {{- with .Values.smb.serverName }}
+            - name: FERRY_SERVER_NAME
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.smb.shares }}
+            - name: FERRY_SHARES
+              value: {{ join "," . | quote }}
+            {{- end }}
+            - name: FERRY_IDLE_TIMEOUT
+              value: {{ .Values.session.idleTimeout | quote }}
+            - name: FERRY_SESSION_LIFETIME
+              value: {{ .Values.session.lifetime | quote }}
+            - name: FERRY_MAX_SESSIONS
+              value: {{ .Values.session.maxSessions | quote }}
+            - name: FERRY_LOGIN_RATE_ADDRESS
+              value: {{ .Values.login.ratePerAddress | quote }}
+            - name: FERRY_LOGIN_RATE_USER
+              value: {{ .Values.login.ratePerUser | quote }}
+            - name: FERRY_LOGIN_TIMEOUT
+              value: {{ .Values.login.timeout | quote }}
+            - name: FERRY_MAX_UPLOAD
+              value: {{ .Values.limits.maxUpload | quote }}
+            - name: FERRY_MAX_LISTING
+              value: {{ .Values.limits.maxListing | quote }}
+            - name: FERRY_REQUEST_TIMEOUT
+              value: {{ .Values.limits.requestTimeout | quote }}
+            - name: FERRY_STALL_TIMEOUT
+              value: {{ .Values.limits.stallTimeout | quote }}
+            - name: FERRY_THUMBNAIL_MAX_BYTES
+              value: {{ .Values.thumbnails.maxBytes | quote }}
+            - name: FERRY_THUMBNAIL_MAX_PIXELS
+              value: {{ .Values.thumbnails.maxPixels | int64 | quote }}
+            - name: FERRY_THUMBNAIL_MEMORY
+              value: {{ .Values.thumbnails.memory | quote }}
+            - name: FERRY_THUMBNAIL_CONCURRENCY
+              value: {{ .Values.thumbnails.concurrency | quote }}
+            {{- with .Values.trustedProxies }}
+            - name: FERRY_TRUSTED_PROXIES
+              value: {{ join "," . | quote }}
+            {{- end }}
+            - name: FERRY_COOKIE_SECURE
+              value: {{ .Values.cookieSecure | quote }}
+            - name: FERRY_LOG_LEVEL
+              value: {{ .Values.log.level | quote }}
+            - name: FERRY_LOG_FORMAT
+              value: {{ .Values.log.format | quote }}
+            {{- with .Values.tracing.otlpEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.goMemLimit }}
+            - name: GOMEMLIMIT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          # /healthz is the process; /readyz whether the SMB server answers,
+          # which takes ferry out of the Service without restarting it.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: metrics
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

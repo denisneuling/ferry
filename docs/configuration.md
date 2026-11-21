@@ -46,6 +46,15 @@ session setup and kept nowhere.
 | `FERRY_REQUEST_TIMEOUT` | `60s` | Every API request but uploads and downloads; and each single SMB call, of transfers too. A call the SMB server does not answer within it ends the session: a connection cancelled in the middle of a request cannot be trusted (docs/spike.md). |
 | `FERRY_STALL_TIMEOUT` | `60s` | An upload or download ends when no bytes move for this long, in either direction — whether the client or the SMB server stopped. Its total duration is not bounded. |
 
+## Telemetry
+
+| variable | default | meaning |
+|---|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | none | Where to send traces, over OTLP/HTTP; without it (and without `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) ferry sends none. The other standard `OTEL_*` variables apply too. [operations.md](operations.md#traces) |
+| `GOMEMLIMIT` | none | The Go runtime's soft memory limit; set it a little below the container's memory limit ([operations.md](operations.md#sizing-the-limit)). The chart sets 450MiB. |
+
+The metrics need no setting: they are on `FERRY_OPS_LISTEN`, path `/metrics`.
+
 ## Logging
 
 | variable | default | meaning |

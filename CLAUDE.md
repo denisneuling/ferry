@@ -90,6 +90,10 @@ is English.
 - Keep the set complete: a new variable goes into `docs/configuration.md` and
   the chart; a changed value into the chart's README (`make helm-docs`); a new
   metric into `docs/operations.md`.
+- The chart makes no assumption about the installation's monitoring: the
+  Service names its `metrics` port, and nothing else — no ServiceMonitor, no
+  scrape annotations, no dashboard. One replica, always: sessions are in
+  memory.
 - Diagrams are Mermaid, in Markdown.
 - Comments say why, in full sentences, in the voice of the surrounding code.
 
@@ -104,6 +108,7 @@ is English.
     make generate-api lint-api   # after changing the spec
     make ui-install ui-lint ui-i18n ui-test ui-build   # the interface (Node 24: nvm use 24)
     make ui-start                # the interface with live reload on :4200, against run-nas
+    make helm-lint helm-docs     # the chart, after changing it or its values
     make build-ferry             # the binary, into bin/
 
 The SMB tests skip without `FERRY_TEST_SMB_SERVER` (and

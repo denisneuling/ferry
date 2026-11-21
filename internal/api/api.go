@@ -18,10 +18,13 @@ import (
 	"strings"
 	"time"
 
+	"sync/atomic"
+
 	"golang.org/x/sync/semaphore"
 
 	v1 "github.com/metapatrol/ferry/api/v1"
 	"github.com/metapatrol/ferry/internal/config"
+	"github.com/metapatrol/ferry/internal/metrics"
 	"github.com/metapatrol/ferry/internal/session"
 	"github.com/metapatrol/ferry/internal/smb"
 )
@@ -39,14 +42,18 @@ type API struct {
 	log       *slog.Logger
 	version   string
 	// thumbs admits FERRY_THUMBNAIL_CONCURRENCY thumbnail decodes at once;
-	// thumbMemory holds them within FERRY_THUMBNAIL_MEMORY together.
+	// thumbMemory holds them within FERRY_THUMBNAIL_MEMORY together, and
+	// thumbUsed is what it holds now, for the metrics.
 	thumbs      chan struct{}
 	thumbMemory *semaphore.Weighted
+	thumbUsed   atomic.Int64
+	metrics     *metrics.Metrics
 }
 
-// New makes the API. login is smb.Login outside tests.
-func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.Logger, version string) *API {
+// New makes the API. login is smb.Login outside tests; m may be nil.
+func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.Logger, version string, m *metrics.Metrics) *API {
 	return &API{
+		metrics:     m,
 		cfg:         cfg,
 		sessions:    sessions,
 		byAddress:   session.NewLimiter(cfg.LoginRatePerAddress, 10000, nil),
@@ -249,6 +256,7 @@ func (a *API) Login(w http.ResponseWriter, r *http.Request, _ v1.LoginParams) {
 		return
 	}
 	if req.Username == "" || req.Password == "" || len(req.Username) > maxUsername || len(req.Password) > maxPassword {
+		a.metrics.Login("invalid")
 		probInvalidRequest.write(w)
 		return
 	}
@@ -274,6 +282,7 @@ func (a *API) Login(w http.ResponseWriter, r *http.Request, _ v1.LoginParams) {
 		// person may have mistyped their password into.
 		a.log.Info("login refused", append(errAttrs(err), "outcome", smb.KindOf(err).String(), "client", addr,
 			"duration_ms", time.Since(start).Milliseconds())...)
+		a.metrics.Login(smb.KindOf(err).String())
 		smbProblem(err).write(w)
 		return
 	}
@@ -286,14 +295,17 @@ func (a *API) Login(w http.ResponseWriter, r *http.Request, _ v1.LoginParams) {
 		_ = conn.Close()
 		if errors.Is(err, session.ErrFull) {
 			a.log.Warn("login refused", "outcome", "too_many_sessions", "client", addr)
+			a.metrics.Login("too_many_sessions")
 			probTooManySessions.write(w)
 			return
 		}
 		a.log.Error("login failed", append(errAttrs(err), "outcome", "internal")...)
+		a.metrics.Login("internal")
 		probInternal.write(w)
 		return
 	}
 	a.log.Info("login", "outcome", "ok", "client", addr, "duration_ms", time.Since(start).Milliseconds())
+	a.metrics.Login("ok")
 	a.setCookie(w, r, id)
 	writeJSON(w, http.StatusOK, a.me(s))
 }
@@ -311,6 +323,7 @@ func (a *API) rateLimited(w http.ResponseWriter, wait time.Duration, by string) 
 	secs := int(wait/time.Second) + 1
 	w.Header().Set("Retry-After", strconv.Itoa(secs))
 	a.log.Info("login refused", "outcome", "rate_limited", "by", by)
+	a.metrics.Login("rate_limited")
 	probRateLimited.write(w)
 }
 
@@ -359,11 +372,17 @@ func (a *API) fail(w http.ResponseWriter, r *http.Request, err error) {
 		a.sessions.Delete(sessionID(r))
 		a.clearCookie(w, r)
 	}
+	a.metrics.SMBError(smb.KindOf(err).String())
 	p := smbProblem(err)
 	if p.status >= 500 {
 		a.log.Warn("request failed", append(errAttrs(err), "route", r.Pattern)...)
 	}
 	p.write(w)
+}
+
+// ThumbnailMemory is what the thumbnail budget holds now, and the budget.
+func (a *API) ThumbnailMemory() (used, limit int64) {
+	return a.thumbUsed.Load(), a.cfg.ThumbnailMemory
 }
 
 // errAttrs describes an error for the log without its text. An error from

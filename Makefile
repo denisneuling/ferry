@@ -9,6 +9,7 @@ HELM_DOCS_VERSION ?= v1.14.2
 REDOCLY_CLI_VERSION ?= 2.54.2
 
 BINARIES := ferry
+CHARTS := charts/ferry
 
 # The test Samba (hack/samba): fictional users and shares, including the
 # `map to guest = Bad User` setting ferry has to refuse. podman by default, as
@@ -34,7 +35,7 @@ RUN_LISTEN ?= :8095
 RUN_OPS_LISTEN ?= :8096
 
 .PHONY: build test test-samba lint clean build-all changelog release install-tools ci \
-	ui-install ui-build ui-lint ui-test ui-i18n ui-start \
+	ui-install ui-build ui-lint ui-test ui-i18n ui-start helm-lint helm-docs helm-package \
 	run run-nas generate-api lint-api dev-samba dev-samba-stop dev-nas dev-nas-stop dev-nas-check secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -62,7 +63,7 @@ clean:
 
 # What CI checks on a pull request for the Go side, in the order it checks
 # it. The interface has its own job (ui-lint ui-i18n ui-test ui-build).
-ci: secret-scan lint test
+ci: secret-scan lint test helm-lint
 
 # ferry on http://localhost:8095 against the Samba from `make dev-samba`
 # (log in as alex / alex-test-password), health on :8096. The interface is
@@ -182,6 +183,29 @@ lint-api:
 install-tools:
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	go install github.com/norwoodj/helm-docs/cmd/helm-docs@$(HELM_DOCS_VERSION)
+
+# ── Helm chart ─────────────────────────────────────────────────────────────
+
+# The chart with each of its ci/*-values.yaml. It must also refuse to render
+# without an SMB server: a ferry with nothing to log in to is a mistake that
+# should fail at install time, not at the first login.
+helm-lint:
+	@for chart in $(CHARTS); do \
+		for f in $$chart/ci/*-values.yaml; do \
+			helm lint $$chart -f $$f && helm template $$chart -f $$f > /dev/null || exit 1; \
+		done; \
+	done
+	@if helm template charts/ferry > /dev/null 2>&1; then \
+		echo "ERROR: charts/ferry rendered without smb.server"; exit 1; \
+	fi
+
+# The chart README from values.yaml.
+helm-docs:
+	@for chart in $(CHARTS); do helm-docs --chart-search-root $$chart --output-file README.md --log-level warning; done
+
+helm-package:
+	@mkdir -p bin
+	@for chart in $(CHARTS); do helm package $$chart --destination bin/ || exit 1; done
 
 # ── Releases ───────────────────────────────────────────────────────────────
 

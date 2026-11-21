@@ -169,6 +169,7 @@ func (a *API) GetContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 		return
 	}
 	n, err := copyOut(w, f, length, wd, a.cfg.StallTimeout)
+	a.metrics.Down(n)
 	if err != nil && n < length {
 		// The status is sent; all that is left is to stop. The client sees
 		// a short body against its Content-Length.
@@ -303,6 +304,7 @@ func (a *API) PutContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 	defer wd.stop()
 	body := &stallReader{r: r.Body, rc: http.NewResponseController(w), wd: wd, stall: a.cfg.StallTimeout}
 	e, err := conn.Upload(wd.ctx, share, p, body, params.Overwrite != nil && *params.Overwrite, a.cfg.MaxUpload)
+	a.metrics.Up(body.n)
 	if err != nil {
 		if smb.KindOf(err) == smb.KindLimit {
 			// Read no more of an oversized body, and tell the client so.
@@ -324,10 +326,13 @@ type stallReader struct {
 	rc    *http.ResponseController
 	wd    *watchdog
 	stall time.Duration
+	n     int64 // bytes read, for the metrics
 }
 
 func (s *stallReader) Read(p []byte) (int, error) {
 	s.wd.kick(s.stall)
 	_ = s.rc.SetReadDeadline(time.Now().Add(s.stall))
-	return s.r.Read(p)
+	n, err := s.r.Read(p)
+	s.n += int64(n)
+	return n, err
 }

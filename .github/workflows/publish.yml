@@ -1,0 +1,209 @@
+# What the GitHub mirror publishes for everyone outside the private network.
+# linux/amd64 images.
+#
+# The repository lives on Forgejo, which builds, tests and releases it
+# (.forgejo/workflows). GitHub gets a push mirror of it: branches and tags
+# arrive as pushes, and this workflow builds the same sources from them. It
+# decides nothing — versions are semantic-release's, on Forgejo; a tag
+# arriving here is only built.
+#
+# Forgejo reads .forgejo/workflows and ignores this directory.
+#
+#   ghcr.io/metapatrol/ferry
+#     :1.0.0 :1.0 :latest     from a release tag
+#     :main :<short sha>      from main
+#   oci://ghcr.io/metapatrol/charts/ferry
+#     :1.0.0                  from a release tag
+#   a GitHub release with the binaries and the chart, from a release tag
+#
+# Nothing runs for develop: before the first release, made deliberately on
+# Forgejo (.forgejo/README.md, "Releases are locked"), main and the tags are
+# untouched, so GitHub builds nothing. After the first run, the container
+# package and the chart are made public by hand in GitHub's package settings
+# — ghcr.io creates them private.
+#
+# The interface's packages are all public, so the image builds with npm ci
+# alone: no registry to point at, no token.
+#
+# A release tagged before this workflow existed is built by running it by hand
+# with that tag: the tag's source, this commit's Dockerfile.
+name: publish
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build, e.g. v1.0.0. Empty builds the branch it runs on.
+        required: false
+        default: ""
+      latest:
+        description: Also tag it latest — for the newest release only.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: publish-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: "1.27"
+  NODE_VERSION: "24"
+  HELM_VERSION: v3.16.3
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Build arguments
+        id: args
+        run: |
+          # This workflow's own Dockerfile, which a tag built by hand may predate.
+          git fetch -q --depth=1 origin "$GITHUB_SHA"
+          git show "$GITHUB_SHA:Dockerfile" > "$RUNNER_TEMP/Dockerfile"
+
+          ref="${TAG:-$GITHUB_REF_NAME}"
+          commit=$(git rev-parse HEAD)
+          # ghcr.io wants the owner in lower case.
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ferry" >> "$GITHUB_OUTPUT"
+          echo "revision=$commit" >> "$GITHUB_OUTPUT"
+          echo "commit=${commit::7}" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          if [[ -n "$TAG" || "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=$ref" >> "$GITHUB_OUTPUT"
+            echo "version=${ref#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${commit::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.args.outputs.image }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.args.outputs.tag }},enable=${{ steps.args.outputs.tag != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.args.outputs.tag }},enable=${{ steps.args.outputs.tag != '' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || inputs.latest == true }}
+            type=ref,event=branch,enable=${{ inputs.tag == '' }}
+            type=raw,value=${{ steps.args.outputs.commit }}
+          labels: |
+            org.opencontainers.image.title=ferry
+            org.opencontainers.image.description=SMB shares in the browser: log in with your Samba account, and see exactly what Samba lets you see.
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.revision=${{ steps.args.outputs.revision }}
+            org.opencontainers.image.version=${{ steps.args.outputs.version }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ runner.temp }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.args.outputs.version }}
+            COMMIT=${{ steps.args.outputs.commit }}
+            BUILT_AT=${{ steps.args.outputs.built_at }}
+            NODE_IMAGE=docker.io/library/node:${{ env.NODE_VERSION }}-alpine
+            GO_IMAGE=docker.io/library/golang:${{ env.GO_VERSION }}-alpine
+          cache-from: type=gha,scope=ferry
+          cache-to: type=gha,scope=ferry,mode=max
+
+  # The chart, the binaries and the GitHub release, for release tags only.
+  # After the image: a release whose image does not exist is worse than none.
+  release:
+    needs: image
+    if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Version
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "not a release tag: $TAG"; exit 1; }
+          commit=$(git rev-parse HEAD)
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+          echo "COMMIT=${commit::7}" >> "$GITHUB_ENV"
+          echo "BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+      # ferry embeds its interface, so the interface is built first.
+      - name: Binaries
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          make ui-install ui-build
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH=$arch go build -trimpath \
+              -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.builtAt=$BUILT_AT" \
+              -o "dist/ferry-linux-$arch" ./cmd/ferry
+          done
+          (cd dist && sha256sum ferry-linux-* > SHA256SUMS)
+
+      - name: Chart
+        env:
+          OWNER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # The released chart points at the public image by default, with the
+          # release as its appVersion: an installation sets nothing to get it.
+          grep -q "^  repository: ghcr.io/${OWNER,,}/ferry$" charts/ferry/values.yaml
+          helm package charts/ferry --version "$VERSION" --app-version "$VERSION" -d dist
+          helm push "dist/ferry-$VERSION.tgz" "oci://ghcr.io/${OWNER,,}/charts"
+
+      - name: Release notes
+        run: |
+          # This version's section of the changelog semantic-release wrote,
+          # with links into the private Forgejo pointed at this repository.
+          awk -v v="$VERSION" '
+            /^#+ \[?[0-9]+\.[0-9]+\.[0-9]+/ { if (on) exit; if (index($0, "[" v "]")) { on = 1; next } }
+            on { print }' CHANGELOG.md \
+            | sed -E "s#https?://[^/)]+/mdvc/ferry/#https://github.com/${GITHUB_REPOSITORY}/#g" > dist/notes.md
+          [ -s dist/notes.md ] || echo "Release $TAG" > dist/notes.md
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          assets=(dist/ferry-linux-* dist/SHA256SUMS dist/ferry-*.tgz)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file dist/notes.md --verify-tag "${assets[@]}"
+          fi

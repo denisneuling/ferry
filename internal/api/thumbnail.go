@@ -48,10 +48,12 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	h.Set("ETag", tag)
 	h.Set("Cache-Control", "private, no-cache")
 	if inm := r.Header.Get("If-None-Match"); inm != "" && etagMatches(inm, tag) {
+		a.metrics.Thumbnail("not_modified")
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 	if f.Size > a.cfg.ThumbnailMaxBytes {
+		a.metrics.Thumbnail("too_large")
 		probTooLarge.write(w)
 		return
 	}
@@ -76,7 +78,11 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		probUnreachable.write(w)
 		return
 	}
-	defer a.thumbMemory.Release(cost)
+	a.thumbUsed.Add(cost)
+	defer func() {
+		a.thumbUsed.Add(-cost)
+		a.thumbMemory.Release(cost)
+	}()
 
 	// The rest of the image: into a buffer of the file's size, filled by the
 	// file's own 1 MiB reads (io.Copy takes File.WriteTo).
@@ -101,6 +107,7 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		a.thumbProblem(w, err)
 		return
 	}
+	a.metrics.Thumbnail("made")
 	h.Set("Content-Type", "image/jpeg")
 	h.Set("Content-Length", strconv.Itoa(len(out)))
 	w.WriteHeader(http.StatusOK)
@@ -110,10 +117,13 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 func (a *API) thumbProblem(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, thumb.ErrUnsupported):
+		a.metrics.Thumbnail("unsupported")
 		probNotAnImage.write(w)
 	case errors.Is(err, thumb.ErrTooLarge):
+		a.metrics.Thumbnail("too_large")
 		probTooLarge.write(w)
 	default:
+		a.metrics.Thumbnail("failed")
 		a.log.Warn("thumbnail failed", errAttrs(err)...)
 		probInternal.write(w)
 	}

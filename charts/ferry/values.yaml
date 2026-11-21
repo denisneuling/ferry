@@ -1,0 +1,124 @@
+# ferry has no users, no database and no secrets of its own: what it needs is
+# the SMB server to log people in to. docs/configuration.md describes every
+# setting; the values here map onto it.
+
+image:
+  # -- The image; the default is the public one the GitHub mirror publishes.
+  repository: ghcr.io/metapatrol/ferry
+  # -- The tag; empty means the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# -- Secrets for pulling from a private registry.
+imagePullSecrets: []
+
+smb:
+  # -- (required) The SMB server, `host` or `host:port` (FERRY_SMB_SERVER).
+  server: ""
+  # -- What the login page calls the server; the host of `smb.server` when empty (FERRY_SERVER_NAME).
+  serverName: ""
+  # -- The shares this ferry offers, compared without case; empty offers all the server lists (FERRY_SHARES).
+  shares: []
+
+session:
+  # -- A session without a request for this long ends (FERRY_IDLE_TIMEOUT).
+  idleTimeout: 30m
+  # -- A session ends this long after its login, whatever its activity (FERRY_SESSION_LIFETIME).
+  lifetime: 12h
+  # -- Sessions at most, each one SMB connection (FERRY_MAX_SESSIONS).
+  maxSessions: 200
+
+login:
+  # -- Login attempts per minute from one client address (FERRY_LOGIN_RATE_ADDRESS).
+  ratePerAddress: 10
+  # -- Login attempts per minute for one username (FERRY_LOGIN_RATE_USER).
+  ratePerUser: 5
+  # -- Connecting and the session setup together (FERRY_LOGIN_TIMEOUT).
+  timeout: 10s
+
+limits:
+  # -- The largest upload, e.g. `4Gi`; `0` for none (FERRY_MAX_UPLOAD).
+  maxUpload: "0"
+  # -- Entries in one folder listing and one recursive delete (FERRY_MAX_LISTING).
+  maxListing: 10000
+  # -- Every API request but transfers, and each single SMB call (FERRY_REQUEST_TIMEOUT).
+  requestTimeout: 60s
+  # -- A transfer that moves no bytes for this long ends (FERRY_STALL_TIMEOUT).
+  stallTimeout: 60s
+
+thumbnails:
+  # -- The largest image read for a thumbnail (FERRY_THUMBNAIL_MAX_BYTES).
+  maxBytes: 64Mi
+  # -- The most pixels an image may have to be decoded (FERRY_THUMBNAIL_MAX_PIXELS).
+  maxPixels: 50000000
+  # -- The memory all thumbnails in the making may take, by estimate (FERRY_THUMBNAIL_MEMORY). The largest use of memory in ferry: keep it below `resources.limits.memory`, with room for the rest (docs/operations.md).
+  memory: 320Mi
+  # -- Thumbnails decoded at once (FERRY_THUMBNAIL_CONCURRENCY).
+  concurrency: 2
+
+# -- Addresses or CIDRs of the proxies in front of ferry whose X-Forwarded-For it believes (FERRY_TRUSTED_PROXIES). Without them, every client behind the ingress shares its address — and its login rate.
+trustedProxies: []
+
+# -- Whether the session cookie is Secure: `auto` (when the request came over HTTPS, as X-Forwarded-Proto says), `true` or `false` (FERRY_COOKIE_SECURE).
+cookieSecure: auto
+
+log:
+  # -- `debug`, `info`, `warn` or `error` (FERRY_LOG_LEVEL).
+  level: info
+  # -- `json` or `text` (FERRY_LOG_FORMAT).
+  format: json
+
+tracing:
+  # -- An OTLP/HTTP endpoint for traces (OTEL_EXPORTER_OTLP_ENDPOINT); empty sends none.
+  otlpEndpoint: ""
+
+# -- The Go runtime's soft memory limit (GOMEMLIMIT), a little below `resources.limits.memory`, so that the garbage collector works harder before the kernel would kill the pod — and every session with it. Empty leaves it unset.
+goMemLimit: 450MiB
+
+# -- Resources. The memory limit follows docs/operations.md: a household with 2 CPUs, a dozen sessions and ten transfers at once fits in 512 MiB with the default thumbnail budget. Keep a CPU limit: Go sizes GOMAXPROCS from it, and a download's memory grows with GOMAXPROCS.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: "2"
+    memory: 512Mi
+
+# -- Further environment variables for the container.
+extraEnv: []
+
+service:
+  type: ClusterIP
+  # -- The port of the interface and the API.
+  port: 80
+  # -- The port of /metrics (and the probes), named `metrics`. How it is scraped is the installation's business.
+  metricsPort: 8081
+
+ingress:
+  # -- An Ingress for the interface. TLS belongs here or in front: without it, passwords and the session cookie cross the network readable.
+  enabled: false
+  className: ""
+  annotations: {}
+  # -- Hosts, e.g. `[{host: files.example.com, paths: [{path: /, pathType: Prefix}]}]`.
+  hosts: []
+  tls: []
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
