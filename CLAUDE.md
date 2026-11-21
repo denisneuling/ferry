@@ -89,7 +89,9 @@ is English.
     make test lint secret-scan   # what CI runs for Go
     make dev-samba               # the test Samba on 127.0.0.1:4445 (podman; CONTAINER=docker)
     make test-samba              # every test, the SMB ones against it
-    make run                     # ferry on :8080 against it (alex / alex-test-password)
+    make run                     # ferry on :8095 against it (alex / alex-test-password)
+    make dev-nas run-nas         # the mock NAS with sample files, and ferry against it
+    make dev-nas-check           # that the mock NAS is what hack/mock-nas/README.md says
     make generate-api lint-api   # after changing the spec
     make build-ferry             # the binary, into bin/
 

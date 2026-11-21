@@ -20,8 +20,21 @@ DEV_SAMBA_BAD_PASSWORD_PORT ?= 4446
 FERRY_TEST_SMB_SERVER ?= 127.0.0.1:$(DEV_SAMBA_PORT)
 FERRY_TEST_SMB_SERVER_BAD_PASSWORD ?= 127.0.0.1:$(DEV_SAMBA_BAD_PASSWORD_PORT)
 
+# The mock NAS (hack/mock-nas): a household's shares with sample files, for
+# development and demonstrations. Switch access-based share enumeration with
+# DEV_NAS_ABSE=yes.
+DEV_NAS_PORT ?= 4455
+DEV_NAS_ABSE ?= no
+DEV_NAS_GO_IMAGE ?= docker.io/library/golang:1.27
+DEV_NAS_UBUNTU_IMAGE ?= docker.io/library/ubuntu:22.04
+
+# Where `make run` and `make run-nas` listen: not 8080, which other
+# development servers tend to hold.
+RUN_LISTEN ?= :8095
+RUN_OPS_LISTEN ?= :8096
+
 .PHONY: build test test-samba lint clean build-all changelog release install-tools ci \
-	run generate-api lint-api dev-samba dev-samba-stop secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
+	run run-nas generate-api lint-api dev-samba dev-samba-stop dev-nas dev-nas-stop dev-nas-check secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -49,15 +62,43 @@ clean:
 # What CI checks on a pull request, in the order it checks it.
 ci: secret-scan lint test
 
-# ferry on http://localhost:8080 against the Samba from `make dev-samba`
-# (log in as alex / alex-test-password), health on :8081. The interface is
+# ferry on http://localhost:8095 against the Samba from `make dev-samba`
+# (log in as alex / alex-test-password), health on :8096. The interface is
 # not built in yet; the API is at /api/v1.
 run:
 	FERRY_SMB_SERVER=$${FERRY_SMB_SERVER:-$(FERRY_TEST_SMB_SERVER)} \
 	FERRY_SERVER_NAME=$${FERRY_SERVER_NAME:-nas.example.lan} \
+	FERRY_LISTEN=$${FERRY_LISTEN:-$(RUN_LISTEN)} \
+	FERRY_OPS_LISTEN=$${FERRY_OPS_LISTEN:-$(RUN_OPS_LISTEN)} \
 	FERRY_LOG_FORMAT=$${FERRY_LOG_FORMAT:-text} \
 	FERRY_LOG_LEVEL=$${FERRY_LOG_LEVEL:-debug} \
 		go run ./cmd/ferry serve
+
+# The same against the mock NAS from `make dev-nas`: log in as alex or sam
+# (hack/mock-nas/README.md has the passwords).
+run-nas:
+	$(MAKE) run FERRY_SMB_SERVER=127.0.0.1:$(DEV_NAS_PORT)
+
+# The mock NAS on 127.0.0.1:$(DEV_NAS_PORT). The first build generates the
+# sample files (~220 MB) and takes a minute; `make dev-nas-stop` stops and
+# removes it, and its state with it.
+dev-nas:
+	$(CONTAINER) build -q -f hack/mock-nas/Dockerfile \
+		--build-arg GO_IMAGE=$(DEV_NAS_GO_IMAGE) --build-arg UBUNTU_IMAGE=$(DEV_NAS_UBUNTU_IMAGE) \
+		-t ferry-mock-nas .
+	$(CONTAINER) run -d --rm --name ferry-mock-nas -p 127.0.0.1:$(DEV_NAS_PORT):445 \
+		-e MOCK_NAS_ACCESS_BASED_SHARE_ENUM=$(DEV_NAS_ABSE) ferry-mock-nas
+	@i=0; until $(CONTAINER) logs ferry-mock-nas 2>&1 | grep -q 'smbd version'; do \
+		i=$$((i + 1)); [ $$i -lt 60 ] || { echo "the mock NAS did not start"; exit 1; }; sleep 1; \
+	done
+	@echo "mock NAS on 127.0.0.1:$(DEV_NAS_PORT): make run-nas, then log in as alex / alex-nas-demo"
+
+dev-nas-stop:
+	$(CONTAINER) stop ferry-mock-nas
+
+# That the running mock NAS is what its README promises.
+dev-nas-check:
+	FERRY_TEST_MOCK_NAS=127.0.0.1:$(DEV_NAS_PORT) go test -count=1 ./hack/mock-nas/check/
 
 # Samba on 127.0.0.1:$(DEV_SAMBA_PORT), and its `map to guest = Bad Password`
 # instance on $(DEV_SAMBA_BAD_PASSWORD_PORT) (hack/samba/setup.sh). Their state

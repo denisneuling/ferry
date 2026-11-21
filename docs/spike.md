@@ -14,7 +14,25 @@ against any server, for the check against a real NAS over 1 GbE.
 | NTLMSSP against a current Samba | works, with the guard below for guest sessions |
 | NetShareEnum on the user's session | works (srvsvc over IPC$); lists every browseable share, also those the user may not open, and hidden `$` shares |
 | throughput, loopback | ~1.5 GB/s for one stream with 1 MiB reads; the network, not ferry, is the limit at 1 GbE (~117 MB/s) |
-| throughput, 1 GbE | to be measured on the first deployment with `hack/spike` |
+| throughput, 1 GbE | not measured yet: to be taken on the first deployment with `hack/spike` |
+| against the mock NAS | see below |
+
+## Against the mock NAS
+
+`hack/spike` against `hack/mock-nas` (Samba 4.15.13-Ubuntu, `map to guest =
+never`), over loopback, two runs:
+
+| step | time |
+|---|---|
+| an unknown user | refused as `auth` in 4–5 ms: the server maps no one to guest |
+| login (alex) | 4–5 ms |
+| share list | 1 ms |
+| a folder of 250 entries | 3–6 ms |
+| a 1.5 GB file, streamed | 0.6–0.9 s: 1.8–2.7 GB/s |
+
+Loopback says what ferry and go-smb2 can do, not what a network will: at
+1 GbE the line (~117 MB/s) is the limit by a factor of fifteen. The 1 GbE
+figure is still open.
 
 ## Hazards
 
