@@ -1,0 +1,5 @@
+{
+  "name": "ferry",
+  "purpose": "SMB shares in the browser: log in with your Samba account, and see exactly what Samba lets you see. No users, no database, nothing stored.",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,45 @@
+name: Bug
+description: Something does not work as the documentation says.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: ferry version
+      description: "The start-up log line, `ferry version`, or the image tag."
+    validations:
+      required: true
+  - type: input
+    id: server
+    attributes:
+      label: SMB server
+      description: "The server software and version, e.g. Samba 4.21, Windows Server 2022. Not its address."
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [login and sessions, "browsing and shares", "downloads and previews", "uploads, rename, move, delete", the interface, the Helm chart, other]
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How it runs
+      options: [Helm chart, container image, binary, from source]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: Leave out user names, file names and paths you would rather not share.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines
+      description: ferry never logs passwords; remove user names, host names and paths first if they are private.
+      render: text

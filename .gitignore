@@ -1,0 +1,34 @@
+# Binaries
+*.exe
+/ferry
+
+# Go
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Build outputs, and gitleaks from `make secret-scan`
+bin/
+
+# Interface — node_modules and build outputs
+ui/node_modules/
+ui/dist/
+ui/.angular/
+
+# The interface's TypeScript API client, generated from the OpenAPI spec by
+# every build, test and lint.
+ui/src/app/api/
+
+# Interface build output, embedded via go:embed (populated by make ui-build).
+internal/ui/dist/*
+!internal/ui/dist/.gitkeep
+
+# semantic-release installs into the workspace during a release run; only
+# there, not in ui/.
+/node_modules/
+/package-lock.json

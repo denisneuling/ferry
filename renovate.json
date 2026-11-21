@@ -1,0 +1,70 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":prImmediately"
+  ],
+  "baseBranchPatterns": [
+    "develop"
+  ],
+  "automergeStrategy": "fast-forward",
+  "labels": [
+    "dependencies"
+  ],
+  "github-actions": {
+    "enabled": false
+  },
+  "gomod": {
+    "enabled": true
+  },
+  "helm-values": {
+    "enabled": true
+  },
+  "npm": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Group Go dependency updates",
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "go dependencies"
+    },
+    {
+      "description": "Automerge patch updates",
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true
+    },
+    {
+      "description": "go-smb2 is the whole SMB side and the login: every update in a pull request of its own, never automerged, so its changes to the session setup are read before they ship",
+      "matchPackageNames": [
+        "github.com/cloudsoda/go-smb2"
+      ],
+      "groupName": "go-smb2",
+      "automerge": false
+    },
+    {
+      "description": "oapi-codegen generates api/v1, and an update has to commit `make generate-api` with it (api/v1/generate_test.go fails otherwise): a pull request of its own, never automerged, so it does not hold the other Go updates back",
+      "matchPackageNames": [
+        "github.com/oapi-codegen/oapi-codegen/v2"
+      ],
+      "groupName": "oapi-codegen",
+      "automerge": false
+    },
+    {
+      "description": "Group the interface's Angular packages: they release together and must move together",
+      "matchFileNames": [
+        "ui/package.json"
+      ],
+      "matchPackageNames": [
+        "@angular/**",
+        "@angular-eslint/**",
+        "angular-eslint"
+      ],
+      "groupName": "angular"
+    }
+  ]
+}

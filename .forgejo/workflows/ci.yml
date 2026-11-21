@@ -1,0 +1,77 @@
+# Checks that run on every pull request, and on pushes to develop.
+#
+# Jobs run on the runner's default image rather than overriding `container:`,
+# and install what they need: tool images like golang:1.27 ship no node, and
+# `actions/checkout` needs one.
+#
+# The cheap checks gate the expensive ones:
+#
+#   secret-scan ─┐
+#   lint ────────┴─> test
+#
+# The interface (ui) and the charts (helm) get their jobs when they exist; see
+# .forgejo/README.md. `runs-on: docker` names a runner *label*, not an image.
+name: ci
+
+# A ref is built once. Branch work is built through its pull request; develop
+# keeps a push trigger because it also receives direct pushes — the post-release
+# sync in main.yml is one — and those reach no pull request.
+on:
+  push:
+    branches: [develop]
+  pull_request:
+
+env:
+  # The instance uses a private CA the runner may not carry.
+  GIT_SSL_NO_VERIFY: "true"
+  GO_VERSION: "1.27"
+  # setup-go's own cache stays off in all three workflows: the runner points
+  # GOPROXY at the in-cluster ci-cache already.
+
+jobs:
+  secret-scan:
+    runs-on: docker
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+      # The Makefile owns the version and the invocation. It scans the working
+      # tree, not the history: `make secret-scan-history` is the audit.
+      - name: Scan for committed credentials
+        run: |
+          M=""
+          for t in curl tar make; do command -v $t >/dev/null || M="$M $t"; done
+          [ -z "$M" ] || (apt-get update -qq && apt-get install -y -qq $M)
+          make secret-scan
+
+  lint:
+    runs-on: docker
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+      - uses: https://data.forgejo.org/actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Install golangci-lint at the pinned version
+        run: |
+          VERSION=$(grep '^GOLANGCI_LINT_VERSION' Makefile | cut -d= -f2 | tr -d ' ')
+          echo "Installing golangci-lint $VERSION"
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" "$VERSION"
+      - run: $(go env GOPATH)/bin/golangci-lint run ./...
+
+  # Unit tests, with the race detector.
+  test:
+    needs: [secret-scan, lint]
+    runs-on: docker
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+      - uses: https://data.forgejo.org/actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      # The race detector needs cgo, and cgo needs a C compiler the default
+      # image may not carry.
+      - name: Install a C compiler for the race detector
+        run: command -v gcc >/dev/null || (apt-get update -qq && apt-get install -y -qq gcc libc6-dev)
+      - run: go test -race -count=1 ./...

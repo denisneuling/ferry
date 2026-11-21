@@ -1,0 +1,227 @@
+# What a version tag publishes.
+#
+# One job per phase: this instance serves no job logs over its API, so the name
+# of the job that goes red is the diagnosis.
+#
+#   gate -> validate -> test -> image -> notes -> binaries
+#
+# Releases are locked until the maintainer makes the first one deliberately:
+# `gate` fails unless the repository variable RELEASES_ENABLED is `true`, so a
+# tag pushed by hand publishes nothing either. See .forgejo/README.md,
+# *Releases are locked*. The charts join `notes` as a sibling of `binaries`
+# when they exist.
+#
+# No release is made until the image is pushed: `notes` creates the Forgejo
+# release, and a release for a version whose image does not exist is worse
+# than none.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # The path that actually runs: semantic-release creates the tag with the
+  # automation token, and Forgejo raises no push event for such a tag. See
+  # .forgejo/trigger-release.sh.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The existing tag to publish, e.g. v1.0.0
+        required: true
+
+env:
+  GIT_SSL_NO_VERIFY: "true"
+  # Nothing here is called FORGEJO_TOKEN: the runner injects its own ephemeral
+  # token under that name, and it wins over a job env. See .forgejo/README.md.
+  GO_VERSION: "1.27"
+  FORGEJO_BASE_URL: ${{ github.server_url }}
+  FORGEJO_REPO: ${{ github.repository }}
+  FORGEJO_ORG: ${{ github.repository_owner }}
+
+jobs:
+  gate:
+    # v0.0.0 is the baseline semantic-release counts the first version from
+    # (v0.1.0); there is nothing to publish for it.
+    if: ${{ (inputs.tag || github.ref_name) != 'v0.0.0' }}
+    runs-on: docker
+    steps:
+      - name: Releases must be unlocked
+        env:
+          RELEASES_ENABLED: ${{ vars.RELEASES_ENABLED }}
+        run: |
+          if [ "$RELEASES_ENABLED" != "true" ]; then
+            echo "ERROR: releases are locked (RELEASES_ENABLED is not true). See .forgejo/README.md."
+            exit 1
+          fi
+          echo "releases are unlocked"
+
+  validate:
+    needs: gate
+    runs-on: docker
+    steps:
+      - name: The tag must be a version
+        run: |
+          echo "Tag: ${{ inputs.tag || github.ref_name }}"
+          echo "${{ inputs.tag || github.ref_name }}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            || (echo "ERROR: tag must match vMAJOR.MINOR.PATCH" && exit 1)
+          echo "Tag format OK"
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+  test:
+    needs: validate
+    runs-on: docker
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - uses: https://data.forgejo.org/actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Install a C compiler for the race detector
+        run: command -v gcc >/dev/null || (apt-get update -qq && apt-get install -y -qq gcc libc6-dev)
+      - run: go test -race -count=1 ./...
+
+  image:
+    needs: test
+    runs-on: docker
+    env:
+      ZOT_URL: ${{ vars.ZOT_URL }}
+      ZOT_USERNAME: ${{ vars.ZOT_USERNAME }}
+      ZOT_TOKEN: ${{ secrets.ZOT_TOKEN }}
+    steps:
+      # Shallow: VERSION comes from the tag, not from `git describe`.
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      # A secret that was never set expands to an empty string rather than
+      # failing, so without this the job dies later with something unrelated.
+      - name: Check the secrets this job needs
+        run: |
+          missing=""
+          for name in ZOT_URL ZOT_USERNAME ZOT_TOKEN; do
+            eval "value=\$$name"
+            [ -n "$value" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "ERROR: unset secret or variable:$missing"
+            echo "See .forgejo/README.md for what each one is."
+            exit 1
+          fi
+          echo "secrets present"
+      - name: Install podman
+        run: command -v podman >/dev/null || (apt-get update -qq && apt-get install -y -qq podman)
+      - name: Build and push the tagged image
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          REGISTRY=$(echo "$ZOT_URL" | sed 's|https://||')
+          IMAGE="$REGISTRY/images/mdvc/ferry"
+          COMMIT=$(echo "$COMMIT_SHA" | cut -c1-7)
+          # The release commit's own twelve-character tag: main.yml skips
+          # release commits, so this is the only job that can publish it.
+          SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-12)
+          VERSION="${TAG#v}"
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          podman --storage-driver=vfs build --tls-verify=false --network host \
+            --build-arg GO_IMAGE="$REGISTRY/library/golang:$GO_VERSION-alpine" \
+            --build-arg VERSION="$VERSION" \
+            --build-arg COMMIT="$COMMIT" \
+            --build-arg BUILT_AT="$BUILD_TIME" \
+            -t "$IMAGE:$VERSION" \
+            -t "$IMAGE:$SHORT_SHA" \
+            -t "$IMAGE:latest" \
+            -f Dockerfile .
+          podman login --username "$ZOT_USERNAME" --password "$ZOT_TOKEN" --tls-verify=false "$REGISTRY"
+          for tag in "$VERSION" "$SHORT_SHA" latest; do
+            podman --storage-driver=vfs push --tls-verify=false "$IMAGE:$tag"
+          done
+
+  notes:
+    needs: image
+    runs-on: docker
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+      - name: Create the release
+        run: |
+          : "${FORGEJO_BASE_URL:?not set - github.server_url resolved to nothing}"
+          : "${FORGEJO_REPO:?not set - github.repository resolved to nothing}"
+          set -eu
+          M=""
+          for t in jq curl tar; do command -v $t >/dev/null || M="$M $t"; done
+          [ -z "$M" ] || (apt-get update -qq && apt-get install -y -qq $M)
+          curl -sfL "https://github.com/orhun/git-cliff/releases/download/v2.12.0/git-cliff-2.12.0-x86_64-unknown-linux-musl.tar.gz" \
+            | tar xz -C /tmp && install /tmp/git-cliff-2.12.0/git-cliff /usr/local/bin/git-cliff
+          BODY=$(git-cliff --config cliff.toml --latest --strip header 2>/dev/null || echo "Release $TAG")
+          PAYLOAD=$(jq -n --arg tag "$TAG" --arg body "$BODY" \
+            '{tag_name: $tag, name: $tag, body: $body, draft: false, prerelease: false}')
+          HTTP=$(curl -k -s -w "%{http_code}" -o /tmp/release.json \
+            -X POST -H "Authorization: token $AUTOMATION_TOKEN" -H "Content-Type: application/json" \
+            -d "$PAYLOAD" "$FORGEJO_BASE_URL/api/v1/repos/$FORGEJO_REPO/releases")
+          echo "create: HTTP $HTTP"
+          # 409 is a re-run against a release that already exists.
+          echo "$HTTP" | grep -qE "^(200|201|409)$" || (cat /tmp/release.json && exit 1)
+
+  binaries:
+    needs: notes
+    runs-on: docker
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      COMMIT_SHA: ${{ github.sha }}
+      AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - uses: https://data.forgejo.org/actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Build, upload and attach
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          : "${FORGEJO_BASE_URL:?not set - github.server_url resolved to nothing}"
+          : "${FORGEJO_REPO:?not set - github.repository resolved to nothing}"
+          set -eux
+          M=""
+          for t in jq curl; do command -v $t >/dev/null || M="$M $t"; done
+          [ -z "$M" ] || (apt-get update -qq && apt-get install -y -qq $M)
+
+          COMMIT=$(echo "$COMMIT_SHA" | cut -c1-7)
+          VERSION="${TAG#v}"
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          ASSETS=""
+          for GOARCH in amd64 arm64; do
+            GOOS=linux GOARCH=$GOARCH go build -trimpath \
+              -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.builtAt=$BUILD_TIME" \
+              -o "ferry-linux-$GOARCH" ./cmd/ferry
+            ASSETS="$ASSETS ferry-linux-$GOARCH"
+          done
+          ls -lh $ASSETS
+
+          RELEASE_ID=$(curl -k -sf -H "Authorization: token $AUTOMATION_TOKEN" \
+            "$FORGEJO_BASE_URL/api/v1/repos/$FORGEJO_REPO/releases/tags/$TAG" | jq -r '.id')
+          echo "release id: $RELEASE_ID"
+          [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]
+
+          for BIN in $ASSETS; do
+            HTTP=$(curl -k -s -o /dev/null -w "%{http_code}" -X POST \
+              -H "Authorization: token $AUTOMATION_TOKEN" -H "Content-Type: application/octet-stream" \
+              --data-binary "@./$BIN" \
+              "$FORGEJO_BASE_URL/api/v1/repos/$FORGEJO_REPO/releases/$RELEASE_ID/assets?name=$BIN")
+            echo "$BIN asset: HTTP $HTTP"
+            echo "$HTTP" | grep -qE "^(200|201)$"
+          done
