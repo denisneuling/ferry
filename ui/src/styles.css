@@ -1701,3 +1701,8 @@ a {
 .lb-stage > iframe {
   justify-self: center;
 }
+/* A filmstrip wider than the screen starts at its first file instead of
+   being centred with its start cut off (seen on phones). */
+.strip {
+  justify-content: safe center;
+}
