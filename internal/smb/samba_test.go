@@ -77,6 +77,42 @@ func TestLoginOutcomes(t *testing.T) {
 	}
 }
 
+// Under `map to guest = Bad Password`, Samba answers a wrong password for an
+// existing user with a guest session — the hazard in its plainest form. The
+// second test instance (hack/samba/smb-bad-password.conf) runs that way;
+// FERRY_TEST_SMB_SERVER_BAD_PASSWORD names it.
+func TestLoginBadPasswordMappedToGuest(t *testing.T) {
+	addr := os.Getenv("FERRY_TEST_SMB_SERVER_BAD_PASSWORD")
+	if addr == "" {
+		t.Skip("FERRY_TEST_SMB_SERVER_BAD_PASSWORD is not set (make dev-samba)")
+	}
+	ctx := context.Background()
+	for _, c := range []struct {
+		name, user, password string
+		want                 Kind
+	}{
+		{"wrong password", "alex", "not-the-password", KindGuest},
+		{"unknown user", "nosuchuser", "whatever", KindGuest},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s, err := Login(ctx, LoginOptions{Server: addr}, Credentials{User: c.user, Password: c.password})
+			if err == nil {
+				_ = s.Close()
+				t.Fatal("got a session")
+			}
+			if KindOf(err) != c.want {
+				t.Fatalf("got %v, want kind %s", err, c.want)
+			}
+		})
+	}
+	// The right password still logs in on that instance.
+	s, err := Login(ctx, LoginOptions{Server: addr}, Credentials{User: "alex", Password: alexPassword})
+	if err != nil {
+		t.Fatalf("right password: %v", err)
+	}
+	_ = s.Close()
+}
+
 func TestLoginUnreachable(t *testing.T) {
 	sambaServer(t)
 	ctx := context.Background()

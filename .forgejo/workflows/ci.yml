@@ -74,4 +74,21 @@ jobs:
       # image may not carry.
       - name: Install a C compiler for the race detector
         run: command -v gcc >/dev/null || (apt-get update -qq && apt-get install -y -qq gcc libc6-dev)
+      # The SMB tests run against a Samba this job starts itself, from the
+      # distribution's package and hack/samba/setup.sh — the script the local
+      # container runs too. No registry and no third-party image: the job runs
+      # anywhere, also for contributors on the GitHub mirror.
+      - name: Start the test Samba
+        run: |
+          set -eu
+          command -v smbd >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq samba >/dev/null)
+          sh hack/samba/setup.sh daemon
+          for port in 445 446; do
+            i=0
+            until timeout 1 bash -c "</dev/tcp/127.0.0.1/$port" 2>/dev/null; do
+              i=$((i + 1)); [ $i -lt 30 ] || { echo "Samba is not listening on $port"; exit 1; }; sleep 1
+            done
+          done
+          echo "FERRY_TEST_SMB_SERVER=127.0.0.1:445" >> "$GITHUB_ENV"
+          echo "FERRY_TEST_SMB_SERVER_BAD_PASSWORD=127.0.0.1:446" >> "$GITHUB_ENV"
       - run: go test -race -count=1 ./...

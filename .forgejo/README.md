@@ -6,7 +6,7 @@ learned about this Forgejo instance in one repository applies to the others.
 
 | workflow | runs on | does |
 |---|---|---|
-| `ci.yml` | pull requests, and pushes to develop | secret scan, lint, tests with the race detector |
+| `ci.yml` | pull requests, and pushes to develop | secret scan, lint, tests with the race detector against a Samba the job starts |
 | `main.yml` | pushes to main | the checks again; once releases are unlocked, the image from the commit and semantic-release |
 | `release.yml` | a `v*` tag, and `workflow_dispatch` | refuse while releases are locked; otherwise validate the tag, test, the tagged image, the Forgejo release, binaries |
 
@@ -14,7 +14,6 @@ The repository starts with the Go service only. The jobs for the parts that
 follow are added with them, from websearch's workflows:
 
 - the generated API code and the OpenAPI lint (`lint`), with the spec;
-- the SMB tests against a Samba job service (`test`), with `internal/smb`;
 - the interface's lint, i18n check, tests and build (`ui`), with `ui/`;
 - chart lint, render and docs (`helm`), and the charts in `release.yml`,
   with `charts/`.
@@ -46,6 +45,19 @@ merge to main. Until the repository variable `RELEASES_ENABLED` is set to
 
 Setting the variable is the maintainer's step, taken together with the first
 merge to main. Nothing in a pull request can set it.
+
+## Samba in CI
+
+The SMB tests (`internal/smb`) need a Samba. The test jobs (`ci.test`,
+`main.verify`, `release.test`) start one themselves: they install the
+distribution's `samba` package and run `hack/samba/setup.sh daemon`, the
+script `make dev-samba`'s container runs too, so the local and the CI Samba
+cannot drift apart. It serves two instances with the same fictional users and
+shares — `map to guest = Bad User` on 445, `Bad Password` on 446 — and the
+tests find them through `FERRY_TEST_SMB_SERVER` and
+`FERRY_TEST_SMB_SERVER_BAD_PASSWORD`. No registry and no third-party image are
+involved, so the same steps work on any runner. Without those variables the
+SMB tests skip.
 
 ## Generated code
 

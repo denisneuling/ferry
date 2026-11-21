@@ -14,7 +14,9 @@ BINARIES := ferry
 CONTAINER ?= podman
 DEV_SAMBA_ALPINE ?= docker.io/library/alpine:3.22
 DEV_SAMBA_PORT ?= 4445
+DEV_SAMBA_BAD_PASSWORD_PORT ?= 4446
 FERRY_TEST_SMB_SERVER ?= 127.0.0.1:$(DEV_SAMBA_PORT)
+FERRY_TEST_SMB_SERVER_BAD_PASSWORD ?= 127.0.0.1:$(DEV_SAMBA_BAD_PASSWORD_PORT)
 
 .PHONY: build test test-samba lint clean build-all changelog release install-tools ci \
 	dev-samba dev-samba-stop secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
@@ -32,7 +34,9 @@ test:
 	go test -v -count=1 ./...
 
 test-samba:
-	FERRY_TEST_SMB_SERVER=$(FERRY_TEST_SMB_SERVER) go test -race -count=1 ./internal/smb/...
+	FERRY_TEST_SMB_SERVER=$(FERRY_TEST_SMB_SERVER) \
+	FERRY_TEST_SMB_SERVER_BAD_PASSWORD=$(FERRY_TEST_SMB_SERVER_BAD_PASSWORD) \
+		go test -race -count=1 ./internal/smb/...
 
 lint:
 	golangci-lint run ./...
@@ -43,15 +47,18 @@ clean:
 # What CI checks on a pull request, in the order it checks it.
 ci: secret-scan lint test
 
-# Samba on 127.0.0.1:$(DEV_SAMBA_PORT); its state goes with the container,
-# which `make dev-samba-stop` stops and removes.
+# Samba on 127.0.0.1:$(DEV_SAMBA_PORT), and its `map to guest = Bad Password`
+# instance on $(DEV_SAMBA_BAD_PASSWORD_PORT) (hack/samba/setup.sh). Their state
+# goes with the container, which `make dev-samba-stop` stops and removes.
 dev-samba:
 	$(CONTAINER) build -q --build-arg ALPINE_IMAGE=$(DEV_SAMBA_ALPINE) -t ferry-dev-samba hack/samba
-	$(CONTAINER) run -d --rm --name ferry-dev-samba -p 127.0.0.1:$(DEV_SAMBA_PORT):445 ferry-dev-samba
+	$(CONTAINER) run -d --rm --name ferry-dev-samba -p 127.0.0.1:$(DEV_SAMBA_PORT):445 \
+		-p 127.0.0.1:$(DEV_SAMBA_BAD_PASSWORD_PORT):446 ferry-dev-samba
 	@i=0; until $(CONTAINER) logs ferry-dev-samba 2>&1 | grep -q 'smbd version'; do \
 		i=$$((i + 1)); [ $$i -lt 60 ] || { echo "Samba did not start"; exit 1; }; sleep 1; \
 	done
 	@echo "FERRY_TEST_SMB_SERVER=$(FERRY_TEST_SMB_SERVER)"
+	@echo "FERRY_TEST_SMB_SERVER_BAD_PASSWORD=$(FERRY_TEST_SMB_SERVER_BAD_PASSWORD)"
 
 dev-samba-stop:
 	$(CONTAINER) stop ferry-dev-samba

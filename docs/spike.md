@@ -29,8 +29,8 @@ response — the NTLM challenge, which never carries it — and takes the final
 response's flags without checking them. The flags are not exported.
 
 A wrong password for an existing user is refused by Samba (`STATUS_LOGON_FAILURE`)
-under `Bad User`; under `map to guest = Bad Password` it would be a guest
-session too.
+under `Bad User`. Under `map to guest = Bad Password` it is a guest session
+too: go-smb2 alone logs alex in with a wrong password and lists every share.
 
 ferry's answer (`internal/smb/guard.go`): the connection go-smb2 dials over is
 wrapped while the session is set up, and the guard reads the session flags of
@@ -38,7 +38,11 @@ the final, successful SESSION_SETUP response from the wire itself. Login
 succeeds only if that response was seen, parsed, and is neither guest nor
 anonymous; otherwise the session is logged off and the login is a 401
 (`KindGuest`). Empty user names and passwords are refused before the server is
-asked. `TestLoginOutcomes` holds it against the container.
+asked. `TestLoginOutcomes` holds it against the `Bad User` instance,
+`TestLoginBadPasswordMappedToGuest` against the `Bad Password` one; the
+guard's unit tests cover what it cannot read (no final response, a broken
+frame, an overflowing buffer — all refused) and the flags that must not
+matter (`SMB2_SESSION_FLAG_ENCRYPT_DATA`).
 
 Worth proposing upstream: an exported `Session.IsGuest()`/`IsAnonymous()`, and
 the guest check moved to the final response.
@@ -121,6 +125,3 @@ should not set `DEBUG` regardless.
 - `File.Close` after the request's context ended: go-smb2's file keeps the
   context it was opened with, so closing a handle of a cancelled download may
   fail and leave it to the server's own cleanup. Close with a fresh context.
-- The Samba service in CI: `hack/samba` is built locally; the CI test job
-  needs it as a job service from the registry mirror, or a public image
-  configured to the same users and shares.

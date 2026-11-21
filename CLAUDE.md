@@ -86,9 +86,11 @@ is English.
     make test-samba              # the SMB tests against it
     make build-ferry             # the binary, into bin/
 
-The SMB tests skip without `FERRY_TEST_SMB_SERVER`. hack/samba holds its
-users, passwords and shares — test values, fictional, and configured with
-`map to guest = Bad User` on purpose. docs/spike.md records what go-smb2 does
+The SMB tests skip without `FERRY_TEST_SMB_SERVER` (and
+`FERRY_TEST_SMB_SERVER_BAD_PASSWORD`). hack/samba holds their users,
+passwords and shares — test values, fictional — and `setup.sh`, which starts
+two instances, `map to guest = Bad User` and `Bad Password`, on purpose. CI
+runs the same script. docs/spike.md records what go-smb2 does
 wrong and how internal/smb holds it (the guest guard, one request in flight
 per session, 1 MiB reads): read it before touching the login or streaming.
 
