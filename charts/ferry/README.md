@@ -10,11 +10,16 @@ nothing: no users, no database, no volumes, no secrets — sessions live in
 the process's memory.
 
 ```sh
-helm install ferry oci://ghcr.io/metapatrol/charts/ferry \
+helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.0.0 \
   --set smb.server=nas.example.lan \
   --set ingress.enabled=true --set 'ingress.hosts[0].host=files.example.com' \
-  --set 'ingress.hosts[0].paths[0].path=/'
+  --set 'ingress.hosts[0].paths[0].path=/' \
+  --set 'ingress.tls[0].hosts[0]=files.example.com' \
+  --set 'ingress.tls[0].secretName=files-example-com-tls'
 ```
+
+`smb.server` is required; the chart refuses to render without it. The
+image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 
 ## What the chart decides
 

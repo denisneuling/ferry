@@ -31,9 +31,9 @@
 
 ---
 
-> **Status:** early development, no release yet. The service, its
-> interface, metrics, traces and the Helm chart are there
-> ([CONCEPT.md](CONCEPT.md) §9, milestones 1–4); the first release is next.
+> **Status:** young. The 0.x releases work against Samba and are used at
+> home; the API, the settings and the chart's values may still change
+> before 1.0, and the [changelog](CHANGELOG.md) says when they do.
 
 ## Why
 
@@ -97,11 +97,16 @@ SMB2/3; TLS termination (the gateway in front does it).
 ## Installation
 
 ```sh
-helm install ferry oci://ghcr.io/metapatrol/charts/ferry --set smb.server=nas.example.lan
+helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.1.0 \
+  --set smb.server=nas.example.lan
 ```
 
+`smb.server` is the one value ferry needs. Put TLS in front of it — the
+Ingress or your gateway — or passwords cross the network readable.
 [docs/installation.md](docs/installation.md) has TLS, the trusted proxies,
-memory and running without Kubernetes.
+memory and running without Kubernetes; the
+[releases](https://github.com/metapatrol/ferry/releases) list the newest
+version.
 
 ## Quick start
 

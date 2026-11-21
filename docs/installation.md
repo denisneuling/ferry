@@ -6,23 +6,32 @@ stateless web server.
 
 ## Helm
 
-The chart and the image are public on GitHub's registry:
+The chart and the image are public on GitHub's registry. Pin a version —
+the [releases](https://github.com/metapatrol/ferry/releases) list them; the
+chart's version is the release's, and it runs the image of that release
+unless `image.tag` says otherwise:
 
 ```sh
-helm install ferry oci://ghcr.io/metapatrol/charts/ferry \
+helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.1.0 \
   --namespace ferry --create-namespace \
   --set smb.server=nas.example.lan \
   --set smb.serverName="The NAS" \
   --set ingress.enabled=true \
   --set ingress.className=nginx \
   --set 'ingress.hosts[0].host=files.example.com' \
-  --set 'ingress.hosts[0].paths[0].path=/'
+  --set 'ingress.hosts[0].paths[0].path=/' \
+  --set 'ingress.tls[0].hosts[0]=files.example.com' \
+  --set 'ingress.tls[0].secretName=files-example-com-tls'
 ```
+
+The TLS secret is the Ingress controller's or cert-manager's business; the
+chart only names it.
 
 The chart's [README](../charts/ferry/README.md) lists every value. The ones
 worth deciding:
 
-- **`smb.server`** — required. Any SMB2/3 server; [samba.md](samba.md) has
+- **`smb.server`** — required; the chart refuses to install without it.
+  Any SMB2/3 server, `host` or `host:port`; [samba.md](samba.md) has
   the Samba settings that make the experience better.
 - **TLS.** ferry speaks plain HTTP; the Ingress or the gateway in front
   terminates TLS. Without TLS, passwords and the session cookie cross the
@@ -48,12 +57,23 @@ static target, as its monitoring wants.
 
 ## Without Kubernetes
 
-The image runs anywhere:
+The image (linux/amd64) runs anywhere:
 
 ```sh
 docker run -d --name ferry -p 8080:8080 --read-only --cap-drop ALL \
-  -e FERRY_SMB_SERVER=nas.example.lan ghcr.io/metapatrol/ferry:latest
+  -e FERRY_SMB_SERVER=nas.example.lan ghcr.io/metapatrol/ferry:0.1.0
 ```
 
-and so does the binary of a GitHub release: `FERRY_SMB_SERVER=nas.example.lan
-ferry serve`. [configuration.md](configuration.md) has every variable.
+Tags are the release (`0.1.0`), its minor line (`0.1`) and `latest`.
+A GitHub release also carries static binaries for linux/amd64 and
+linux/arm64, with `SHA256SUMS`:
+
+```sh
+sha256sum -c --ignore-missing SHA256SUMS
+chmod +x ferry-linux-arm64
+FERRY_SMB_SERVER=nas.example.lan ./ferry-linux-arm64 serve
+```
+
+ferry then listens on `:8080`, and on `:8081` for the probes and the
+metrics. The same rule holds without Kubernetes: TLS in front, from a
+reverse proxy. [configuration.md](configuration.md) has every variable.
