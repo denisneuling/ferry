@@ -7,6 +7,7 @@ require (
 	github.com/oapi-codegen/oapi-codegen/v2 v2.8.2
 	github.com/oapi-codegen/runtime v1.9.1
 	go.yaml.in/yaml/v4 v4.0.0
+	golang.org/x/image v0.48.0
 	golang.org/x/term v0.48.0
 )
 

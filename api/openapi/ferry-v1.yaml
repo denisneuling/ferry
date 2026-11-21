@@ -272,6 +272,51 @@ paths:
         "413": { $ref: "#/components/responses/TooLarge" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/thumbnail:
+    get:
+      operationId: getThumbnail
+      tags: [files]
+      summary: A thumbnail of an image, made on the fly.
+      description: |
+        A JPEG of the image that fits in a `size`×`size` square, upright as
+        its EXIF orientation says, never larger than the original. JPEG,
+        PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+        for every request and never stored; `ETag` follows the file, so the
+        browser revalidates with `If-None-Match` and gets `304` while the
+        file is unchanged. Images beyond the deployment's bounds — bytes or
+        pixels — are `413`.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - name: size
+          in: query
+          required: false
+          description: The edge of the square the thumbnail fits in, in pixels.
+          schema:
+            type: integer
+            enum: [160, 320, 640]
+            default: 320
+      responses:
+        "200":
+          description: The thumbnail.
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        "304":
+          description: Not modified since the `If-None-Match` ETag.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415":
+          description: Not an image ferry can make a thumbnail of (`not_an_image`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/folders:
     post:
       operationId: createFolder
@@ -422,7 +467,7 @@ components:
             `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
             `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
             `range_not_satisfiable`, `server_unreachable`, `session_lost`,
-            `too_many_sessions`, `internal`.
+            `too_many_sessions`, `not_an_image`, `internal`.
 
     Info:
       type: object

@@ -39,6 +39,9 @@ session setup and kept nowhere.
 |---|---|---|
 | `FERRY_MAX_UPLOAD` | `0` (none) | The largest upload, in bytes, with an optional binary suffix: `512Mi`, `4Gi`. Larger is `413`, and nothing is left on the share. |
 | `FERRY_MAX_LISTING` | `10000` | Entries in one folder listing, and in one recursive delete. Beyond it, `413`. |
+| `FERRY_THUMBNAIL_MAX_BYTES` | `64Mi` | The largest image ferry reads to make a thumbnail; larger is `413` and the interface shows an icon. |
+| `FERRY_THUMBNAIL_MAX_PIXELS` | `50000000` | The most pixels an image may have to be decoded — checked from its header before decoding, so a small file claiming a huge image cannot exhaust memory. |
+| `FERRY_THUMBNAIL_CONCURRENCY` | `2` | Thumbnails made at once; the rest wait their turn within the request timeout. A 12-megapixel photo takes about 30 MB and a quarter of a second of one core. |
 | `FERRY_REQUEST_TIMEOUT` | `60s` | Every API request but uploads and downloads. |
 | `FERRY_STALL_TIMEOUT` | `60s` | An upload or download ends when no bytes move for this long, in either direction — whether the client or the SMB server stopped. Its total duration is not bounded. |
 

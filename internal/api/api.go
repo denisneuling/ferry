@@ -36,6 +36,8 @@ type API struct {
 	login     LoginFunc
 	log       *slog.Logger
 	version   string
+	// thumbs admits FERRY_THUMBNAIL_CONCURRENCY thumbnail decodes at once.
+	thumbs chan struct{}
 }
 
 // New makes the API. login is smb.Login outside tests.
@@ -48,6 +50,7 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		login:     login,
 		log:       log,
 		version:   version,
+		thumbs:    make(chan struct{}, max(1, cfg.ThumbnailConcurrency)),
 	}
 }
 

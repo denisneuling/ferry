@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"net/url"
@@ -283,5 +285,66 @@ func BenchmarkDownload(b *testing.B) {
 			b.Fatal(res.StatusCode, err)
 		}
 		b.SetBytes(n)
+	}
+}
+
+func TestThumbnail(t *testing.T) {
+	h := sambaHarness(t)
+	c := h.login(t, "alex", alexPassword)
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	dir := "thumb-" + hex.EncodeToString(b)
+	h.do(t, "POST", "/api/v1/shares/alex/folders?path="+q(dir), nil, ferryReq, c)
+	t.Cleanup(func() {
+		h.do(t, "DELETE", "/api/v1/shares/alex/entries?recursive=true&path="+q(dir), nil, ferryReq, c)
+	})
+
+	img := image.NewRGBA(image.Rect(0, 0, 1200, 800))
+	var photo bytes.Buffer
+	if err := jpeg.Encode(&photo, img, nil); err != nil {
+		t.Fatal(err)
+	}
+	h.do(t, "PUT", "/api/v1/shares/alex/content?path="+q(dir+"/photo.jpg"), bytes.NewReader(photo.Bytes()), ferryReq, c)
+	h.do(t, "PUT", "/api/v1/shares/alex/content?path="+q(dir+"/notes.txt"), strings.NewReader("not an image"), ferryReq, c)
+
+	res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=160&path="+q(dir+"/photo.jpg"), nil, nil, c)
+	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/jpeg" || res.Header.Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("thumbnail: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+	th, err := jpeg.Decode(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := th.Bounds(); b.Dx() != 160 || b.Dy() != 106 {
+		t.Fatalf("thumbnail %v", b)
+	}
+	tag := res.Header.Get("ETag")
+	if res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=160&path="+q(dir+"/photo.jpg"), nil, map[string]string{"If-None-Match": tag}, c); res.StatusCode != 304 {
+		t.Fatalf("revalidation: %d", res.StatusCode)
+	}
+	if res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=320&path="+q(dir+"/photo.jpg"), nil, map[string]string{"If-None-Match": tag}, c); res.StatusCode != 200 {
+		t.Fatalf("another size under the same ETag: %d", res.StatusCode)
+	}
+
+	for _, c2 := range []struct {
+		path   string
+		status int
+		code   string
+	}{
+		{"/api/v1/shares/alex/thumbnail?path=" + q(dir+"/notes.txt"), 415, "not_an_image"},
+		{"/api/v1/shares/alex/thumbnail?path=" + q(dir), 409, "is_a_folder"},
+		{"/api/v1/shares/alex/thumbnail?path=" + q(dir+"/nope.jpg"), 404, "not_found"},
+		{"/api/v1/shares/alex/thumbnail?size=100&path=" + q(dir+"/photo.jpg"), 400, "invalid_request"},
+	} {
+		res := h.do(t, "GET", c2.path, nil, nil, c)
+		if res.StatusCode != c2.status || problemCode(t, res) != c2.code {
+			t.Errorf("%s: %d", c2.path, res.StatusCode)
+		}
+	}
+
+	h.api.cfg.ThumbnailMaxBytes = int64(photo.Len() - 1)
+	res = h.do(t, "GET", "/api/v1/shares/alex/thumbnail?path="+q(dir+"/photo.jpg"), nil, nil, c)
+	if res.StatusCode != 413 || problemCode(t, res) != "too_large" {
+		t.Fatalf("over the byte bound: %d", res.StatusCode)
 	}
 }

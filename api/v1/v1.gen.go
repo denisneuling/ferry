@@ -161,6 +161,27 @@ func (e MoveEntryParamsXFerryRequest) Valid() bool {
 	}
 }
 
+// Defines values for GetThumbnailParamsSize.
+const (
+	GetThumbnailParamsSizeN160 GetThumbnailParamsSize = 160
+	GetThumbnailParamsSizeN320 GetThumbnailParamsSize = 320
+	GetThumbnailParamsSizeN640 GetThumbnailParamsSize = 640
+)
+
+// Valid indicates whether the value is a known member of the GetThumbnailParamsSize enum.
+func (e GetThumbnailParamsSize) Valid() bool {
+	switch e {
+	case GetThumbnailParamsSizeN160:
+		return true
+	case GetThumbnailParamsSizeN320:
+		return true
+	case GetThumbnailParamsSizeN640:
+		return true
+	default:
+		return false
+	}
+}
+
 // Entry defines model for Entry.
 type Entry struct {
 	Modified time.Time `json:"modified"`
@@ -231,7 +252,7 @@ type Problem struct {
 	// `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
 	// `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
 	// `range_not_satisfiable`, `server_unreachable`, `session_lost`,
-	// `too_many_sessions`, `internal`.
+	// `too_many_sessions`, `not_an_image`, `internal`.
 	Code   string  `json:"code"`
 	Detail *string `json:"detail,omitempty"`
 	Status int     `json:"status"`
@@ -374,6 +395,18 @@ type MoveEntryParams struct {
 
 // MoveEntryParamsXFerryRequest defines parameters for MoveEntry.
 type MoveEntryParamsXFerryRequest string
+
+// GetThumbnailParams defines parameters for GetThumbnail.
+type GetThumbnailParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// Size The edge of the square the thumbnail fits in, in pixels.
+	Size *GetThumbnailParamsSize `form:"size,omitempty" json:"size,omitempty"`
+}
+
+// GetThumbnailParamsSize defines parameters for GetThumbnail.
+type GetThumbnailParamsSize int
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -569,6 +602,19 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 	MoveEntry(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetThumbnail A thumbnail of an image, made on the fly.
+	//
+	// A JPEG of the image that fits in a `size`×`size` square, upright as
+	// its EXIF orientation says, never larger than the original. JPEG,
+	// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+	// for every request and never stored; `ETag` follows the file, so the
+	// browser revalidates with `If-None-Match` and gets `304` while the
+	// file is unchanged. Images beyond the deployment's bounds — bytes or
+	// pixels — are `413`.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
+	GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // GetInfo What the login page shows before anyone is logged in.
@@ -806,6 +852,29 @@ func (c *Client) MoveEntryWithBody(ctx context.Context, share ShareName, params 
 // Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 func (c *Client) MoveEntry(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMoveEntryRequest(c.Server, share, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetThumbnail A thumbnail of an image, made on the fly.
+//
+// A JPEG of the image that fits in a `size`×`size` square, upright as
+// its EXIF orientation says, never larger than the original. JPEG,
+// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+// for every request and never stored; `ETag` follows the file, so the
+// browser revalidates with `If-None-Match` and gets `304` while the
+// file is unchanged. Images beyond the deployment's bounds — bytes or
+// pixels — are `413`.
+//
+// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
+func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetThumbnailRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1432,6 +1501,79 @@ func NewMoveEntryRequestWithBody(server string, share ShareName, params *MoveEnt
 	return req, nil
 }
 
+// NewGetThumbnailRequest constructs an http.Request for the GetThumbnail method
+func NewGetThumbnailRequest(server string, share ShareName, params *GetThumbnailParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/shares/%s/thumbnail", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Size != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "size", *params.Size, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1606,6 +1748,21 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 	MoveEntryWithResponse(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveEntryResponse, error)
+
+	// GetThumbnailWithResponse A thumbnail of an image, made on the fly.
+	//
+	// A JPEG of the image that fits in a `size`×`size` square, upright as
+	// its EXIF orientation says, never larger than the original. JPEG,
+	// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+	// for every request and never stored; `ETag` follows the file, so the
+	// browser revalidates with `If-None-Match` and gets `304` while the
+	// file is unchanged. Images beyond the deployment's bounds — bytes or
+	// pixels — are `413`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
+	GetThumbnailWithResponse(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*GetThumbnailResponse, error)
 }
 
 type GetInfoResponse struct {
@@ -2388,6 +2545,96 @@ func (r MoveEntryResponse) ContentType() string {
 	return ""
 }
 
+type GetThumbnailResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetThumbnailResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetThumbnailResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetThumbnailResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetThumbnailResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetInfoWithResponse What the login page shows before anyone is logged in.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -2595,6 +2842,27 @@ func (c *ClientWithResponses) MoveEntryWithResponse(ctx context.Context, share S
 		return nil, err
 	}
 	return ParseMoveEntryResponse(rsp)
+}
+
+// GetThumbnailWithResponse A thumbnail of an image, made on the fly.
+//
+// A JPEG of the image that fits in a `size`×`size` square, upright as
+// its EXIF orientation says, never larger than the original. JPEG,
+// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+// for every request and never stored; `ETag` follows the file, so the
+// browser revalidates with `If-None-Match` and gets `304` while the
+// file is unchanged. Images beyond the deployment's bounds — bytes or
+// pixels — are `413`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
+func (c *ClientWithResponses) GetThumbnailWithResponse(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*GetThumbnailResponse, error) {
+	rsp, err := c.GetThumbnail(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetThumbnailResponse(rsp)
 }
 
 // ParseGetInfoResponse parses an HTTP response from a GetInfoWithResponse call
@@ -3230,6 +3498,84 @@ func ParseMoveEntryResponse(rsp *http.Response) (*MoveEntryResponse, error) {
 	return response, nil
 }
 
+// ParseGetThumbnailResponse parses an HTTP response from a GetThumbnailWithResponse call
+func ParseGetThumbnailResponse(rsp *http.Response) (*GetThumbnailResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetThumbnailResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetInfo What the login page shows before anyone is logged in.
@@ -3265,6 +3611,9 @@ type ServerInterface interface {
 	// MoveEntry Rename or move a file or folder within a share.
 	// (POST /api/v1/shares/{share}/move)
 	MoveEntry(w http.ResponseWriter, r *http.Request, share ShareName, params MoveEntryParams)
+	// GetThumbnail A thumbnail of an image, made on the fly.
+	// (GET /api/v1/shares/{share}/thumbnail)
+	GetThumbnail(w http.ResponseWriter, r *http.Request, share ShareName, params GetThumbnailParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -3786,6 +4135,61 @@ func (siw *ServerInterfaceWrapper) MoveEntry(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetThumbnail operation middleware
+func (siw *ServerInterfaceWrapper) GetThumbnail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetThumbnailParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "size", r.URL.Query(), &params.Size, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetThumbnail(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -3915,6 +4319,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/entries", wrapper.ListEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/content", wrapper.GetContent)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/shares/{share}/content", wrapper.PutContent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/thumbnail", wrapper.GetThumbnail)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/move", wrapper.MoveEntry)
 

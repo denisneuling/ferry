@@ -43,8 +43,16 @@ type Config struct {
 	// long, in either direction (FERRY_STALL_TIMEOUT).
 	StallTimeout time.Duration
 
-	MaxUpload  int64 // FERRY_MAX_UPLOAD, bytes; 0: no limit
-	MaxListing int   // FERRY_MAX_LISTING: entries in one folder, and in a recursive delete
+	MaxUpload int64 // FERRY_MAX_UPLOAD, bytes; 0: no limit
+	// Thumbnails bound what one costs and how many are made at once: the
+	// bytes read (FERRY_THUMBNAIL_MAX_BYTES), the pixels decoded
+	// (FERRY_THUMBNAIL_MAX_PIXELS) and the decodes in parallel
+	// (FERRY_THUMBNAIL_CONCURRENCY). A 12-megapixel photo takes about 30 MB
+	// and a quarter of a second of one core.
+	ThumbnailMaxBytes    int64
+	ThumbnailMaxPixels   int
+	ThumbnailConcurrency int
+	MaxListing           int // FERRY_MAX_LISTING: entries in one folder, and in a recursive delete
 
 	// LoginRatePerAddress and LoginRatePerUser bound login attempts per
 	// minute, per client address and per username (FERRY_LOGIN_RATE_ADDRESS,
@@ -68,22 +76,25 @@ type Config struct {
 // FromEnv reads the configuration through getenv (os.Getenv).
 func FromEnv(getenv func(string) string) (Config, error) {
 	c := Config{
-		ListenAddr:          or(getenv("FERRY_LISTEN"), ":8080"),
-		OpsListenAddr:       or(getenv("FERRY_OPS_LISTEN"), ":8081"),
-		CookieSecure:        or(getenv("FERRY_COOKIE_SECURE"), "auto"),
-		LogLevel:            or(getenv("FERRY_LOG_LEVEL"), "info"),
-		LogFormat:           or(getenv("FERRY_LOG_FORMAT"), "json"),
-		ServerName:          getenv("FERRY_SERVER_NAME"),
-		IdleTimeout:         30 * time.Minute,
-		SessionLifetime:     12 * time.Hour,
-		MaxSessions:         200,
-		LoginTimeout:        10 * time.Second,
-		RequestTimeout:      60 * time.Second,
-		StallTimeout:        60 * time.Second,
-		MaxUpload:           0,
-		MaxListing:          10000,
-		LoginRatePerAddress: 10,
-		LoginRatePerUser:    5,
+		ListenAddr:           or(getenv("FERRY_LISTEN"), ":8080"),
+		OpsListenAddr:        or(getenv("FERRY_OPS_LISTEN"), ":8081"),
+		CookieSecure:         or(getenv("FERRY_COOKIE_SECURE"), "auto"),
+		LogLevel:             or(getenv("FERRY_LOG_LEVEL"), "info"),
+		LogFormat:            or(getenv("FERRY_LOG_FORMAT"), "json"),
+		ServerName:           getenv("FERRY_SERVER_NAME"),
+		IdleTimeout:          30 * time.Minute,
+		SessionLifetime:      12 * time.Hour,
+		MaxSessions:          200,
+		LoginTimeout:         10 * time.Second,
+		RequestTimeout:       60 * time.Second,
+		StallTimeout:         60 * time.Second,
+		MaxUpload:            0,
+		MaxListing:           10000,
+		ThumbnailMaxBytes:    64 << 20,
+		ThumbnailMaxPixels:   50_000_000,
+		ThumbnailConcurrency: 2,
+		LoginRatePerAddress:  10,
+		LoginRatePerUser:     5,
 	}
 	var errs []error
 	fail := func(name string, err error) { errs = append(errs, fmt.Errorf("%s: %w", name, err)) }
@@ -136,6 +147,8 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		{"FERRY_MAX_LISTING", &c.MaxListing, 1},
 		{"FERRY_LOGIN_RATE_ADDRESS", &c.LoginRatePerAddress, 1},
 		{"FERRY_LOGIN_RATE_USER", &c.LoginRatePerUser, 1},
+		{"FERRY_THUMBNAIL_MAX_PIXELS", &c.ThumbnailMaxPixels, 1},
+		{"FERRY_THUMBNAIL_CONCURRENCY", &c.ThumbnailConcurrency, 1},
 	}
 	for _, i := range ints {
 		if v := getenv(i.name); v != "" {
@@ -153,6 +166,13 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			fail("FERRY_MAX_UPLOAD", err)
 		}
 		c.MaxUpload = n
+	}
+	if v := getenv("FERRY_THUMBNAIL_MAX_BYTES"); v != "" {
+		n, err := parseBytes(v)
+		if err != nil || n == 0 {
+			fail("FERRY_THUMBNAIL_MAX_BYTES", fmt.Errorf("%q is not a positive byte count like 64Mi", v))
+		}
+		c.ThumbnailMaxBytes = n
 	}
 	for _, s := range strings.Split(getenv("FERRY_TRUSTED_PROXIES"), ",") {
 		if s = strings.TrimSpace(s); s == "" {

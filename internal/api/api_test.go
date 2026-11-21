@@ -21,18 +21,21 @@ import (
 
 func testConfig() config.Config {
 	return config.Config{
-		SMBServer:           "127.0.0.1:1",
-		ServerName:          "nas.example.lan",
-		IdleTimeout:         30 * time.Minute,
-		SessionLifetime:     12 * time.Hour,
-		MaxSessions:         10,
-		LoginTimeout:        5 * time.Second,
-		RequestTimeout:      10 * time.Second,
-		StallTimeout:        10 * time.Second,
-		MaxListing:          1000,
-		LoginRatePerAddress: 100,
-		LoginRatePerUser:    3,
-		CookieSecure:        "auto",
+		SMBServer:            "127.0.0.1:1",
+		ServerName:           "nas.example.lan",
+		IdleTimeout:          30 * time.Minute,
+		SessionLifetime:      12 * time.Hour,
+		MaxSessions:          10,
+		LoginTimeout:         5 * time.Second,
+		RequestTimeout:       10 * time.Second,
+		StallTimeout:         10 * time.Second,
+		MaxListing:           1000,
+		LoginRatePerAddress:  100,
+		LoginRatePerUser:     3,
+		CookieSecure:         "auto",
+		ThumbnailMaxBytes:    8 << 20,
+		ThumbnailMaxPixels:   50_000_000,
+		ThumbnailConcurrency: 2,
 	}
 }
 
