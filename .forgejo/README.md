@@ -8,7 +8,7 @@ learned about this Forgejo instance in one repository applies to the others.
 |---|---|---|
 | `ci.yml` | pull requests, and pushes to develop | secret scan, lint (with the generated API code and the OpenAPI spec), the interface's lint, i18n check, tests and build, chart lint, render and docs, tests with the race detector against a Samba the job starts |
 | `main.yml` | pushes to main | the checks again, the image from the commit, semantic-release |
-| `release.yml` | a `v*` tag, and `workflow_dispatch` | validate the tag, test, the tagged image, the Forgejo release, binaries, the chart; nothing for `v0.0.0` |
+| `release.yml` | a `v*` tag, and `workflow_dispatch` | validate the tag, test, the tagged image, the Forgejo release, binaries with SHA256SUMS, the chart; nothing for `v0.0.0` |
 
 The repository starts with the Go service only. The jobs for the parts that
 follow are added with them, from websearch's workflows:

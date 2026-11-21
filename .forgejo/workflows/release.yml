@@ -217,6 +217,11 @@ jobs:
               -o "ferry-linux-$GOARCH" ./cmd/ferry
             ASSETS="$ASSETS ferry-linux-$GOARCH"
           done
+          # The same checksum file as the GitHub release, so a download from
+          # either can be checked with sha256sum -c.
+          sha256sum $ASSETS > SHA256SUMS
+          cat SHA256SUMS
+          ASSETS="$ASSETS SHA256SUMS"
           ls -lh $ASSETS
 
           RELEASE_ID=$(curl -k -sf -H "Authorization: token $AUTOMATION_TOKEN" \
