@@ -31,9 +31,10 @@
 
 ---
 
-> **Status:** young. The 0.x releases work against Samba and are used at
-> home; the API, the settings and the chart's values may still change
-> before 1.0, and the [changelog](CHANGELOG.md) says when they do.
+> **Status:** young; 0.1.0 is the first public release. The 0.x releases
+> work against Samba and are used at home; the API, the settings and the
+> chart's values may still change before 1.0, and the
+> [changelog](CHANGELOG.md) says when they do.
 
 ## Why
 
