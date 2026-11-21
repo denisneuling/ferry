@@ -122,6 +122,7 @@ per session, 1 MiB reads): read it before touching the login or streaming.
 ## Commits
 
 Conventional Commits; `feat:`/`fix:` release (semantic-release), `feat!:`
-raises the minor version. Pull requests target `develop`. Nothing is merged
-or pushed to `main` and no tag is made without the maintainer: the first
-release is made deliberately (`.forgejo/README.md`, *Releases are locked*).
+raises the minor version. Pull requests target `develop`; a release is a pull
+request from `develop` to `main`, and semantic-release tags it
+(`.forgejo/README.md`, *Releasing*). Nothing is pushed to `main` directly and
+no tag is made by hand; `v0.0.0` on the initial commit is the baseline.

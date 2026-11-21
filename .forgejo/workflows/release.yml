@@ -3,13 +3,8 @@
 # One job per phase: this instance serves no job logs over its API, so the name
 # of the job that goes red is the diagnosis.
 #
-#   gate -> validate -> test -> image -> notes ─┬─> binaries
-#                                               └─> chart
-#
-# Releases are locked until the maintainer makes the first one deliberately:
-# `gate` fails unless the repository variable RELEASES_ENABLED is `true`, so a
-# tag pushed by hand publishes nothing either. See .forgejo/README.md,
-# *Releases are locked*.
+#   validate -> test -> image -> notes ─┬─> binaries
+#                                       └─> chart
 #
 # No release is made until the image is pushed: `notes` creates the Forgejo
 # release, and a release for a version whose image does not exist is worse
@@ -39,24 +34,10 @@ env:
   FORGEJO_ORG: ${{ github.repository_owner }}
 
 jobs:
-  gate:
+  validate:
     # v0.0.0 is the baseline semantic-release counts the first version from
     # (v0.1.0); there is nothing to publish for it.
     if: ${{ (inputs.tag || github.ref_name) != 'v0.0.0' }}
-    runs-on: docker
-    steps:
-      - name: Releases must be unlocked
-        env:
-          RELEASES_ENABLED: ${{ vars.RELEASES_ENABLED }}
-        run: |
-          if [ "$RELEASES_ENABLED" != "true" ]; then
-            echo "ERROR: releases are locked (RELEASES_ENABLED is not true). See .forgejo/README.md."
-            exit 1
-          fi
-          echo "releases are unlocked"
-
-  validate:
-    needs: gate
     runs-on: docker
     steps:
       - name: The tag must be a version

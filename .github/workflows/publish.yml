@@ -16,10 +16,9 @@
 #     :1.0.0                  from a release tag
 #   a GitHub release with the binaries and the chart, from a release tag
 #
-# Nothing runs for develop: before the first release, made deliberately on
-# Forgejo (.forgejo/README.md, "Releases are locked"), main and the tags are
-# untouched, so GitHub builds nothing. After the first run, the container
-# package and the chart are made public by hand in GitHub's package settings
+# Nothing runs for develop: a release is a merge to main on Forgejo
+# (.forgejo/README.md, "Releasing"). After the first run, the container
+# package and the chart were made public by hand in GitHub's package settings
 # — ghcr.io creates them private.
 #
 # The interface's packages are all public, so the image builds with npm ci

@@ -7,8 +7,8 @@ learned about this Forgejo instance in one repository applies to the others.
 | workflow | runs on | does |
 |---|---|---|
 | `ci.yml` | pull requests, and pushes to develop | secret scan, lint (with the generated API code and the OpenAPI spec), the interface's lint, i18n check, tests and build, chart lint, render and docs, tests with the race detector against a Samba the job starts |
-| `main.yml` | pushes to main | the checks again; once releases are unlocked, the image from the commit and semantic-release |
-| `release.yml` | a `v*` tag, and `workflow_dispatch` | refuse while releases are locked; otherwise validate the tag, test, the tagged image, the Forgejo release, binaries, the chart |
+| `main.yml` | pushes to main | the checks again, the image from the commit, semantic-release |
+| `release.yml` | a `v*` tag, and `workflow_dispatch` | validate the tag, test, the tagged image, the Forgejo release, binaries, the chart; nothing for `v0.0.0` |
 
 The repository starts with the Go service only. The jobs for the parts that
 follow are added with them, from websearch's workflows:
@@ -24,28 +24,24 @@ A cheap check gates an expensive one:
     main.yml     config, secret-scan, lint ─> verify ─┬─> image
                                                      └─> semantic-release
 
-    release.yml  gate ─> validate ─> test ─> image ─> notes ─┬─> binaries
-                                                            └─> chart
+    release.yml  validate ─> test ─> image ─> notes ─┬─> binaries
+                                                    └─> chart
 
 No Forgejo release is made until the image is pushed: `notes` creates it, and a
 release whose image does not exist is worse than none.
 
-## Releases are locked
+## Releasing
 
-The first release is made deliberately by the maintainer, not by the first
-merge to main. Until the repository variable `RELEASES_ENABLED` is set to
-`true`:
+A release is a pull request from develop to main. Merging it runs
+`main.yml`, whose semantic-release decides from the Conventional Commits
+whether there is a version, tags it and dispatches `release.yml`; the GitHub
+mirror then builds the public artifacts from main and the tag
+(`.github/workflows/publish.yml`, which never runs for develop).
 
-- `main.yml` runs the checks on main and skips the image and semantic-release;
-- `release.yml` fails in its first job, `gate`, whether it was dispatched or
-  started by a tag pushed by hand.
-
-Setting the variable is the maintainer's step, taken together with the first
-merge to main. Nothing in a pull request can set it.
-
-The GitHub mirror builds nothing before then either: `.github/workflows/publish.yml`
-runs for main, `v*` tags and by hand, never for develop, and main and the
-tags stay untouched until the first release.
+The tag `v0.0.0` on the initial commit is the baseline semantic-release
+counts from, so the first release was 0.1.0 rather than 1.0.0. It was made
+through the API, which raises no push event, and `release.yml` skips it
+anyway.
 
 ## Samba in CI
 
@@ -132,7 +128,6 @@ when the runner image lacks it.
 
 | name | kind | value | needed by |
 |---|---|---|---|
-| `RELEASES_ENABLED` | variable | `true` once releases are unlocked | `main.config`, `release.gate` |
 | `ZOT_URL` | variable | the registry, e.g. `https://registry.example.com` | the image jobs |
 | `ZOT_USERNAME` | variable | registry login | the same |
 | `ZOT_TOKEN` | secret | registry password or token | the same |
@@ -164,8 +159,8 @@ nothing — a release tag semantic-release made here is built there:
 - `oci://ghcr.io/metapatrol/charts/ferry` from a release tag;
 - a GitHub release with the binaries and the chart, from a release tag.
 
-Before then — the releases are locked — it builds nothing. What GitHub needs
-outside this repository:
+Before the first release it built nothing. What GitHub needs outside this
+repository:
 
 - the push mirror from Forgejo, and `main` as the GitHub repository's
   default branch;

@@ -4,11 +4,6 @@
 # semantic-release deciding whether the commits since the last tag warrant a
 # version.
 #
-# Releases are locked until the maintainer makes the first one deliberately:
-# without the repository variable RELEASES_ENABLED set to `true`, this
-# workflow runs the checks and nothing else — no image, no semantic-release.
-# See .forgejo/README.md, *Releases are locked*.
-#
 # Publishing a version is release.yml's job, and semantic-release asks for it
 # directly rather than leaving the tag to trigger it: Forgejo raises no push
 # event for a tag created with the automation token. See
@@ -27,9 +22,9 @@ env:
   FORGEJO_REPO: ${{ github.repository }}
 
 jobs:
-  # Whether this installation is configured, and allowed, to publish anything.
-  # Without registry credentials the image job is skipped rather than failed;
-  # without RELEASES_ENABLED both publishing jobs are.
+  # Whether this installation is configured to publish anything. Without
+  # registry credentials the image job is skipped rather than failed, and
+  # without the automation token semantic-release is.
   config:
     # Nothing to do for semantic-release's own commit: it changes a changelog
     # and a chart version, and the tag it carries is release.yml's business.
@@ -41,7 +36,6 @@ jobs:
     steps:
       - id: check
         env:
-          RELEASES_ENABLED: ${{ vars.RELEASES_ENABLED }}
           ZOT_URL: ${{ vars.ZOT_URL }}
           ZOT_USERNAME: ${{ vars.ZOT_USERNAME }}
           ZOT_TOKEN: ${{ secrets.ZOT_TOKEN }}
@@ -49,19 +43,15 @@ jobs:
         run: |
           publish=false
           release=false
-          if [ "$RELEASES_ENABLED" != "true" ]; then
-            echo "releases are locked (RELEASES_ENABLED is not true) - checks only"
+          if [ -n "$ZOT_URL" ] && [ -n "$ZOT_USERNAME" ] && [ -n "$ZOT_TOKEN" ]; then
+            publish=true
           else
-            if [ -n "$ZOT_URL" ] && [ -n "$ZOT_USERNAME" ] && [ -n "$ZOT_TOKEN" ]; then
-              publish=true
-            else
-              echo "registry values are not set - skipping the image build"
-            fi
-            if [ -n "$AUTOMATION_TOKEN" ]; then
-              release=true
-            else
-              echo "AUTOMATION_TOKEN is not set - skipping semantic-release"
-            fi
+            echo "registry values are not set - skipping the image build"
+          fi
+          if [ -n "$AUTOMATION_TOKEN" ]; then
+            release=true
+          else
+            echo "AUTOMATION_TOKEN is not set - skipping semantic-release"
           fi
           for out in "$GITHUB_OUTPUT" "$FORGEJO_OUTPUT"; do
             [ -n "$out" ] || continue
