@@ -1,0 +1,362 @@
+// Package api is ferry's HTTP API: it implements api/v1's ServerInterface on
+// top of the session table and internal/smb, maps SMB errors to problem
+// responses (problem.go) and streams files both ways (content.go). It holds
+// no rules about access: those are the SMB server's.
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"net"
+	"net/http"
+	"net/netip"
+	"strconv"
+	"strings"
+	"time"
+
+	v1 "github.com/metapatrol/ferry/api/v1"
+	"github.com/metapatrol/ferry/internal/config"
+	"github.com/metapatrol/ferry/internal/session"
+	"github.com/metapatrol/ferry/internal/smb"
+)
+
+// LoginFunc sets up an SMB session; smb.Login, or a stand-in in tests.
+type LoginFunc func(context.Context, smb.LoginOptions, smb.Credentials) (*smb.Session, error)
+
+// API serves /api/v1.
+type API struct {
+	cfg       config.Config
+	sessions  *session.Table
+	byAddress *session.Limiter
+	byUser    *session.Limiter
+	login     LoginFunc
+	log       *slog.Logger
+	version   string
+}
+
+// New makes the API. login is smb.Login outside tests.
+func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.Logger, version string) *API {
+	return &API{
+		cfg:       cfg,
+		sessions:  sessions,
+		byAddress: session.NewLimiter(cfg.LoginRatePerAddress, 10000, nil),
+		byUser:    session.NewLimiter(cfg.LoginRatePerUser, 10000, nil),
+		login:     login,
+		log:       log,
+		version:   version,
+	}
+}
+
+var _ v1.ServerInterface = (*API)(nil)
+
+// Handler returns the API's routes with ferry's checks in front of them: the
+// CSRF header on every request that changes something, and the headers
+// every API answer carries. They wrap the generated router rather than run
+// as its middlewares, because the router binds parameters first — a missing
+// X-Ferry-Request would otherwise be a generic parameter error.
+func (a *API) Handler() http.Handler {
+	h := v1.HandlerWithOptions(a, v1.StdHTTPServerOptions{
+		BaseRouter: http.NewServeMux(),
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			// Parameter errors from the generated code: which parameter,
+			// never its value.
+			probInvalidRequest.write(w)
+		},
+	})
+	return apiHeaders(requireFerryRequest(h))
+}
+
+// requireFerryRequest refuses a request that changes something unless it
+// carries X-Ferry-Request: 1. A cross-site form or a simple fetch cannot set
+// a custom header, and one that tries needs a CORS preflight ferry never
+// answers; with the SameSite=Strict cookie this is the CSRF protection.
+func requireFerryRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+		default:
+			if r.Header.Get("X-Ferry-Request") != "1" {
+				probMissingFerryReq.write(w)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// apiHeaders are what every API answer carries. A file download replaces
+// the Content-Security-Policy with its own sandbox (content.go).
+func apiHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "same-origin")
+		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		h.Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+// decodeJSON reads a small JSON body into v, refusing unknown fields and
+// anything beyond max bytes.
+func decodeJSON(w http.ResponseWriter, r *http.Request, max int64, v any) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, max))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			probTooLarge.write(w)
+		} else {
+			probInvalidRequest.write(w)
+		}
+		return false
+	}
+	if dec.More() {
+		probInvalidRequest.write(w)
+		return false
+	}
+	return true
+}
+
+// ── Cookies and client addresses ───────────────────────────────────────────
+
+const (
+	cookieName       = "ferry_session"
+	secureCookieName = "__Host-ferry_session"
+)
+
+// secure reports whether the session cookie should be Secure for this
+// request. "auto" believes X-Forwarded-Proto from anyone: a forged header
+// can only make the cookie stricter.
+func (a *API) secure(r *http.Request) bool {
+	switch a.cfg.CookieSecure {
+	case "true":
+		return true
+	case "false":
+		return false
+	}
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+func (a *API) setCookie(w http.ResponseWriter, r *http.Request, id string) {
+	c := &http.Cookie{
+		Name:     cookieName,
+		Value:    id,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	}
+	if a.secure(r) {
+		c.Name, c.Secure = secureCookieName, true
+	}
+	http.SetCookie(w, c)
+}
+
+func (a *API) clearCookie(w http.ResponseWriter, r *http.Request) {
+	for _, name := range []string{cookieName, secureCookieName} {
+		c := &http.Cookie{Name: name, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode}
+		if name == secureCookieName {
+			if !a.secure(r) {
+				continue
+			}
+			c.Secure = true
+		}
+		http.SetCookie(w, c)
+	}
+}
+
+func sessionID(r *http.Request) string {
+	for _, name := range []string{secureCookieName, cookieName} {
+		if c, err := r.Cookie(name); err == nil && c.Value != "" && len(c.Value) <= 64 {
+			return c.Value
+		}
+	}
+	return ""
+}
+
+// clientAddr is the address login attempts are counted against: the TCP
+// peer, or — when the peer is a trusted proxy — the last address in
+// X-Forwarded-For that is not one.
+func (a *API) clientAddr(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	peer, err := netip.ParseAddr(host)
+	if err != nil || !a.trusted(peer) {
+		return host
+	}
+	hops := strings.Split(strings.Join(r.Header.Values("X-Forwarded-For"), ","), ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
+		if err != nil {
+			break
+		}
+		if !a.trusted(hop) {
+			return hop.String()
+		}
+	}
+	return host
+}
+
+func (a *API) trusted(addr netip.Addr) bool {
+	addr = addr.Unmap()
+	for _, p := range a.cfg.TrustedProxies {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
+// ── Session and login ──────────────────────────────────────────────────────
+
+func (a *API) GetInfo(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, v1.Info{
+		Server:                 a.cfg.ServerName,
+		IdleTimeoutSeconds:     int(a.cfg.IdleTimeout / time.Second),
+		SessionLifetimeSeconds: int(a.cfg.SessionLifetime / time.Second),
+		Version:                a.version,
+	})
+}
+
+const (
+	maxUsername = 256
+	maxPassword = 1024
+)
+
+func (a *API) Login(w http.ResponseWriter, r *http.Request, _ v1.LoginParams) {
+	var req v1.LoginRequest
+	if !decodeJSON(w, r, 4<<10, &req) {
+		return
+	}
+	if req.Username == "" || req.Password == "" || len(req.Username) > maxUsername || len(req.Password) > maxPassword {
+		probInvalidRequest.write(w)
+		return
+	}
+	addr := a.clientAddr(r)
+	if ok, wait := a.byAddress.Allow("a:" + addr); !ok {
+		a.rateLimited(w, wait, "address")
+		return
+	}
+	if ok, wait := a.byUser.Allow("u:" + strings.ToLower(req.Username)); !ok {
+		a.rateLimited(w, wait, "username")
+		return
+	}
+
+	user, domain := splitUser(req.Username)
+	start := time.Now()
+	conn, err := a.login(r.Context(), smb.LoginOptions{Server: a.cfg.SMBServer, Timeout: a.cfg.LoginTimeout},
+		smb.Credentials{User: user, Password: req.Password, Domain: domain})
+	// The password is not needed again. Go cannot wipe a string, but nothing
+	// below holds a reference to it.
+	req.Password = ""
+	if err != nil {
+		// The kind and the NT status only: never the username, which a
+		// person may have mistyped their password into.
+		a.log.Info("login refused", "outcome", smb.KindOf(err).String(), "err", err, "client", addr,
+			"duration_ms", time.Since(start).Milliseconds())
+		smbProblem(err).write(w)
+		return
+	}
+	// A login replaces the session the browser had, if any.
+	if old := sessionID(r); old != "" {
+		a.sessions.Delete(old)
+	}
+	id, s, err := a.sessions.Create(conn, req.Username)
+	if err != nil {
+		_ = conn.Close()
+		if errors.Is(err, session.ErrFull) {
+			a.log.Warn("login refused", "outcome", "too_many_sessions", "client", addr)
+			probTooManySessions.write(w)
+			return
+		}
+		a.log.Error("login failed", "outcome", "internal", "err", err)
+		probInternal.write(w)
+		return
+	}
+	a.log.Info("login", "outcome", "ok", "client", addr, "duration_ms", time.Since(start).Milliseconds())
+	a.setCookie(w, r, id)
+	writeJSON(w, http.StatusOK, a.me(s))
+}
+
+// splitUser takes the domain off DOMAIN\user. A plain name and user@domain
+// go to the server as they are.
+func splitUser(name string) (user, domain string) {
+	if i := strings.IndexByte(name, '\\'); i > 0 {
+		return name[i+1:], name[:i]
+	}
+	return name, ""
+}
+
+func (a *API) rateLimited(w http.ResponseWriter, wait time.Duration, by string) {
+	secs := int(wait/time.Second) + 1
+	w.Header().Set("Retry-After", strconv.Itoa(secs))
+	a.log.Info("login refused", "outcome", "rate_limited", "by", by)
+	probRateLimited.write(w)
+}
+
+func (a *API) Logout(w http.ResponseWriter, r *http.Request, _ v1.LogoutParams) {
+	if id := sessionID(r); id != "" {
+		a.sessions.Delete(id)
+	}
+	a.clearCookie(w, r)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) GetMe(w http.ResponseWriter, r *http.Request) {
+	s, ok := a.acquire(w, r)
+	if !ok {
+		return
+	}
+	defer a.sessions.Release(s)
+	writeJSON(w, http.StatusOK, a.me(s))
+}
+
+func (a *API) me(s *session.Session) v1.Me {
+	return v1.Me{
+		Username:           s.User,
+		Server:             a.cfg.ServerName,
+		ExpiresAt:          s.Expires.UTC(),
+		IdleTimeoutSeconds: int(a.cfg.IdleTimeout / time.Second),
+	}
+}
+
+// acquire finds the request's session, or answers 401. The caller releases
+// it.
+func (a *API) acquire(w http.ResponseWriter, r *http.Request) (*session.Session, bool) {
+	s, ok := a.sessions.Acquire(sessionID(r))
+	if !ok {
+		a.clearCookie(w, r)
+		probUnauthenticated.write(w)
+		return nil, false
+	}
+	return s, true
+}
+
+// fail answers an error from internal/smb. A lost SMB session ends the
+// ferry session: there is no password to reconnect with.
+func (a *API) fail(w http.ResponseWriter, r *http.Request, err error) {
+	if smb.KindOf(err) == smb.KindSessionLost {
+		a.sessions.Delete(sessionID(r))
+		a.clearCookie(w, r)
+	}
+	p := smbProblem(err)
+	if p.status >= 500 {
+		a.log.Warn("request failed", "route", r.Pattern, "err", err)
+	}
+	p.write(w)
+}
+
+// drain reads what is left of a body, up to a bound, so the connection can
+// be reused.
+func drain(r io.Reader) { _, _ = io.CopyN(io.Discard, r, 64<<10) }

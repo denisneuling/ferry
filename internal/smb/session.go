@@ -169,6 +169,11 @@ func (s *Session) fail(err error) error {
 
 // acquire waits for the session's one request slot (see Session.op).
 func (s *Session) acquire(ctx context.Context) error {
+	// An ended context loses even against a free slot: select would pick
+	// between the two at random.
+	if err := ctx.Err(); err != nil {
+		return classify(err)
+	}
 	select {
 	case s.op <- struct{}{}:
 		return nil
@@ -326,8 +331,41 @@ type File struct {
 	f       *smb2.File
 	sess    *Session
 	ctx     context.Context
+	release func() // ends the file's own context (handleContext)
 	Size    int64
 	ModTime time.Time
+}
+
+// closeGrace is how long a file's handle outlives the request that opened
+// it, so that it can still be closed on the server after the request ended.
+const closeGrace = 10 * time.Second
+
+// handleContext is the context an open file is bound to. go-smb2 binds a
+// file to the context of the share it was opened through, for every later
+// call — Close included. Bound to the request's context, a download the
+// client aborts (every seek in a video does) could not close its handle, and
+// the handles would pile up on the server until logoff. So the file gets a
+// context of its own that ends closeGrace after the request's does: long
+// enough to close cleanly, short enough that a call the server never answers
+// still ends. stop ends it at once.
+func handleContext(ctx context.Context) (hctx context.Context, stop func()) {
+	hctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	var timer *time.Timer
+	var mu sync.Mutex
+	unwatch := context.AfterFunc(ctx, func() {
+		mu.Lock()
+		defer mu.Unlock()
+		timer = time.AfterFunc(closeGrace, cancel)
+	})
+	return hctx, func() {
+		unwatch()
+		mu.Lock()
+		if timer != nil {
+			timer.Stop()
+		}
+		mu.Unlock()
+		cancel()
+	}
 }
 
 // Open opens a file for reading. A folder is KindIsDir.
@@ -347,20 +385,24 @@ func (s *Session) Open(ctx context.Context, share, p string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := m.OpenFile(sp, os.O_RDONLY, 0)
+	hctx, stop := handleContext(ctx)
+	f, err := m.WithContext(hctx).OpenFile(sp, os.O_RDONLY, 0)
 	if err != nil {
+		stop()
 		return nil, s.fail(err)
 	}
 	fi, err := f.Stat()
 	if err != nil {
 		_ = f.Close()
+		stop()
 		return nil, s.fail(err)
 	}
 	if fi.IsDir() {
 		_ = f.Close()
+		stop()
 		return nil, &Error{Kind: KindIsDir}
 	}
-	return &File{f: f, sess: s, ctx: ctx, Size: fi.Size(), ModTime: fi.ModTime()}, nil
+	return &File{f: f, sess: s, ctx: ctx, release: stop, Size: fi.Size(), ModTime: fi.ModTime()}, nil
 }
 
 // The file's methods take the session's request slot for each call, with the
@@ -429,11 +471,12 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	return n, f.err(err)
 }
 
-// Close closes the handle. It does so even when the opening request's
-// context has ended, with a short context of its own, so that handles are
-// not left open on the server.
+// Close closes the handle on the server. It works for closeGrace after the
+// opening request's context ended (handleContext), so an aborted download
+// still closes its handle.
 func (f *File) Close() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer f.release()
+	ctx, cancel := context.WithTimeout(context.Background(), closeGrace)
 	defer cancel()
 	if err := f.sess.begin(ctx); err != nil {
 		return err

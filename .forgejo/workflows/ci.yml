@@ -50,6 +50,16 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
+      # api/v1/v1.gen.go is committed: generated again with the oapi-codegen
+      # go.mod pins as a tool, it must not change.
+      - name: The generated API code is up to date
+        run: |
+          make generate-api
+          git diff --exit-code -- api/v1 || { echo "api/v1 is out of date: run make generate-api and commit it"; exit 1; }
+      # The spec is the contract the interface's client is generated from:
+      # Redocly at the version the Makefile pins.
+      - name: Lint the OpenAPI spec
+        run: make lint-api
       - name: Install golangci-lint at the pinned version
         run: |
           VERSION=$(grep '^GOLANGCI_LINT_VERSION' Makefile | cut -d= -f2 | tr -d ' ')

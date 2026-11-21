@@ -1,0 +1,12 @@
+# oapi-codegen settings for ferry's API. The spec is the source of truth:
+# change api/openapi/ferry-v1.yaml, then `make generate-api`.
+package: v1
+generate:
+  models: true
+  std-http-server: true
+  client: true
+output: v1.gen.go
+compatibility:
+  # Enum values carry their type's name (EntryTypeFile): unprefixed constants
+  # collide as soon as two enums share a value.
+  always-prefix-enum-values: true

@@ -17,6 +17,7 @@ func TestRun(t *testing.T) {
 		{name: "no command", args: nil, code: 2, stderrPart: "Usage:"},
 		{name: "version", args: []string{"version"}, code: 0, stdout: "ferry dev (commit unknown, built unknown)\n"},
 		{name: "help", args: []string{"help"}, code: 0, stdout: usage},
+		{name: "serve with arguments", args: []string{"serve", "now"}, code: 2, stderrPart: "takes no arguments"},
 		{name: "unknown", args: []string{"sail"}, code: 2, stderrPart: `unknown command "sail"`},
 	}
 	for _, tc := range cases {

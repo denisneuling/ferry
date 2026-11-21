@@ -123,5 +123,17 @@ should not set `DEBUG` regardless.
 ## Open for milestone 2
 
 - `File.Close` after the request's context ended: go-smb2's file keeps the
-  context it was opened with, so closing a handle of a cancelled download may
-  fail and leave it to the server's own cleanup. Close with a fresh context.
+  context it was opened with, so the handle of an aborted download could not
+  be closed. Done: open files get a context of their own that outlives the
+  request's by ten seconds (`handleContext`); `TestAbortedDownloadClosesItsHandle`
+  and `TestUploadCanceledLeavesNothingBehind` hold it.
+- go-smb2's `Rename` always replaces an existing target
+  (`ReplaceIfExists: 1`): "without overwrite" is a check before the rename,
+  not an atomic refusal. Worth an option upstream.
+- go-smb2's `Remove` retries a permission failure after `Chmod(0666)`, which
+  would clear the file's DOS attributes. It cannot trigger today — the
+  server's `ResponseError` does not match `os.ErrPermission` — and
+  `TestReadOnlyShare` shows a refused delete leaves the file as it was. A
+  go-smb2 update that changes that matching would make ferry change files it
+  was told it may not delete; read its changes (Renovate keeps go-smb2 in
+  pull requests of its own).

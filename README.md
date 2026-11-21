@@ -17,6 +17,8 @@
 
 <p align="center">
   <a href="CONCEPT.md">Concept</a> ·
+  <a href="docs/configuration.md">Configuration</a> ·
+  <a href="api/openapi/ferry-v1.yaml">API</a> ·
   <a href="docs/mockup/index.html">Mockup</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="SECURITY.md">Security</a>
@@ -90,9 +92,18 @@ SMB2/3; TLS termination (the gateway in front does it).
 ## Quick start
 
 ```sh
-make test lint secret-scan   # what CI runs
-make build-ferry             # bin/ferry
+make dev-samba               # a test Samba on :4445 (podman; CONTAINER=docker)
+make test-samba lint         # the tests against it, and the linters
+make run                     # ferry on :8080 against it: log in as alex / alex-test-password
 ```
+
+```sh
+curl -s localhost:8080/api/v1/info
+```
+
+The interface is not built in yet; the API is at `/api/v1`
+([api/openapi/ferry-v1.yaml](api/openapi/ferry-v1.yaml)), configured as in
+[docs/configuration.md](docs/configuration.md).
 
 ## Contributing
 

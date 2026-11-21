@@ -6,14 +6,13 @@ learned about this Forgejo instance in one repository applies to the others.
 
 | workflow | runs on | does |
 |---|---|---|
-| `ci.yml` | pull requests, and pushes to develop | secret scan, lint, tests with the race detector against a Samba the job starts |
+| `ci.yml` | pull requests, and pushes to develop | secret scan, lint (with the generated API code and the OpenAPI spec), tests with the race detector against a Samba the job starts |
 | `main.yml` | pushes to main | the checks again; once releases are unlocked, the image from the commit and semantic-release |
 | `release.yml` | a `v*` tag, and `workflow_dispatch` | refuse while releases are locked; otherwise validate the tag, test, the tagged image, the Forgejo release, binaries |
 
 The repository starts with the Go service only. The jobs for the parts that
 follow are added with them, from websearch's workflows:
 
-- the generated API code and the OpenAPI lint (`lint`), with the spec;
 - the interface's lint, i18n check, tests and build (`ui`), with `ui/`;
 - chart lint, render and docs (`helm`), and the charts in `release.yml`,
   with `charts/`.
@@ -61,7 +60,7 @@ SMB tests skip.
 
 ## Generated code
 
-`api/v1/v1.gen.go` will be committed, so that every tool — `go build`, `go mod
+`api/v1/v1.gen.go` is committed, so that every tool — `go build`, `go mod
 tidy`, Renovate — sees a complete module. The lint job generates it again with
 the oapi-codegen `go.mod` pin as a tool and fails when that changes anything;
 `api/v1/generate_test.go` checks the same in every test run. The interface's

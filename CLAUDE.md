@@ -83,7 +83,9 @@ is English.
 
     make test lint secret-scan   # what CI runs for Go
     make dev-samba               # the test Samba on 127.0.0.1:4445 (podman; CONTAINER=docker)
-    make test-samba              # the SMB tests against it
+    make test-samba              # every test, the SMB ones against it
+    make run                     # ferry on :8080 against it (alex / alex-test-password)
+    make generate-api lint-api   # after changing the spec
     make build-ferry             # the binary, into bin/
 
 The SMB tests skip without `FERRY_TEST_SMB_SERVER` (and

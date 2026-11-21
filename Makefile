@@ -5,6 +5,8 @@
 GOLANGCI_LINT_VERSION ?= v2.14.0
 GITLEAKS_VERSION ?= v8.30.1
 HELM_DOCS_VERSION ?= v1.14.2
+# Lints the OpenAPI spec; run through npx, so it needs Node but no install.
+REDOCLY_CLI_VERSION ?= 2.54.2
 
 BINARIES := ferry
 
@@ -19,7 +21,7 @@ FERRY_TEST_SMB_SERVER ?= 127.0.0.1:$(DEV_SAMBA_PORT)
 FERRY_TEST_SMB_SERVER_BAD_PASSWORD ?= 127.0.0.1:$(DEV_SAMBA_BAD_PASSWORD_PORT)
 
 .PHONY: build test test-samba lint clean build-all changelog release install-tools ci \
-	dev-samba dev-samba-stop secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
+	run generate-api lint-api dev-samba dev-samba-stop secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -36,9 +38,9 @@ test:
 test-samba:
 	FERRY_TEST_SMB_SERVER=$(FERRY_TEST_SMB_SERVER) \
 	FERRY_TEST_SMB_SERVER_BAD_PASSWORD=$(FERRY_TEST_SMB_SERVER_BAD_PASSWORD) \
-		go test -race -count=1 ./internal/smb/...
+		go test -race -count=1 ./...
 
-lint:
+lint: lint-api
 	golangci-lint run ./...
 
 clean:
@@ -46,6 +48,16 @@ clean:
 
 # What CI checks on a pull request, in the order it checks it.
 ci: secret-scan lint test
+
+# ferry on http://localhost:8080 against the Samba from `make dev-samba`
+# (log in as alex / alex-test-password), health on :8081. The interface is
+# not built in yet; the API is at /api/v1.
+run:
+	FERRY_SMB_SERVER=$${FERRY_SMB_SERVER:-$(FERRY_TEST_SMB_SERVER)} \
+	FERRY_SERVER_NAME=$${FERRY_SERVER_NAME:-nas.example.lan} \
+	FERRY_LOG_FORMAT=$${FERRY_LOG_FORMAT:-text} \
+	FERRY_LOG_LEVEL=$${FERRY_LOG_LEVEL:-debug} \
+		go run ./cmd/ferry serve
 
 # Samba on 127.0.0.1:$(DEV_SAMBA_PORT), and its `map to guest = Bad Password`
 # instance on $(DEV_SAMBA_BAD_PASSWORD_PORT) (hack/samba/setup.sh). Their state
@@ -81,7 +93,19 @@ build-all:
 		done; \
 	done
 
-# Tools a local run needs on PATH.
+# ── Generated code ─────────────────────────────────────────────────────────
+
+# The API's types, server interface and client, from its OpenAPI spec. The spec
+# is the source of truth; TestGeneratedCodeIsCurrent fails when the generated
+# code does not match it. oapi-codegen is a tool in go.mod.
+generate-api:
+	go generate ./api/v1/
+
+lint-api:
+	npx -y @redocly/cli@$(REDOCLY_CLI_VERSION) lint api/openapi/ferry-v1.yaml
+
+# Tools a local run needs on PATH. oapi-codegen is not among them: the target
+# above runs it at the version go.mod pins.
 install-tools:
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	go install github.com/norwoodj/helm-docs/cmd/helm-docs@$(HELM_DOCS_VERSION)

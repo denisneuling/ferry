@@ -1,0 +1,503 @@
+openapi: 3.0.3
+info:
+  title: ferry
+  version: v1
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  description: |
+    ferry shows SMB shares in a browser. This is the API its interface uses.
+
+    **Login is an SMB session setup.** `POST /api/v1/login` connects to the
+    configured SMB server and authenticates with exactly the credentials
+    given. ferry keeps the live SMB session in memory under a random session
+    cookie and forgets the password. Every other call acts on that session,
+    as that user: the SMB server decides what is allowed, and ferry adds no
+    rights and removes none.
+
+    **Sessions** end after an idle timeout, after an absolute lifetime, on
+    logout, when the SMB connection drops, or when ferry restarts. A call
+    with an ended session is a `401` problem with code `unauthenticated`.
+
+    **Cross-site requests.** Every request that changes something — login,
+    logout, uploads, folders, moves, deletes — must carry the header
+    `X-Ferry-Request: 1`. With the `SameSite=Strict` session cookie that is
+    the CSRF protection.
+
+    **Paths** are slash-separated and relative to the share's root; `/`, `.`
+    and the empty path all mean the root. `..`, backslashes and NUL bytes
+    are refused (`400`, `invalid_path`) before anything reaches the server.
+
+    **Errors** are RFC 9457 problem details (`application/problem+json`)
+    with a stable `code`. What the SMB server refuses is a problem, never an
+    empty success: access denied is `403`, not found `404`, a name that
+    exists or a file in use `409`, an unreachable server `502`.
+servers:
+  - url: /
+tags:
+  - name: session
+    description: Login, logout and the current session.
+  - name: files
+    description: Shares, folders and files, as the logged-in user.
+security:
+  - SessionCookie: []
+
+paths:
+  # ── Session ────────────────────────────────────────────────────────────────
+  /api/v1/info:
+    get:
+      operationId: getInfo
+      tags: [session]
+      summary: What the login page shows before anyone is logged in.
+      security: []
+      responses:
+        "200":
+          description: The server's display name and the session timeouts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Info" }
+
+  /api/v1/login:
+    post:
+      operationId: login
+      tags: [session]
+      summary: Log in with an SMB username and password.
+      description: |
+        Sets up an SMB session with exactly these credentials. On success the
+        response sets the session cookie; the password is not kept. A login
+        the server would only grant as a guest or anonymously is refused like
+        a wrong password. Logins are rate limited per client address and per
+        username.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/FerryRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Logged in. `Set-Cookie` carries the session.
+          headers:
+            Set-Cookie:
+              description: The session cookie, `HttpOnly; SameSite=Strict; Path=/`, and `Secure` over HTTPS.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+
+  /api/v1/logout:
+    post:
+      operationId: logout
+      tags: [session]
+      summary: End the session and its SMB session.
+      description: Idempotent; without a session it does nothing and still answers 204.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/FerryRequest"
+      responses:
+        "204":
+          description: Logged out; the cookie is cleared.
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/v1/me:
+    get:
+      operationId: getMe
+      tags: [session]
+      summary: The current session.
+      responses:
+        "200":
+          description: Who is logged in, on which server, and until when.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ── Files ──────────────────────────────────────────────────────────────────
+  /api/v1/shares:
+    get:
+      operationId: listShares
+      tags: [files]
+      summary: The shares the server lists for this user.
+      description: |
+        The disk shares the SMB server enumerates on the user's session,
+        without hidden (`$`) shares, narrowed by the deployment's allow-list
+        if it has one. The server may list shares the user cannot open;
+        opening one is then a `403`.
+      responses:
+        "200":
+          description: The shares, sorted by name.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShareList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/entries:
+    parameters:
+      - $ref: "#/components/parameters/ShareName"
+      - $ref: "#/components/parameters/EntryPath"
+    get:
+      operationId: listEntries
+      tags: [files]
+      summary: The entries of a folder.
+      responses:
+        "200":
+          description: The folder's entries, unsorted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EntryList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    delete:
+      operationId: deleteEntry
+      tags: [files]
+      summary: Delete a file or a folder.
+      description: |
+        A folder is deleted only when it is empty, unless `recursive` is
+        true; then its contents are deleted first, depth first. A recursive
+        delete that fails part-way leaves what it had not reached yet.
+      parameters:
+        - $ref: "#/components/parameters/FerryRequest"
+        - name: recursive
+          in: query
+          required: false
+          description: Delete a folder with everything in it.
+          schema: { type: boolean, default: false }
+      responses:
+        "204":
+          description: Deleted.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/content:
+    parameters:
+      - $ref: "#/components/parameters/ShareName"
+      - $ref: "#/components/parameters/EntryPath"
+    get:
+      operationId: getContent
+      tags: [files]
+      summary: Download a file, streamed, with Range.
+      description: |
+        Answers with the file's bytes. One byte range (`Range: bytes=a-b`) is
+        honoured with `206`; several ranges are answered with the whole file.
+        `ETag` and `Last-Modified` follow the file's size and modification
+        time, so `If-None-Match` and `If-Range` work.
+
+        The file never runs in ferry's origin: every answer carries
+        `Content-Security-Policy: sandbox` and `X-Content-Type-Options:
+        nosniff`. With `disposition=inline` the browser may show images,
+        video, audio, PDF and plain text itself; anything else — HTML and SVG
+        included — is sent as an attachment regardless.
+      parameters:
+        - name: disposition
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [attachment, inline]
+            default: attachment
+      responses:
+        "200":
+          description: The whole file.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "206":
+          description: The requested range.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "304":
+          description: Not modified since the `If-None-Match` ETag.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "416":
+          description: The range lies outside the file.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    put:
+      operationId: putContent
+      tags: [files]
+      summary: Upload a file, streamed.
+      description: |
+        The body is written to a temporary name in the target folder and
+        renamed to the file's name once it is complete, so a failed or
+        interrupted upload never leaves a partial file under the real name.
+        An existing file is replaced only with `overwrite=true`; otherwise
+        it is a `409`. The deployment's upload limit applies (`413`).
+      parameters:
+        - $ref: "#/components/parameters/FerryRequest"
+        - name: overwrite
+          in: query
+          required: false
+          description: Replace a file of the same name.
+          schema: { type: boolean, default: false }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          description: Uploaded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/folders:
+    post:
+      operationId: createFolder
+      tags: [files]
+      summary: Create a folder.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/FerryRequest"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/move:
+    post:
+      operationId: moveEntry
+      tags: [files]
+      summary: Rename or move a file or folder within a share.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/FerryRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoveRequest" }
+      responses:
+        "200":
+          description: Moved; the entry under its new name.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: ferry_session
+      description: |
+        The session cookie `POST /api/v1/login` sets. Served over HTTPS it is
+        named `__Host-ferry_session`.
+
+  parameters:
+    ShareName:
+      name: share
+      in: path
+      required: true
+      description: The share's name, as the server lists it.
+      schema: { type: string, minLength: 1, maxLength: 80 }
+    EntryPath:
+      name: path
+      in: query
+      required: false
+      description: Slash-separated, relative to the share's root; empty for the root.
+      schema: { type: string, maxLength: 4096, default: "" }
+    FerryRequest:
+      name: X-Ferry-Request
+      in: header
+      required: true
+      description: Must be `1`. Together with the SameSite cookie, the CSRF protection.
+      schema: { type: string, enum: ["1"] }
+
+  responses:
+    BadRequest:
+      description: The request is not valid (`invalid_request`, `invalid_path`, `missing_ferry_request`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: No session (`unauthenticated`), or the server refused the credentials (`login_failed`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: The SMB server refused the operation (`access_denied`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: No such share, file or folder (`not_found`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: |
+        The name exists (`exists`), the file is in use (`busy`), the folder is
+        not empty (`not_empty`), or a file was named where a folder is needed
+        or the other way round (`not_a_folder`, `is_a_folder`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooLarge:
+      description: "A bound of ferry's own was reached (`too_large`): the upload limit, or the number of entries in a folder."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooManyRequests:
+      description: Too many logins from this address or for this username (`rate_limited`); `Retry-After` says when to try again.
+      headers:
+        Retry-After:
+          description: Seconds until the next attempt may succeed.
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    BadGateway:
+      description: The SMB server cannot be reached or did not answer (`server_unreachable`), or the SMB connection was lost (`session_lost`, which also ends the session).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unavailable:
+      description: ferry holds as many sessions as it is configured for (`too_many_sessions`).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, description: "A URI identifying the problem type." }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code:
+          type: string
+          description: |
+            Stable, machine-readable: `invalid_request`, `invalid_path`,
+            `missing_ferry_request`, `unauthenticated`, `login_failed`,
+            `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
+            `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
+            `range_not_satisfiable`, `server_unreachable`, `session_lost`,
+            `too_many_sessions`, `internal`.
+
+    Info:
+      type: object
+      required: [server, idleTimeoutSeconds, sessionLifetimeSeconds, version]
+      properties:
+        server:
+          type: string
+          description: The SMB server's display name, for "with your account on …".
+        idleTimeoutSeconds: { type: integer }
+        sessionLifetimeSeconds: { type: integer }
+        version: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      additionalProperties: false
+      properties:
+        username: { type: string, minLength: 1, maxLength: 256 }
+        password: { type: string, minLength: 1, maxLength: 1024, format: password }
+
+    Me:
+      type: object
+      required: [username, server, expiresAt, idleTimeoutSeconds]
+      properties:
+        username: { type: string }
+        server: { type: string, description: "The SMB server's display name." }
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the session ends at the latest, regardless of activity.
+        idleTimeoutSeconds: { type: integer }
+
+    Share:
+      type: object
+      required: [name, comment]
+      properties:
+        name: { type: string }
+        comment: { type: string, description: "The server's comment for the share; not translated." }
+    ShareList:
+      type: object
+      required: [shares]
+      properties:
+        shares:
+          type: array
+          items: { $ref: "#/components/schemas/Share" }
+
+    EntryType:
+      type: string
+      enum: [file, folder]
+    Entry:
+      type: object
+      required: [name, path, type, size, modified]
+      properties:
+        name: { type: string }
+        path: { type: string, description: "Slash-separated, relative to the share's root." }
+        type: { $ref: "#/components/schemas/EntryType" }
+        size: { type: integer, format: int64, description: "Bytes; 0 for folders." }
+        modified: { type: string, format: date-time }
+    EntryList:
+      type: object
+      required: [path, entries]
+      properties:
+        path: { type: string, description: "The folder, cleaned." }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/Entry" }
+
+    MoveRequest:
+      type: object
+      required: [from, to]
+      additionalProperties: false
+      properties:
+        from: { type: string, maxLength: 4096, description: "The entry's path." }
+        to: { type: string, maxLength: 4096, description: "Its new path, in the same share." }
+        overwrite:
+          type: boolean
+          default: false
+          description: Replace a file of the target name.
