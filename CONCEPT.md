@@ -317,6 +317,7 @@ Filestash for a week before Filestash goes.
 | go-smb2 (cloudsoda fork), not libsmbclient | pure Go, distroless image, the same code rclone runs against many servers |
 | Session cookie, not Basic auth or tokens in the browser | the password is sent once; JavaScript never holds it; logout works |
 | No sharing links | they would need state and a second authorisation model |
+| Own interface components, no `@metapatrol/ng` | the look is ferry's own (“Hafen”), so shared primitives would be restyled everywhere; and the repository is public, so the build must not need a private registry or a token: `npm ci` is enough. Angular CDK supplies behaviour only (focus trap, a11y, overlay positioning), without its styles |
 
 ---
 
@@ -336,6 +337,9 @@ Filestash for a week before Filestash goes.
 - A credential appears in a log line through a wrapped error from the SMB
   library.
 
+What the spike found for each of them, and how ferry holds it:
+[docs/spike.md](docs/spike.md).
+
 ---
 
 ## 12. Open questions
@@ -343,6 +347,3 @@ Filestash for a week before Filestash goes.
 - **Previous versions:** show ZFS snapshots through SMB's `@GMT` tokens? This
   needs `vfs_shadow_copy2` configured in Samba; ferry would only use it where a
   server offers it.
-- **Shared components:** should ferry reuse `@metapatrol/ng` primitives (dialogs,
-  inputs) under its own theme, or carry its own small set? The metapatrol shell
-  is ruled out either way.

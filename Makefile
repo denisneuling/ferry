@@ -8,8 +8,16 @@ HELM_DOCS_VERSION ?= v1.14.2
 
 BINARIES := ferry
 
-.PHONY: build test lint clean build-all changelog release install-tools ci \
-	secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
+# The test Samba (hack/samba): fictional users and shares, including the
+# `map to guest = Bad User` setting ferry has to refuse. podman by default, as
+# in the sibling projects; CONTAINER=docker works too.
+CONTAINER ?= podman
+DEV_SAMBA_ALPINE ?= docker.io/library/alpine:3.22
+DEV_SAMBA_PORT ?= 4445
+FERRY_TEST_SMB_SERVER ?= 127.0.0.1:$(DEV_SAMBA_PORT)
+
+.PHONY: build test test-samba lint clean build-all changelog release install-tools ci \
+	dev-samba dev-samba-stop secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -18,8 +26,13 @@ LDFLAGS = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buil
 build:
 	go build ./...
 
+# The SMB tests skip without FERRY_TEST_SMB_SERVER; test-samba runs them
+# against the Samba from `make dev-samba`.
 test:
 	go test -v -count=1 ./...
+
+test-samba:
+	FERRY_TEST_SMB_SERVER=$(FERRY_TEST_SMB_SERVER) go test -race -count=1 ./internal/smb/...
 
 lint:
 	golangci-lint run ./...
@@ -29,6 +42,19 @@ clean:
 
 # What CI checks on a pull request, in the order it checks it.
 ci: secret-scan lint test
+
+# Samba on 127.0.0.1:$(DEV_SAMBA_PORT); its state goes with the container,
+# which `make dev-samba-stop` stops and removes.
+dev-samba:
+	$(CONTAINER) build -q --build-arg ALPINE_IMAGE=$(DEV_SAMBA_ALPINE) -t ferry-dev-samba hack/samba
+	$(CONTAINER) run -d --rm --name ferry-dev-samba -p 127.0.0.1:$(DEV_SAMBA_PORT):445 ferry-dev-samba
+	@i=0; until $(CONTAINER) logs ferry-dev-samba 2>&1 | grep -q 'smbd version'; do \
+		i=$$((i + 1)); [ $$i -lt 60 ] || { echo "Samba did not start"; exit 1; }; sleep 1; \
+	done
+	@echo "FERRY_TEST_SMB_SERVER=$(FERRY_TEST_SMB_SERVER)"
+
+dev-samba-stop:
+	$(CONTAINER) stop ferry-dev-samba
 
 # ── Binaries ───────────────────────────────────────────────────────────────
 

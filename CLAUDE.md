@@ -82,7 +82,15 @@ is English.
 ## Commands
 
     make test lint secret-scan   # what CI runs for Go
+    make dev-samba               # the test Samba on 127.0.0.1:4445 (podman; CONTAINER=docker)
+    make test-samba              # the SMB tests against it
     make build-ferry             # the binary, into bin/
+
+The SMB tests skip without `FERRY_TEST_SMB_SERVER`. hack/samba holds its
+users, passwords and shares — test values, fictional, and configured with
+`map to guest = Bad User` on purpose. docs/spike.md records what go-smb2 does
+wrong and how internal/smb holds it (the guest guard, one request in flight
+per session, 1 MiB reads): read it before touching the login or streaming.
 
 ## Commits
 
