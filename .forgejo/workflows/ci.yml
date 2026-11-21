@@ -64,6 +64,11 @@ jobs:
     runs-on: docker
     env:
       CGO_ENABLED: "1"
+      # The test Samba this job starts (see the step below). Set here rather
+      # than by the step, so that the SMB tests can never skip unnoticed: with
+      # the addresses set and no Samba, they fail.
+      FERRY_TEST_SMB_SERVER: 127.0.0.1:445
+      FERRY_TEST_SMB_SERVER_BAD_PASSWORD: 127.0.0.1:446
     steps:
       - uses: https://data.forgejo.org/actions/checkout@v6
       - uses: https://data.forgejo.org/actions/setup-go@v6
@@ -89,6 +94,4 @@ jobs:
               i=$((i + 1)); [ $i -lt 30 ] || { echo "Samba is not listening on $port"; exit 1; }; sleep 1
             done
           done
-          echo "FERRY_TEST_SMB_SERVER=127.0.0.1:445" >> "$GITHUB_ENV"
-          echo "FERRY_TEST_SMB_SERVER_BAD_PASSWORD=127.0.0.1:446" >> "$GITHUB_ENV"
       - run: go test -race -count=1 ./...
