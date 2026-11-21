@@ -141,14 +141,12 @@ func (g *gen) scans() {
 
 // ── Files ───────────────────────────────────────────────────────────────────
 
-// photo is a JPEG of w×h pixels that looks like something — a sky, a
-// horizon, a sun and some shapes, in a palette of its own — with an EXIF
-// orientation tag. The pixels are stored turned the other way, as a phone
-// does, so a viewer that ignores the tag shows it sideways.
+// photo is a JPEG that looks like something — a sky, a horizon, a sun and
+// some shapes, in a palette of its own — w×h as a person sees it, with an
+// EXIF orientation tag. The scene is drawn upright and its pixels stored
+// turned the other way, as a phone stores them: a viewer that honours the
+// tag shows it upright, one that ignores it shows it sideways.
 func (g *gen) photo(w, h, orientation int) []byte {
-	if orientation >= 5 {
-		w, h = h, w
-	}
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	hue := g.r.Float64()
 	sky := hsv(hue, 0.35, 0.95)
@@ -193,10 +191,42 @@ func (g *gen) photo(w, h, orientation int) []byte {
 		}
 	}
 	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 88}); err != nil {
+	if err := jpeg.Encode(&buf, stored(img, orientation), &jpeg.Options{Quality: 88}); err != nil {
 		log.Fatal(err)
 	}
 	return withOrientation(buf.Bytes(), orientation)
+}
+
+// stored turns an upright image into the pixels a camera stores with the
+// given orientation tag: the inverse of what the tag tells a viewer to do.
+func stored(up *image.RGBA, o int) *image.RGBA {
+	b := up.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if o == 1 {
+		return up
+	}
+	sw, sh := w, h
+	if o >= 5 {
+		sw, sh = h, w
+	}
+	out := image.NewRGBA(image.Rect(0, 0, sw, sh))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var sx, sy int
+			switch o {
+			case 3: // the viewer turns it half round
+				sx, sy = w-1-x, h-1-y
+			case 6: // the viewer turns it a quarter clockwise: store it a quarter counter-clockwise
+				sx, sy = y, w-1-x
+			case 8: // the viewer turns it a quarter counter-clockwise: store it a quarter clockwise
+				sx, sy = h-1-y, x
+			default:
+				sx, sy = x, y
+			}
+			out.SetRGBA(sx, sy, up.RGBAAt(x, y))
+		}
+	}
+	return out
 }
 
 // withOrientation inserts an EXIF segment with one tag, Orientation, after
