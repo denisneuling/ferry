@@ -1706,3 +1706,33 @@ a {
 .strip {
   justify-content: safe center;
 }
+/* The login keeps its content above the ferry: the space it leaves at the
+   bottom is the height of the ferry's top above the edge (bottom + 54 px +
+   its bob) and a gap — the mockup's left too little on phones, where the
+   ferry sat on the note. Low screens (a phone held sideways) get a lower sea
+   and no ferry at all, rather than a ferry over the form. */
+.login {
+  padding-bottom: 204px;
+}
+@media (max-width: 760px) {
+  .login {
+    padding-bottom: 188px;
+  }
+}
+@media (max-height: 560px) {
+  .login {
+    padding-top: 56px;
+    padding-bottom: 96px;
+  }
+  .sea {
+    height: 84px;
+  }
+  .boat {
+    display: none;
+  }
+}
+/* A thumbnail of the strip loads when it scrolls near; until then its place
+   shows as a quiet tile rather than a gap. */
+.strip button {
+  background: #ffffff14;
+}
