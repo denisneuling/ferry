@@ -168,7 +168,7 @@ func (a *API) GetContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 	if err != nil && n < length {
 		// The status is sent; all that is left is to stop. The client sees
 		// a short body against its Content-Length.
-		a.log.Info("download ended early", "err", err, "bytes", n)
+		a.log.Info("download ended early", append(errAttrs(err), "bytes", n)...)
 	}
 }
 

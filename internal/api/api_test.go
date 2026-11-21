@@ -71,7 +71,17 @@ func (h *harness) do(t testing.TB, method, path string, body io.Reader, hdr map[
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = res.Body.Close() })
+	// The whole body is read before the next request goes out. A body left
+	// unread keeps its handler writing — and its file open on the share,
+	// which makes Samba refuse a rename of that file as a sharing violation.
+	// On loopback the socket buffers can hide that; on a CI runner they did
+	// not.
+	b, err := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body = io.NopCloser(bytes.NewReader(b))
 	return res
 }
 

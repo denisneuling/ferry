@@ -73,7 +73,9 @@ WebDAV page) all break at least one of these rules:
 - **Samba decides.** Samba validates the password and enforces every access
   decision. ferry adds no rights of its own and removes none. A file written
   through ferry is owned and permissioned exactly as one copied through
-  Explorer.
+  Explorer. The one thing a deployment decides is which shares this ferry
+  offers at all (`FERRY_SHARES`): an operator's choice of scope, not a
+  permission check, and it can only narrow, never widen, what Samba allows.
 - **Nothing kept.**
   - Credentials live only for the duration of the login request.
   - The session, meaning the live SMB connection, lives in memory and nowhere
@@ -110,8 +112,10 @@ Browser ──HTTP──▶ gateway ──▶ ferry (one Go process)
   apart and makes logout final. Samba handles a few dozen sessions without
   effort.
 - **Share enumeration** goes through srvsvc NetShareEnum on the user's own
-  session. Hidden `$` shares are left out. A deployment can narrow the list
-  further (`FERRY_SHARES`).
+  session. Hidden `$` shares are left out of the list. A deployment can
+  choose which shares ferry offers at all (`FERRY_SHARES`); a share outside
+  that choice is neither listed nor opened, a hidden one asked for by name
+  included.
 
 ---
 
@@ -277,7 +281,7 @@ charts/ferry-grafana-dashboard/
   works*, scope).
 - **Configuration**, through environment variables, with no secrets:
   - `FERRY_SMB_SERVER` (host[:port])
-  - `FERRY_SHARES` (optional allow-list)
+  - `FERRY_SHARES` (optional: the shares this ferry offers)
   - `FERRY_IDLE_TIMEOUT`, `FERRY_SESSION_LIFETIME`
   - `FERRY_MAX_UPLOAD`
   - `FERRY_LISTEN`

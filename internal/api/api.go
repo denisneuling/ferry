@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -263,8 +264,8 @@ func (a *API) Login(w http.ResponseWriter, r *http.Request, _ v1.LoginParams) {
 	if err != nil {
 		// The kind and the NT status only: never the username, which a
 		// person may have mistyped their password into.
-		a.log.Info("login refused", "outcome", smb.KindOf(err).String(), "err", err, "client", addr,
-			"duration_ms", time.Since(start).Milliseconds())
+		a.log.Info("login refused", append(errAttrs(err), "outcome", smb.KindOf(err).String(), "client", addr,
+			"duration_ms", time.Since(start).Milliseconds())...)
 		smbProblem(err).write(w)
 		return
 	}
@@ -280,7 +281,7 @@ func (a *API) Login(w http.ResponseWriter, r *http.Request, _ v1.LoginParams) {
 			probTooManySessions.write(w)
 			return
 		}
-		a.log.Error("login failed", "outcome", "internal", "err", err)
+		a.log.Error("login failed", append(errAttrs(err), "outcome", "internal")...)
 		probInternal.write(w)
 		return
 	}
@@ -352,9 +353,21 @@ func (a *API) fail(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	p := smbProblem(err)
 	if p.status >= 500 {
-		a.log.Warn("request failed", "route", r.Pattern, "err", err)
+		a.log.Warn("request failed", append(errAttrs(err), "route", r.Pattern)...)
 	}
 	p.write(w)
+}
+
+// errAttrs describes an error for the log without its text. An error from
+// internal/smb is its kind and NT status; anything else only its Go type.
+// Error texts from net/http, url, the body or a path check can carry a file
+// name, a path or a query, and file names stay out of the log (CLAUDE.md).
+func errAttrs(err error) []any {
+	var e *smb.Error
+	if errors.As(err, &e) {
+		return []any{"error_kind", e.Kind.String(), "nt_status", fmt.Sprintf("0x%08x", e.Status)}
+	}
+	return []any{"error_type", fmt.Sprintf("%T", err)}
 }
 
 // drain reads what is left of a body, up to a bound, so the connection can

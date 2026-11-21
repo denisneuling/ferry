@@ -15,10 +15,15 @@ is English.
   (OpenAPI with oapi-codegen, the CI setup they all come from). They are models
   for conventions, not dependencies: code is copied with its tests.
 - **Samba decides.** Samba validates the password and enforces every access
-  decision. ferry adds no right and removes none: no allow-list of its own
-  beyond `FERRY_SHARES` narrowing what is listed, no permission cache, no
-  owner or mode set on a write. What Samba refuses is a problem response,
-  never an empty listing and never a retry under other credentials.
+  decision. ferry adds no right and removes none: no permission check or
+  cache of its own, no owner or mode set on a write. What Samba refuses is a
+  problem response, never an empty listing and never a retry under other
+  credentials.
+- **`FERRY_SHARES` is the operator's choice, not a permission.** It says
+  which shares this ferry offers at all, for listing and opening alike (a
+  share outside it is a 404, a hidden `$` share asked for by name included).
+  It can only narrow what ferry offers, never widen what Samba allows; inside
+  the offered shares, Samba decides alone.
 - **Nothing is persisted.** No database, no volume, no file outside an
   in-memory buffer or the client's stream. Sessions live in the session table
   and die with the process. Thumbnails are made on the fly and never cached on
