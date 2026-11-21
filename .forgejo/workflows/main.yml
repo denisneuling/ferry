@@ -200,8 +200,11 @@ jobs:
           GIT_COMMITTER_EMAIL: automation@forge.metapatrol.com
           NODE_TLS_REJECT_UNAUTHORIZED: "0"
         run: |
+          # Pinned with ci.yml's release-notes job: preset 10 needs a newer
+          # changelog writer than semantic-release 25 ships.
           npm install --no-save \
-            semantic-release \
+            semantic-release@25 \
+            conventional-changelog-conventionalcommits@9 \
             @semantic-release/changelog \
             @semantic-release/exec \
             @semantic-release/git

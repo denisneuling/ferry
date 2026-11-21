@@ -105,6 +105,17 @@ semantic-release's `successCmd`, which dispatches `release.yml` directly.
 
 `on: push: tags` stays for tags pushed by hand, which do raise the event.
 
+The changelog semantic-release commits reaches the public main, so its links
+must lead to GitHub, not to this forge, which is the remote semantic-release
+runs against. The release-notes generator writes them that way by
+configuration (`.releaserc.json`, the `conventionalcommits` preset's URL
+formats): no step rewrites them afterwards, so none can be forgotten.
+Forgejo's pull request numbers stay plain text, since they are not GitHub's.
+`ci.yml`'s `release-notes` job renders notes from the history against a
+private remote and fails on any other link (`hack/release/check-notes.mjs`);
+it and `main.yml` pin the same tooling, because preset 10 needs a newer
+changelog writer than semantic-release 25 ships.
+
 ## Before the first run
 
 **The runner label.** Every job says `runs-on: docker` — a label, not an image.

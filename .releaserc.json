@@ -6,6 +6,7 @@
     [
       "@semantic-release/commit-analyzer",
       {
+        "preset": "conventionalcommits",
         "releaseRules": [
           {
             "breaking": true,
@@ -14,7 +15,21 @@
         ]
       }
     ],
-    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits",
+        "presetConfig": {
+          "commitUrlFormat": "https://github.com/metapatrol/ferry/commit/{{hash}}",
+          "compareUrlFormat": "https://github.com/metapatrol/ferry/compare/{{previousTag}}...{{currentTag}}",
+          "issueUrlFormat": "https://github.com/metapatrol/ferry/issues/{{id}}",
+          "issuePrefixes": [
+            "ferry-no-issue-links-"
+          ],
+          "userUrlFormat": "https://github.com/{{user}}"
+        }
+      }
+    ],
     [
       "@semantic-release/changelog",
       {
@@ -25,7 +40,7 @@
       "@semantic-release/exec",
       {
         "successCmd": "sh .forgejo/trigger-release.sh ${nextRelease.gitTag}",
-        "prepareCmd": "sed -i -E 's#https?://[^/)]+/mdvc/ferry/#https://github.com/metapatrol/ferry/#g' CHANGELOG.md && for chart in charts/*/Chart.yaml; do sed -i 's/^version:.*/version: ${nextRelease.version}/' $chart && sed -i 's/^appVersion:.*/appVersion: \"${nextRelease.version}\"/' $chart; done && wget -qO /tmp/helm-docs.tar.gz https://github.com/norwoodj/helm-docs/releases/download/v1.14.2/helm-docs_1.14.2_Linux_x86_64.tar.gz && tar xzf /tmp/helm-docs.tar.gz -C /tmp helm-docs && for dir in charts/*/; do /tmp/helm-docs --chart-search-root $dir --output-file README.md --log-level warning; done"
+        "prepareCmd": "for chart in charts/*/Chart.yaml; do sed -i 's/^version:.*/version: ${nextRelease.version}/' $chart && sed -i 's/^appVersion:.*/appVersion: \"${nextRelease.version}\"/' $chart; done && wget -qO /tmp/helm-docs.tar.gz https://github.com/norwoodj/helm-docs/releases/download/v1.14.2/helm-docs_1.14.2_Linux_x86_64.tar.gz && tar xzf /tmp/helm-docs.tar.gz -C /tmp helm-docs && for dir in charts/*/; do /tmp/helm-docs --chart-search-root $dir --output-file README.md --log-level warning; done"
       }
     ],
     [

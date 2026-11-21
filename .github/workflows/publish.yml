@@ -189,12 +189,11 @@ jobs:
 
       - name: Release notes
         run: |
-          # This version's section of the changelog semantic-release wrote,
-          # with links into the private Forgejo pointed at this repository.
+          # This version's section of the changelog semantic-release wrote;
+          # its links already lead here (.releaserc.json).
           awk -v v="$VERSION" '
             /^#+ \[?[0-9]+\.[0-9]+\.[0-9]+/ { if (on) exit; if (index($0, "[" v "]")) { on = 1; next } }
-            on { print }' CHANGELOG.md \
-            | sed -E "s#https?://[^/)]+/mdvc/ferry/#https://github.com/${GITHUB_REPOSITORY}/#g" > dist/notes.md
+            on { print }' CHANGELOG.md > dist/notes.md
           [ -s dist/notes.md ] || echo "Release $TAG" > dist/notes.md
 
       - name: GitHub release

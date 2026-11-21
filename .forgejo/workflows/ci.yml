@@ -7,7 +7,7 @@
 # The cheap checks gate the expensive ones:
 #
 #   secret-scan ─┐
-#   lint ────────┴─> test, ui, helm `runs-on: docker` names a runner *label*, not an image.
+#   lint ────────┴─> test, ui, helm, release-notes `runs-on: docker` names a runner *label*, not an image.
 name: ci
 
 # A ref is built once. Branch work is built through its pull request; develop
@@ -151,3 +151,25 @@ jobs:
             echo "ERROR: the chart README is out of date. Run: make helm-docs"
             exit 1
           fi
+
+  # The changelog semantic-release writes lands on the public main: its links
+  # must lead to GitHub, never to this forge (hack/release/check-notes.mjs).
+  release-notes:
+    needs: [secret-scan, lint]
+    runs-on: docker
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          fetch-depth: 200
+      - uses: https://data.forgejo.org/actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Release notes link only to GitHub
+        run: |
+          set -eu
+          mkdir -p /tmp/sr && cd /tmp/sr
+          # The same packages as main.yml's release step.
+          npm install --no-save --no-audit --no-fund \
+            semantic-release@25 conventional-changelog-conventionalcommits@9
+          cp "$GITHUB_WORKSPACE/hack/release/check-notes.mjs" .
+          node check-notes.mjs "$GITHUB_WORKSPACE"
