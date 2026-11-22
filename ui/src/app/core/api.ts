@@ -8,6 +8,7 @@ export type Share = components['schemas']['Share'];
 export type Entry = components['schemas']['Entry'];
 export type EntryList = components['schemas']['EntryList'];
 export type Space = components['schemas']['Space'];
+export type FileMetadata = components['schemas']['FileMetadata'];
 export type Problem = components['schemas']['Problem'];
 
 /** An answer of the API that is not a success: its status and stable code. */
@@ -121,6 +122,11 @@ export class Api {
   /** The size and free space of the volume a folder is on, as the server reports them. */
   space(share: string, path: string): Promise<Space> {
     return this.json('GET', `${shareBase(share)}/space?path=${q(path)}`);
+  }
+
+  /** What a file says about itself, read by the server from its bytes. */
+  metadata(share: string, path: string): Promise<FileMetadata> {
+    return this.json('GET', `${shareBase(share)}/metadata?path=${q(path)}`);
   }
 
   mkdir(share: string, path: string): Promise<Entry> {

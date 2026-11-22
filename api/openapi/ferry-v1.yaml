@@ -320,6 +320,39 @@ paths:
         "413": { $ref: "#/components/responses/TooLarge" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/metadata:
+    get:
+      operationId: getMetadata
+      tags: [files]
+      summary: What a file says about itself.
+      description: |
+        Read from the file's own bytes, by its content rather than its name:
+        an image's size and camera (EXIF, HEIC included), a PDF's pages and
+        title, a recording's length, codec and tags, a text's encoding and
+        lines. Only a bounded part of the file is read — its start, and for
+        formats that keep their index at the end, box headers and the tail —
+        and nothing is stored or logged. A format ferry does not read, or a
+        file it cannot make sense of, is `kind: other` with whatever was
+        found, not an error. Every value comes out of the file: show it as
+        text. `ETag` follows the file.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+      responses:
+        "200":
+          description: What the file says.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FileMetadata" }
+        "304":
+          description: Not modified since the `If-None-Match` ETag.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/thumbnail:
     get:
       operationId: getThumbnail
@@ -602,6 +635,50 @@ components:
         type: { $ref: "#/components/schemas/EntryType" }
         size: { type: integer, format: int64, description: "Bytes; 0 for folders." }
         modified: { type: string, format: date-time }
+    FileMetadata:
+      type: object
+      required: [kind]
+      description: |
+        What a file says about itself; a property is present only when the
+        file says it. Strings are the file's own words, cleaned of control
+        characters and cut at 200 characters.
+      properties:
+        kind: { type: string, enum: [image, video, audio, pdf, text, other] }
+        format: { type: string, description: "e.g. JPEG, HEIC, MP4, FLAC, PDF 1.7." }
+        width: { type: integer, description: "As shown: upright, after the EXIF orientation." }
+        height: { type: integer, description: "As shown: upright, after the EXIF orientation." }
+        taken: { type: string, description: "When the photo was taken, as the camera wrote it: ISO 8601, with a zone only when the camera gave one." }
+        camera: { type: string }
+        lens: { type: string }
+        fNumber: { type: number, format: double, description: "The aperture: 2.8 for f/2.8." }
+        exposure: { type: string, description: "The exposure time in seconds: 1/250, 0.5, 2." }
+        iso: { type: integer }
+        focalLength: { type: number, format: double, description: Millimetres. }
+        orientation: { type: integer, minimum: 1, maximum: 8, description: The EXIF orientation. }
+        location:
+          type: object
+          description: The photo's GPS position, as coordinates only.
+          required: [latitude, longitude]
+          properties:
+            latitude: { type: number, format: double }
+            longitude: { type: number, format: double }
+        pages: { type: integer }
+        title: { type: string }
+        author: { type: string, description: "A PDF's author, a recording's artist." }
+        album: { type: string }
+        producer: { type: string, description: The program that made a PDF. }
+        durationSeconds: { type: number, format: double }
+        codec: { type: string }
+        bitrate: { type: integer, description: Bits per second. }
+        sampleRate: { type: integer }
+        channels: { type: integer }
+        encoding:
+          type: string
+          enum: [ascii, utf-8, utf-8-bom, utf-16le, utf-16be, 8bit]
+          description: "How a text is encoded, as far as its bytes tell; `8bit` is not UTF-8 but some 8-bit code page, most likely Windows-1252 or ISO-8859-1."
+        lines: { type: integer }
+        linesAtLeast: { type: boolean, description: "The file is longer than the part counted: lines is a lower bound." }
+        lineEndings: { type: string, enum: [LF, CRLF, CR, mixed] }
     Space:
       type: object
       required: [total, free]

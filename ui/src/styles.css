@@ -1262,10 +1262,16 @@ a.brand:hover span {
   margin: 0 0 16px;
   font: 500 20px var(--serif);
 }
+/* The part of the details that comes out of the file itself. */
+.lb-info h4.lb-info-sub {
+  margin-top: 22px;
+}
+
 .lb-info dl {
   margin: 0;
   display: grid;
-  grid-template-columns: auto 1fr;
+  /* One label column for both lists, so that their values line up. */
+  grid-template-columns: minmax(5.5em, max-content) 1fr;
   gap: 10px 16px;
   font-size: 14px;
 }

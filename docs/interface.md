@@ -55,6 +55,27 @@ entry), move, delete. A right click opens the same as a menu.
 In the preview: ← → for the previous and next file, `i` for the details,
 Esc to close.
 
+## Details
+
+`i` or the ⓘ button in the preview shows a file's details: its name, type,
+size, modification time and folder, and below them what the file says
+about itself, read by ferry from its own bytes:
+
+- **photos** — dimensions, when they were taken (by the camera's clock),
+  camera and lens, aperture, exposure time, ISO and focal length, an
+  orientation other than upright, and a GPS position as coordinates only —
+  no map, nothing sent anywhere. JPEG, PNG, WebP, TIFF and HEIC (its EXIF
+  read from the container, without decoding the picture);
+- **PDFs** — pages, title, author and the program that made them;
+- **recordings** — duration, codec, resolution, bitrate, sample rate,
+  channels, title, artist and album, from MP4, MOV, M4A, MP3, FLAC and WAV,
+  without ffmpeg;
+- **texts** — encoding, lines and line endings.
+
+Only a bounded part of a file is read (4 MiB at most), and nothing is
+stored or written to a log. What the file says is shown as text: a camera
+name or a title is never markup.
+
 ## Uploading
 
 **Upload**, or drop files anywhere on the folder. Uploads run two at a time

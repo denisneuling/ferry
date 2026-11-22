@@ -40,8 +40,12 @@ ship it, on with `make dev-nas DEV_NAS_ABSE=yes`.
 
 - **Photos:** JPEGs at camera sizes (12 to 24 megapixels, ~3 MB each), with
   EXIF orientations 1, 3, 6 and 8, stored turned as phones store them, so a
-  viewer that ignores the tag shows them sideways.
-- **Documents:** valid multi-page PDFs, Markdown, plain text, a CSV.
+  viewer that ignores the tag shows them sideways. Their EXIF names
+  fictional cameras (Fictional Optics, Harbour Camera Co.) with a time, an
+  exposure and a lens; every third photo has a GPS position out on the
+  Baltic Sea, where nobody lives.
+- **Documents:** valid multi-page PDFs with a title in their info
+  dictionary, Markdown, plain text, a CSV.
 - **Audio:** WAV files that play.
 - **Video:** `Urlaub am Meer 🌊 2025.mp4` is 1.5 GB of zeros
   (`MOCK_NAS_VIDEO_SIZE`) with a video's name: enough to stream, seek and

@@ -194,7 +194,7 @@ func (g *gen) photo(w, h, orientation int) []byte {
 	if err := jpeg.Encode(&buf, stored(img, orientation), &jpeg.Options{Quality: 88}); err != nil {
 		log.Fatal(err)
 	}
-	return withOrientation(buf.Bytes(), orientation)
+	return g.withEXIF(buf.Bytes(), orientation)
 }
 
 // stored turns an upright image into the pixels a camera stores with the
@@ -231,14 +231,110 @@ func stored(up *image.RGBA, o int) *image.RGBA {
 
 // withOrientation inserts an EXIF segment with one tag, Orientation, after
 // the JPEG's start marker.
-func withOrientation(b []byte, o int) []byte {
-	tiff := []byte("II*\x00\x08\x00\x00\x00\x01\x00\x12\x01\x03\x00\x01\x00\x00\x00")
-	tiff = append(tiff, byte(o), 0, 0, 0, 0, 0, 0, 0)
-	seg := append([]byte("Exif\x00\x00"), tiff...)
+// cameras the mock's photos claim to come from: fictional makes, so that
+// the details a viewer shows look like a camera's without naming a real one.
+var cameras = []struct{ make, model, lens string }{
+	{"Fictional Optics", "FO-1 Mark II", "FO 35mm F2"},
+	{"Harbour Camera Co.", "Seagull 24", "Seagull 24-70mm F4"},
+	{"Fictional Optics", "Pocket P3", ""},
+}
+
+// withEXIF adds an EXIF block as a camera writes it: the orientation the
+// pixels are stored in, a make and model, the time and the exposure, and
+// for every third photo a position out on the water, where nobody lives.
+func (g *gen) withEXIF(b []byte, o int) []byte {
+	cam := cameras[g.r.Intn(len(cameras))]
+	taken := epoch.Add(-time.Duration(g.r.Intn(700*24)) * time.Hour).Add(time.Duration(g.r.Intn(3600)) * time.Second)
+	fnum := []uint32{18, 28, 40, 56, 80}[g.r.Intn(5)]
+	speed := []uint32{60, 125, 250, 500, 1000}[g.r.Intn(5)]
+	iso := []uint16{100, 200, 400, 800}[g.r.Intn(4)]
+	focal := []uint32{24, 35, 50, 70}[g.r.Intn(4)]
+	ifd0 := []exifTag{asciiTag(0x010F, cam.make), asciiTag(0x0110, cam.model), shortTag(0x0112, uint16(o))}
+	exif := []exifTag{
+		asciiTag(0x9003, taken.Format("2006:01:02 15:04:05")), asciiTag(0x9011, "+01:00"),
+		rationalTag(0x829D, [2]uint32{fnum, 10}), rationalTag(0x829A, [2]uint32{1, speed}),
+		shortTag(0x8827, iso), rationalTag(0x920A, [2]uint32{focal, 1}),
+	}
+	if cam.lens != "" {
+		exif = append(exif, asciiTag(0xA434, cam.lens))
+	}
+	var gps []exifTag
+	if g.r.Intn(3) == 0 {
+		// The open Baltic Sea between Fehmarn and Lolland.
+		gps = []exifTag{
+			asciiTag(1, "N"), rationalTag(2, [2]uint32{54, 1}, [2]uint32{36, 1}, [2]uint32{uint32(g.r.Intn(60)), 1}),
+			asciiTag(3, "E"), rationalTag(4, [2]uint32{11, 1}, [2]uint32{20, 1}, [2]uint32{uint32(g.r.Intn(60)), 1}),
+		}
+	}
+	seg := append([]byte("Exif\x00\x00"), buildTIFF(ifd0, exif, gps)...)
 	out := append([]byte{}, b[:2]...)
 	out = append(out, 0xFF, 0xE1, byte((len(seg)+2)>>8), byte(len(seg)+2))
 	out = append(out, seg...)
 	return append(out, b[2:]...)
+}
+
+type exifTag struct {
+	id, typ uint16
+	count   uint32
+	val     []byte
+}
+
+func asciiTag(id uint16, s string) exifTag {
+	return exifTag{id, 2, uint32(len(s) + 1), append([]byte(s), 0)}
+}
+
+func shortTag(id, v uint16) exifTag {
+	return exifTag{id, 3, 1, binary.LittleEndian.AppendUint16(nil, v)}
+}
+
+func rationalTag(id uint16, vs ...[2]uint32) exifTag {
+	var b []byte
+	for _, v := range vs {
+		b = binary.LittleEndian.AppendUint32(binary.LittleEndian.AppendUint32(b, v[0]), v[1])
+	}
+	return exifTag{id, 5, uint32(len(vs)), b}
+}
+
+// buildTIFF lays out IFD0 with pointers to an EXIF IFD and, when there are
+// tags for it, a GPS IFD, each followed by its out-of-line values.
+func buildTIFF(ifd0, exif, gps []exifTag) []byte {
+	write := func(tags []exifTag, at int) []byte {
+		out := binary.LittleEndian.AppendUint16(nil, uint16(len(tags)))
+		valAt := at + 2 + 12*len(tags) + 4
+		var vals []byte
+		for _, t := range tags {
+			out = binary.LittleEndian.AppendUint16(out, t.id)
+			out = binary.LittleEndian.AppendUint16(out, t.typ)
+			out = binary.LittleEndian.AppendUint32(out, t.count)
+			if len(t.val) <= 4 {
+				v := make([]byte, 4)
+				copy(v, t.val)
+				out = append(out, v...)
+			} else {
+				out = binary.LittleEndian.AppendUint32(out, uint32(valAt+len(vals)))
+				vals = append(vals, t.val...)
+			}
+		}
+		out = append(out, 0, 0, 0, 0)
+		return append(out, vals...)
+	}
+	pointers := []exifTag{{0x8769, 4, 1, make([]byte, 4)}}
+	if gps != nil {
+		pointers = append(pointers, exifTag{0x8825, 4, 1, make([]byte, 4)})
+	}
+	exifAt := 8 + len(write(append(ifd0, pointers...), 8))
+	gpsAt := exifAt + len(write(exif, exifAt))
+	binary.LittleEndian.PutUint32(pointers[0].val, uint32(exifAt))
+	if gps != nil {
+		binary.LittleEndian.PutUint32(pointers[1].val, uint32(gpsAt))
+	}
+	out := []byte("II*\x00\x08\x00\x00\x00")
+	out = append(out, write(append(ifd0, pointers...), 8)...)
+	out = append(out, write(exif, exifAt)...)
+	if gps != nil {
+		out = append(out, write(gps, gpsAt)...)
+	}
+	return out
 }
 
 func (g *gen) screenshot(w, h int) []byte {
@@ -288,12 +384,14 @@ func pdf(title string, pages int) []byte {
 		obj(fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>", 5+2*i))
 		obj(fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(text), text))
 	}
+	obj(fmt.Sprintf("<< /Title (%s) /Producer (ferry mock NAS) >>", latin1(title)))
+	info := len(offsets)
 	xref := b.Len()
 	fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f \n", len(offsets)+1)
 	for _, o := range offsets {
 		fmt.Fprintf(&b, "%010d 00000 n \n", o)
 	}
-	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(offsets)+1, xref)
+	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R /Info %d 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(offsets)+1, info, xref)
 	return b.Bytes()
 }
 

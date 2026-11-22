@@ -16,6 +16,7 @@ import { describe } from '../core/errors';
 import { Format } from '../core/format';
 import { hasThumbnail, kindIcon, kindLabel, kindOf, previewKind } from '../core/kinds';
 import { Icon } from '../ui/icon';
+import { FileDetails } from '../ui/file-details';
 
 /**
  * The preview: a file of the folder over everything, with the files of the
@@ -26,7 +27,7 @@ import { Icon } from '../ui/icon';
 @Component({
   selector: 'f-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, FileDetails],
   host: { '(document:keydown)': 'key($event)' },
   template: `@if (entry(); as e) {
     <div
@@ -156,6 +157,9 @@ import { Icon } from '../ui/icon';
             <dt i18n="@@info.where">Location</dt>
             <dd>{{ where() }}</dd>
           </dl>
+          @if (browser.share(); as share) {
+            <f-file-details [share]="share" [path]="e.path" />
+          }
         </aside>
       }
     </div>

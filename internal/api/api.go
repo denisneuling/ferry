@@ -44,7 +44,9 @@ type API struct {
 	// thumbs admits FERRY_THUMBNAIL_CONCURRENCY thumbnail decodes at once;
 	// thumbMemory holds them within FERRY_THUMBNAIL_MEMORY together, and
 	// thumbUsed is what it holds now, for the metrics.
-	thumbs      chan struct{}
+	thumbs chan struct{}
+	// metaSlots admits metaConcurrency metadata readings at once.
+	metaSlots   chan struct{}
 	thumbMemory *semaphore.Weighted
 	thumbUsed   atomic.Int64
 	metrics     *metrics.Metrics
@@ -62,6 +64,7 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		log:         log,
 		version:     version,
 		thumbs:      make(chan struct{}, max(1, cfg.ThumbnailConcurrency)),
+		metaSlots:   make(chan struct{}, metaConcurrency),
 		thumbMemory: semaphore.NewWeighted(max(1, cfg.ThumbnailMemory)),
 	}
 }

@@ -38,6 +38,90 @@ func (e EntryType) Valid() bool {
 	}
 }
 
+// Defines values for FileMetadataEncoding.
+const (
+	FileMetadataEncodingAscii   FileMetadataEncoding = "ascii"
+	FileMetadataEncodingN8bit   FileMetadataEncoding = "8bit"
+	FileMetadataEncodingUtf16be FileMetadataEncoding = "utf-16be"
+	FileMetadataEncodingUtf16le FileMetadataEncoding = "utf-16le"
+	FileMetadataEncodingUtf8    FileMetadataEncoding = "utf-8"
+	FileMetadataEncodingUtf8Bom FileMetadataEncoding = "utf-8-bom"
+)
+
+// Valid indicates whether the value is a known member of the FileMetadataEncoding enum.
+func (e FileMetadataEncoding) Valid() bool {
+	switch e {
+	case FileMetadataEncodingAscii:
+		return true
+	case FileMetadataEncodingN8bit:
+		return true
+	case FileMetadataEncodingUtf16be:
+		return true
+	case FileMetadataEncodingUtf16le:
+		return true
+	case FileMetadataEncodingUtf8:
+		return true
+	case FileMetadataEncodingUtf8Bom:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileMetadataKind.
+const (
+	FileMetadataKindAudio FileMetadataKind = "audio"
+	FileMetadataKindImage FileMetadataKind = "image"
+	FileMetadataKindOther FileMetadataKind = "other"
+	FileMetadataKindPdf   FileMetadataKind = "pdf"
+	FileMetadataKindText  FileMetadataKind = "text"
+	FileMetadataKindVideo FileMetadataKind = "video"
+)
+
+// Valid indicates whether the value is a known member of the FileMetadataKind enum.
+func (e FileMetadataKind) Valid() bool {
+	switch e {
+	case FileMetadataKindAudio:
+		return true
+	case FileMetadataKindImage:
+		return true
+	case FileMetadataKindOther:
+		return true
+	case FileMetadataKindPdf:
+		return true
+	case FileMetadataKindText:
+		return true
+	case FileMetadataKindVideo:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileMetadataLineEndings.
+const (
+	FileMetadataLineEndingsCR    FileMetadataLineEndings = "CR"
+	FileMetadataLineEndingsCRLF  FileMetadataLineEndings = "CRLF"
+	FileMetadataLineEndingsLF    FileMetadataLineEndings = "LF"
+	FileMetadataLineEndingsMixed FileMetadataLineEndings = "mixed"
+)
+
+// Valid indicates whether the value is a known member of the FileMetadataLineEndings enum.
+func (e FileMetadataLineEndings) Valid() bool {
+	switch e {
+	case FileMetadataLineEndingsCR:
+		return true
+	case FileMetadataLineEndingsCRLF:
+		return true
+	case FileMetadataLineEndingsLF:
+		return true
+	case FileMetadataLineEndingsMixed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FerryRequest.
 const (
 	FerryRequestN1 FerryRequest = "1"
@@ -225,6 +309,79 @@ type EntryStreamProblem struct {
 
 // EntryType defines model for EntryType.
 type EntryType string
+
+// FileMetadata What a file says about itself; a property is present only when the
+// file says it. Strings are the file's own words, cleaned of control
+// characters and cut at 200 characters.
+type FileMetadata struct {
+	Album *string `json:"album,omitempty"`
+
+	// Author A PDF's author, a recording's artist.
+	Author *string `json:"author,omitempty"`
+
+	// Bitrate Bits per second.
+	Bitrate         *int     `json:"bitrate,omitempty"`
+	Camera          *string  `json:"camera,omitempty"`
+	Channels        *int     `json:"channels,omitempty"`
+	Codec           *string  `json:"codec,omitempty"`
+	DurationSeconds *float64 `json:"durationSeconds,omitempty"`
+
+	// Encoding How a text is encoded, as far as its bytes tell; `8bit` is not UTF-8 but some 8-bit code page, most likely Windows-1252 or ISO-8859-1.
+	Encoding *FileMetadataEncoding `json:"encoding,omitempty"`
+
+	// Exposure The exposure time in seconds: 1/250, 0.5, 2.
+	Exposure *string `json:"exposure,omitempty"`
+
+	// FNumber The aperture: 2.8 for f/2.8.
+	FNumber *float64 `json:"fNumber,omitempty"`
+
+	// FocalLength Millimetres.
+	FocalLength *float64 `json:"focalLength,omitempty"`
+
+	// Format e.g. JPEG, HEIC, MP4, FLAC, PDF 1.7.
+	Format *string `json:"format,omitempty"`
+
+	// Height As shown: upright, after the EXIF orientation.
+	Height      *int                     `json:"height,omitempty"`
+	Iso         *int                     `json:"iso,omitempty"`
+	Kind        FileMetadataKind         `json:"kind"`
+	Lens        *string                  `json:"lens,omitempty"`
+	LineEndings *FileMetadataLineEndings `json:"lineEndings,omitempty"`
+	Lines       *int                     `json:"lines,omitempty"`
+
+	// LinesAtLeast The file is longer than the part counted: lines is a lower bound.
+	LinesAtLeast *bool `json:"linesAtLeast,omitempty"`
+
+	// Location The photo's GPS position, as coordinates only.
+	Location *struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+	} `json:"location,omitempty"`
+
+	// Orientation The EXIF orientation.
+	Orientation *int `json:"orientation,omitempty"`
+	Pages       *int `json:"pages,omitempty"`
+
+	// Producer The program that made a PDF.
+	Producer   *string `json:"producer,omitempty"`
+	SampleRate *int    `json:"sampleRate,omitempty"`
+
+	// Taken When the photo was taken, as the camera wrote it: ISO 8601, with a zone only when the camera gave one.
+	Taken *string `json:"taken,omitempty"`
+	Title *string `json:"title,omitempty"`
+
+	// Width As shown: upright, after the EXIF orientation.
+	Width *int `json:"width,omitempty"`
+}
+
+// FileMetadataEncoding How a text is encoded, as far as its bytes tell; `8bit` is not UTF-8 but some 8-bit code page, most likely Windows-1252 or ISO-8859-1.
+type FileMetadataEncoding string
+
+// FileMetadataKind defines model for FileMetadata.Kind.
+type FileMetadataKind string
+
+// FileMetadataLineEndings defines model for FileMetadata.LineEndings.
+type FileMetadataLineEndings string
 
 // Info defines model for Info.
 type Info struct {
@@ -439,6 +596,12 @@ type CreateFolderParams struct {
 
 // CreateFolderParamsXFerryRequest defines parameters for CreateFolder.
 type CreateFolderParamsXFerryRequest string
+
+// GetMetadataParams defines parameters for GetMetadata.
+type GetMetadataParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+}
 
 // MoveEntryParams defines parameters for MoveEntry.
 type MoveEntryParams struct {
@@ -755,6 +918,21 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/shares/{share}/folders (the `CreateFolder` operationId).
 	CreateFolder(ctx context.Context, share ShareName, params *CreateFolderParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetMetadata What a file says about itself.
+	//
+	// Read from the file's own bytes, by its content rather than its name:
+	// an image's size and camera (EXIF, HEIC included), a PDF's pages and
+	// title, a recording's length, codec and tags, a text's encoding and
+	// lines. Only a bounded part of the file is read — its start, and for
+	// formats that keep their index at the end, box headers and the tail —
+	// and nothing is stored or logged. A format ferry does not read, or a
+	// file it cannot make sense of, is `kind: other` with whatever was
+	// found, not an error. Every value comes out of the file: show it as
+	// text. `ETag` follows the file.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/metadata (the `GetMetadata` operationId).
+	GetMetadata(ctx context.Context, share ShareName, params *GetMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// MoveEntryWithBody Rename or move a file or folder within a share.
 	//
 	// Takes any type of body and a specified content type.
@@ -1015,6 +1193,31 @@ func (c *Client) ListEntries(ctx context.Context, share ShareName, params *ListE
 // Corresponds with POST /api/v1/shares/{share}/folders (the `CreateFolder` operationId).
 func (c *Client) CreateFolder(ctx context.Context, share ShareName, params *CreateFolderParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateFolderRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMetadata What a file says about itself.
+//
+// Read from the file's own bytes, by its content rather than its name:
+// an image's size and camera (EXIF, HEIC included), a PDF's pages and
+// title, a recording's length, codec and tags, a text's encoding and
+// lines. Only a bounded part of the file is read — its start, and for
+// formats that keep their index at the end, box headers and the tail —
+// and nothing is stored or logged. A format ferry does not read, or a
+// file it cannot make sense of, is `kind: other` with whatever was
+// found, not an error. Every value comes out of the file: show it as
+// text. `ETag` follows the file.
+//
+// Corresponds with GET /api/v1/shares/{share}/metadata (the `GetMetadata` operationId).
+func (c *Client) GetMetadata(ctx context.Context, share ShareName, params *GetMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMetadataRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1660,6 +1863,67 @@ func NewCreateFolderRequest(server string, share ShareName, params *CreateFolder
 	return req, nil
 }
 
+// NewGetMetadataRequest constructs an http.Request for the GetMetadata method
+func NewGetMetadataRequest(server string, share ShareName, params *GetMetadataParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/metadata"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewMoveEntryRequest calls the generic MoveEntry builder with application/json body
 func NewMoveEntryRequest(server string, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -2033,6 +2297,23 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/shares/{share}/folders (the `CreateFolder` operationId).
 	CreateFolderWithResponse(ctx context.Context, share ShareName, params *CreateFolderParams, reqEditors ...RequestEditorFn) (*CreateFolderResponse, error)
+
+	// GetMetadataWithResponse What a file says about itself.
+	//
+	// Read from the file's own bytes, by its content rather than its name:
+	// an image's size and camera (EXIF, HEIC included), a PDF's pages and
+	// title, a recording's length, codec and tags, a text's encoding and
+	// lines. Only a bounded part of the file is read — its start, and for
+	// formats that keep their index at the end, box headers and the tail —
+	// and nothing is stored or logged. A format ferry does not read, or a
+	// file it cannot make sense of, is `kind: other` with whatever was
+	// found, not an error. Every value comes out of the file: show it as
+	// text. `ETag` follows the file.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/metadata (the `GetMetadata` operationId).
+	GetMetadataWithResponse(ctx context.Context, share ShareName, params *GetMetadataParams, reqEditors ...RequestEditorFn) (*GetMetadataResponse, error)
 
 	// MoveEntryWithBodyWithResponse Rename or move a file or folder within a share.
 	//
@@ -2775,6 +3056,89 @@ func (r CreateFolderResponse) ContentType() string {
 	return ""
 }
 
+type GetMetadataResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FileMetadata
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMetadataResponse) GetJSON200() *FileMetadata {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetMetadataResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetMetadataResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetMetadataResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetMetadataResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r GetMetadataResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetMetadataResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMetadataResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMetadataResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMetadataResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMetadataResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type MoveEntryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3224,6 +3588,29 @@ func (c *ClientWithResponses) CreateFolderWithResponse(ctx context.Context, shar
 		return nil, err
 	}
 	return ParseCreateFolderResponse(rsp)
+}
+
+// GetMetadataWithResponse What a file says about itself.
+//
+// Read from the file's own bytes, by its content rather than its name:
+// an image's size and camera (EXIF, HEIC included), a PDF's pages and
+// title, a recording's length, codec and tags, a text's encoding and
+// lines. Only a bounded part of the file is read — its start, and for
+// formats that keep their index at the end, box headers and the tail —
+// and nothing is stored or logged. A format ferry does not read, or a
+// file it cannot make sense of, is `kind: other` with whatever was
+// found, not an error. Every value comes out of the file: show it as
+// text. `ETag` follows the file.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/metadata (the `GetMetadata` operationId).
+func (c *ClientWithResponses) GetMetadataWithResponse(ctx context.Context, share ShareName, params *GetMetadataParams, reqEditors ...RequestEditorFn) (*GetMetadataResponse, error) {
+	rsp, err := c.GetMetadata(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMetadataResponse(rsp)
 }
 
 // MoveEntryWithBodyWithResponse Rename or move a file or folder within a share.
@@ -3861,6 +4248,77 @@ func ParseCreateFolderResponse(rsp *http.Response) (*CreateFolderResponse, error
 	return response, nil
 }
 
+// ParseGetMetadataResponse parses an HTTP response from a GetMetadataWithResponse call
+func ParseGetMetadataResponse(rsp *http.Response) (*GetMetadataResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMetadataResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FileMetadata
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 304:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseMoveEntryResponse parses an HTTP response from a MoveEntryWithResponse call
 func ParseMoveEntryResponse(rsp *http.Response) (*MoveEntryResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -4100,6 +4558,9 @@ type ServerInterface interface {
 	// CreateFolder Create a folder.
 	// (POST /api/v1/shares/{share}/folders)
 	CreateFolder(w http.ResponseWriter, r *http.Request, share ShareName, params CreateFolderParams)
+	// GetMetadata What a file says about itself.
+	// (GET /api/v1/shares/{share}/metadata)
+	GetMetadata(w http.ResponseWriter, r *http.Request, share ShareName, params GetMetadataParams)
 	// MoveEntry Rename or move a file or folder within a share.
 	// (POST /api/v1/shares/{share}/move)
 	MoveEntry(w http.ResponseWriter, r *http.Request, share ShareName, params MoveEntryParams)
@@ -4576,6 +5037,48 @@ func (siw *ServerInterfaceWrapper) CreateFolder(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// GetMetadata operation middleware
+func (siw *ServerInterfaceWrapper) GetMetadata(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetMetadataParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMetadata(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // MoveEntry operation middleware
 func (siw *ServerInterfaceWrapper) MoveEntry(w http.ResponseWriter, r *http.Request) {
 
@@ -4857,6 +5360,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/entries", wrapper.ListEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/content", wrapper.GetContent)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/shares/{share}/content", wrapper.PutContent)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/metadata", wrapper.GetMetadata)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/thumbnail", wrapper.GetThumbnail)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/move", wrapper.MoveEntry)
