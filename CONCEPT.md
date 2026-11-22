@@ -63,7 +63,7 @@ WebDAV page) all break at least one of these rules:
 | service | Go 1.27, one binary with the interface embedded |
 | SMB | [cloudsoda/go-smb2](https://github.com/cloudsoda/go-smb2): the maintained fork of hirochachacha/go-smb2 that rclone uses; pure Go, no cgo, no libsmbclient |
 | contract | OpenAPI 3.0.3 first, with oapi-codegen for server and types (soulforge's setup). The interface's TypeScript client is generated from the same spec |
-| state | none persisted. Sessions in memory only |
+| state | sessions in memory only; an optional cache of thumbnails and details on a volume, encrypted |
 | authentication | the SMB session setup (NTLMSSP) against the configured server. No tokens, no OIDC |
 | interface | Angular with its own layout and theme (“Hafen”, §5), not the metapatrol shell; embedded in the binary. English with German as the first translation (`@angular/localize`) |
 | operations | Kubernetes, Helm (OCI), Flux; Prometheus metrics, OTEL traces; Forgejo Actions CI and semantic-release, as in soulforge |
@@ -76,16 +76,24 @@ WebDAV page) all break at least one of these rules:
   Explorer. The one thing a deployment decides is which shares this ferry
   offers at all (`FERRY_SHARES`): an operator's choice of scope, not a
   permission check, and it can only narrow, never widen, what Samba allows.
-- **Nothing kept.**
+- **Nothing kept but an optional cache.**
   - Credentials live only for the duration of the login request.
   - The session, meaning the live SMB connection, lives in memory and nowhere
     else.
   - A restart logs everyone out, and nothing is lost by it.
+  - The one thing that may be kept is what ferry derives from a file — a
+    thumbnail, its details — in a directory (`FERRY_CACHE_DIR`, off by
+    default), so that a restart or the next person does not make it again.
+    Entries are named by a keyed hash of the file's identity and encrypted
+    under a key derived from it: no names, no pictures on the volume. An
+    entry is given only after the person's own session has opened the file
+    for reading, so Samba still decides; a changed file has another entry.
+    Deleting the cache loses nothing.
 - **Servers are generic.** A household NAS is the first deployment, but ferry contains
   nothing specific to it. Any SMB2/3 server will do.
 - **Small.**
-  - A distroless image with no volumes, running as non-root on a read-only
-    root filesystem.
+  - A distroless image with no volumes (but the cache's, when it is on),
+    running as non-root on a read-only root filesystem.
   - Idle memory in tens of MB.
 - **Fail closed and say so.** An SMB error becomes a precise HTTP problem
   response (403, 404, 409, 502). It never turns into an empty listing.
@@ -166,7 +174,7 @@ Illustrative. The contract is `api/openapi/ferry-v1.yaml`.
 | GET | `/api/v1/shares/{share}/archive/{ticket}` | the ZIP, stored, streamed from the share; broken off when a file fails |
 | POST | `/api/v1/shares/{share}/move` | rename or move within a share, `{from, to}` |
 | DELETE | `/api/v1/shares/{share}/entries?path=` | delete a file or an empty folder; recursive only when asked |
-| GET | `/api/v1/shares/{share}/thumbnail?path=&v=` | thumbnail of an image or a recording's cover, made on the fly, never cached on disk; with the entry's version `v`, cached by the browser until the file changes |
+| GET | `/api/v1/shares/{share}/thumbnail?path=&v=` | thumbnail of an image or a recording's cover, made on the fly or taken from the cache once the file is open for reading; with the entry's version `v`, cached by the browser until the file changes |
 
 - **Paths** are cleaned and resolved within the share. `..`, absolute paths and
   NUL bytes are refused before anything reaches SMB.
@@ -266,7 +274,7 @@ be tried without a backend.
   - read-only root filesystem;
   - all capabilities dropped;
   - no service account token;
-  - no volumes besides an `emptyDir` for `/tmp`, if any.
+  - no volumes but the cache's, when it is on.
 
 ---
 
@@ -292,7 +300,8 @@ charts/ferry/               Helm chart
   - Apache-2.0.
 - **README:** the same structure as the other projects (lockup, *Why*, *How it
   works*, scope).
-- **Configuration**, through environment variables, with no secrets:
+- **Configuration**, through environment variables, with one secret — the
+  cache's key, when the cache is on:
   - `FERRY_SMB_SERVER` (host[:port])
   - `FERRY_SHARES` (optional: the shares this ferry offers)
   - `FERRY_IDLE_TIMEOUT`, `FERRY_SESSION_LIFETIME`
@@ -331,7 +340,7 @@ Filestash for a week before Filestash goes.
 | Own small Go service, not an existing file manager | none of the ones looked at keeps Samba as the only authority without own users, stored credentials or pool access, and is also pleasant to use |
 | SMB session setup as the login, no OIDC | the accounts already exist in Samba; a second identity system costs resources and drifts |
 | A few SMB connections per browser session, set up at login, never pooled across people | keeps identities apart and makes logout real; one connection for browsing keeps it quick while thumbnails and downloads load on the others |
-| Nothing persisted | no secret to protect at rest, nothing to back up, a restart is harmless |
+| Nothing persisted but an optional cache of derived data | nothing to back up, a restart is harmless; the cache holds no names and no plain pictures, and gives an entry only after Samba let the person open the file |
 | go-smb2 (cloudsoda fork), not libsmbclient | pure Go, distroless image, the same code rclone runs against many servers |
 | Session cookie, not Basic auth or tokens in the browser | the password is sent once; JavaScript never holds it; logout works |
 | No sharing links | they would need state and a second authorisation model |

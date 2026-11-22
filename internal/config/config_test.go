@@ -33,6 +33,9 @@ func TestDefaults(t *testing.T) {
 	if c.SMBConnections != 3 || c.MaxArchive != 10000 {
 		t.Errorf("smb connections %d", c.SMBConnections)
 	}
+	if c.CacheDir != "" || c.CacheMaxBytes != 1<<30 {
+		t.Errorf("cache %q %d", c.CacheDir, c.CacheMaxBytes)
+	}
 }
 
 func TestValues(t *testing.T) {
@@ -47,6 +50,9 @@ func TestValues(t *testing.T) {
 		"FERRY_MAX_LISTING":     "500000",
 		"FERRY_MAX_DELETE":      "25",
 		"FERRY_SMB_CONNECTIONS": "1",
+		"FERRY_CACHE_DIR":       "/var/cache/ferry",
+		"FERRY_CACHE_MAX_BYTES": "10Gi",
+		"FERRY_CACHE_KEY":       strings.Repeat("k", 32),
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -62,6 +68,9 @@ func TestValues(t *testing.T) {
 	}
 	if c.MaxListing != 500000 || c.MaxDelete != 25 || c.SMBConnections != 1 {
 		t.Errorf("max listing %d, max delete %d, smb connections %d", c.MaxListing, c.MaxDelete, c.SMBConnections)
+	}
+	if c.CacheDir != "/var/cache/ferry" || c.CacheMaxBytes != 10<<30 || len(c.CacheKey) != 32 {
+		t.Errorf("cache %q %d", c.CacheDir, c.CacheMaxBytes)
 	}
 	if len(c.TrustedProxies) != 2 || c.TrustedProxies[1].String() != "192.0.2.7/32" {
 		t.Errorf("proxies %v", c.TrustedProxies)
@@ -80,6 +89,8 @@ func TestErrors(t *testing.T) {
 		"auto, true or false":   {"FERRY_SMB_SERVER": "nas", "FERRY_COOKIE_SECURE": "yes"},
 		"shorter than":          {"FERRY_SMB_SERVER": "nas", "FERRY_SESSION_LIFETIME": "5m"},
 		"integer of at least 1": {"FERRY_SMB_SERVER": "nas", "FERRY_MAX_SESSIONS": "0"},
+		"FERRY_CACHE_KEY":       {"FERRY_SMB_SERVER": "nas", "FERRY_CACHE_DIR": "/c", "FERRY_CACHE_KEY": "short"},
+		"like 1Gi":              {"FERRY_SMB_SERVER": "nas", "FERRY_CACHE_MAX_BYTES": "1GB"},
 	}
 	for want, e := range cases {
 		_, err := FromEnv(env(e))

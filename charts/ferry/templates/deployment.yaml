@@ -13,6 +13,16 @@ spec:
   # second replica would not know them. A restart logs everyone out and loses
   # nothing else.
   replicas: 1
+  {{- if .Values.cache.enabled }}
+  # The cache's volume is ReadWriteOnce: the old pod lets go of it before
+  # the new one starts. Sessions die with the old pod either way. The null
+  # removes the rollingUpdate defaults the API server set on a release that
+  # ran without the cache: Helm's merge keeps them otherwise, and the API
+  # refuses them next to Recreate.
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  {{- end }}
   selector:
     matchLabels:
       {{- include "ferry.selectorLabels" . | nindent 6 }}
@@ -99,6 +109,17 @@ spec:
               value: {{ .Values.thumbnails.memory | quote }}
             - name: FERRY_THUMBNAIL_CONCURRENCY
               value: {{ .Values.thumbnails.concurrency | quote }}
+            {{- if .Values.cache.enabled }}
+            - name: FERRY_CACHE_DIR
+              value: /var/cache/ferry
+            - name: FERRY_CACHE_MAX_BYTES
+              value: {{ .Values.cache.maxBytes | quote }}
+            - name: FERRY_CACHE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cache.existingSecret | default (printf "%s-cache" (include "ferry.fullname" .)) }}
+                  key: key
+            {{- end }}
             {{- with .Values.trustedProxies }}
             - name: FERRY_TRUSTED_PROXIES
               value: {{ join "," . | quote }}
@@ -134,6 +155,17 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.cache.enabled }}
+          volumeMounts:
+            - name: cache
+              mountPath: /var/cache/ferry
+          {{- end }}
+      {{- if .Values.cache.enabled }}
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: {{ .Values.cache.persistence.existingClaim | default (printf "%s-cache" (include "ferry.fullname" .)) }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

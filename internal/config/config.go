@@ -1,9 +1,10 @@
 // Package config reads what `ferry serve` is configured with, from FERRY_*
 // variables. docs/configuration.md describes every one.
 //
-// There are no secrets among them: ferry has no credentials of its own. The
-// only passwords it ever sees are the ones people type, and those never
-// become configuration.
+// ferry has no credentials of its own: the only passwords it ever sees are
+// the ones people type, and those never become configuration. The one
+// secret among the variables is the cache's key (FERRY_CACHE_KEY), and only
+// when the cache is on.
 package config
 
 import (
@@ -57,6 +58,12 @@ type Config struct {
 	MaxListing           int // FERRY_MAX_LISTING: entries in one folder listing
 	MaxDelete            int // FERRY_MAX_DELETE: entries in one recursive delete
 	MaxArchive           int // FERRY_MAX_ARCHIVE: entries in one ZIP download
+	// The cache of thumbnails and details: a directory (FERRY_CACHE_DIR;
+	// empty: none), its size (FERRY_CACHE_MAX_BYTES) and the key that names
+	// and encrypts its entries (FERRY_CACHE_KEY, at least 32 bytes).
+	CacheDir      string
+	CacheMaxBytes int64
+	CacheKey      string
 	// SMBConnections is how many SMB connections a login sets up
 	// (FERRY_SMB_CONNECTIONS, 1 to 4): one for browsing, the others for
 	// thumbnails, details and content (smb.Group).
@@ -107,6 +114,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		ThumbnailMaxPixels:   50_000_000,
 		ThumbnailMemory:      320 << 20,
 		ThumbnailConcurrency: 2,
+		CacheMaxBytes:        1 << 30,
 		LoginRatePerAddress:  10,
 		LoginRatePerUser:     5,
 	}
@@ -206,6 +214,20 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			fail("FERRY_THUMBNAIL_MEMORY", fmt.Errorf("%q is not a positive byte count like 320Mi", v))
 		}
 		c.ThumbnailMemory = n
+	}
+	c.CacheDir = strings.TrimSpace(getenv("FERRY_CACHE_DIR"))
+	c.CacheKey = getenv("FERRY_CACHE_KEY")
+	if v := getenv("FERRY_CACHE_MAX_BYTES"); v != "" {
+		n, err := parseBytes(v)
+		if err != nil || n == 0 {
+			fail("FERRY_CACHE_MAX_BYTES", fmt.Errorf("%q is not a positive byte count like 1Gi", v))
+		}
+		c.CacheMaxBytes = n
+	}
+	if c.CacheDir != "" && len(c.CacheKey) < 32 {
+		// Without a key the entries could be neither named nor encrypted;
+		// a made-up one would lose them all at the next start.
+		fail("FERRY_CACHE_KEY", errors.New("is required with FERRY_CACHE_DIR, at least 32 bytes"))
 	}
 	for _, s := range strings.Split(getenv("FERRY_TRUSTED_PROXIES"), ",") {
 		if s = strings.TrimSpace(s); s == "" {

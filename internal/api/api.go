@@ -23,6 +23,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	v1 "github.com/metapatrol/ferry/api/v1"
+	"github.com/metapatrol/ferry/internal/cache"
 	"github.com/metapatrol/ferry/internal/config"
 	"github.com/metapatrol/ferry/internal/metrics"
 	"github.com/metapatrol/ferry/internal/session"
@@ -59,6 +60,20 @@ type API struct {
 	metrics     *metrics.Metrics
 	// archives holds the ZIP downloads listed and not yet fetched.
 	archives archiveTickets
+	// cache keeps thumbnails and details across restarts and people; nil
+	// without FERRY_CACHE_DIR.
+	cache *cache.Cache
+}
+
+// UseCache makes the API keep thumbnails and details in c. An entry is
+// looked up only after the person's own session has opened the file for
+// reading, so that Samba decides who gets it.
+func (a *API) UseCache(c *cache.Cache) { a.cache = c }
+
+// derivedKey is what a thumbnail or a file's details is kept under: the file
+// as the open just found it.
+func derivedKey(kind, variant, share, p string, f *smb.File) cache.Key {
+	return cache.Key{Kind: kind, Variant: variant, Share: share, Path: p, Size: f.Size, ModTime: f.ModTime}
 }
 
 // New makes the API. login is smb.LoginGroup outside tests; m may be nil.

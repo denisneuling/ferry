@@ -28,7 +28,8 @@ if you ever see one in its output, that is a security problem: see
 - Run the checks before pushing: the README's *Quick start* has the commands.
 - Explain the why in the commit body when the diff does not.
 - Keep to the ground rules in [CLAUDE.md](CLAUDE.md) — above all: Samba
-  decides every access, nothing is persisted, and credentials never reach a
+  decides every access, nothing is persisted but the optional cache of
+  derived data, and credentials never reach a
   log, trace, metric or error.
 - Use fictional data in tests, examples and screenshots (`alex`,
   `nas.example.lan`), never a real server or person.

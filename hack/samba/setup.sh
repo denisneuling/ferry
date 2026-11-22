@@ -34,6 +34,10 @@ echo "family notes" > /srv/family/notes.txt
 echo "scan 1" > /srv/scans/scan-001.txt
 echo "sam only" > /srv/sam/private.txt
 echo "public" > /srv/public/readme.txt
+# Files alex sees in a shared folder but may not read: sam's, mode 0600. A
+# cache entry sam's requests made must not reach alex (internal/api).
+printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' | base64 -d > /srv/family/sam-only.png
+echo "sam's notes" > /srv/family/sam-only.txt
 # A file large enough to measure streaming, made once.
 [ -f /srv/alex/big.bin ] || head -c 268435456 /dev/urandom > /srv/alex/big.bin
 # A folder of 60000 empty files, made once: listings that are larger than a
@@ -45,6 +49,7 @@ fi
 chown -R alex:family /srv/alex /srv/hidden && chmod 0700 /srv/alex
 chown -R sam:family /srv/sam && chmod 0700 /srv/sam
 chown -R root:family /srv/family && chmod 2775 /srv/family
+chown sam:family /srv/family/sam-only.png /srv/family/sam-only.txt && chmod 0600 /srv/family/sam-only.png /srv/family/sam-only.txt
 chown -R root:root /srv/scans && chmod 0755 /srv/scans
 chown -R nobody /srv/public && chmod 0777 /srv/public
 

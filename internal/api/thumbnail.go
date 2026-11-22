@@ -55,6 +55,16 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
+	// The file is open for reading under this person's session: whoever
+	// gets this far may have what was made of it, by whomever.
+	key := derivedKey("thumbnail", strconv.Itoa(size), share, p, f)
+	if a.cache != nil {
+		if out, ok := a.cache.Get(key); ok {
+			a.metrics.Thumbnail("cached")
+			writeThumbnail(w, out)
+			return
+		}
+	}
 
 	// The picture is the file itself, or the cover a recording carries: then
 	// only the cover is read, found by the tags' headers.
@@ -157,8 +167,15 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		return
 	}
 	a.metrics.Thumbnail("made")
-	h.Set("Content-Type", "image/jpeg")
-	h.Set("Content-Length", strconv.Itoa(len(out)))
+	if a.cache != nil {
+		a.cache.Put(key, out)
+	}
+	writeThumbnail(w, out)
+}
+
+func writeThumbnail(w http.ResponseWriter, out []byte) {
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Content-Length", strconv.Itoa(len(out)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(out)
 }

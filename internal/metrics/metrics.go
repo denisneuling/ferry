@@ -33,6 +33,9 @@ type Metrics struct {
 	smbLost     *prometheus.CounterVec
 	smbWait     *prometheus.HistogramVec
 	archives    *prometheus.CounterVec
+	cacheReqs   *prometheus.CounterVec
+	cacheBytes  prometheus.Gauge
+	cacheEvict  prometheus.Counter
 }
 
 // Gauges are read at every scrape from where they are kept.
@@ -92,8 +95,21 @@ func New(version, commit string, g Gauges) *Metrics {
 			Name: "ferry_archives_total",
 			Help: "ZIP downloads by outcome: ok, failed (a file failed once the archive had begun; the download was broken off), canceled (the client left).",
 		}, []string{"outcome"}),
+		cacheReqs: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ferry_cache_requests_total",
+			Help: "Lookups in the cache of thumbnails and details, by kind (thumbnail, metadata) and outcome: hit, miss, error (the disk failed; a failed write counts too).",
+		}, []string{"kind", "outcome"}),
+		cacheBytes: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "ferry_cache_bytes",
+			Help: "Bytes in the cache's entries, as last counted.",
+		}),
+		cacheEvict: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "ferry_cache_evictions_total",
+			Help: "Entries removed from the cache to keep it within FERRY_CACHE_MAX_BYTES, the least recently used first.",
+		}),
 	}
-	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency, m.smbConns, m.smbLost, m.smbWait, m.archives)
+	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency, m.smbConns, m.smbLost, m.smbWait, m.archives,
+		m.cacheReqs, m.cacheBytes, m.cacheEvict)
 	build := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:        "ferry_build_info",
 		Help:        "Always 1; the labels say which build runs.",
@@ -194,5 +210,26 @@ func (m *Metrics) SlotWait(pool string, d time.Duration) {
 func (m *Metrics) Archive(outcome string) {
 	if m != nil {
 		m.archives.WithLabelValues(outcome).Inc()
+	}
+}
+
+// CacheRequest counts a lookup in the cache, or a failed write to it.
+func (m *Metrics) CacheRequest(kind, outcome string) {
+	if m != nil {
+		m.cacheReqs.WithLabelValues(kind, outcome).Inc()
+	}
+}
+
+// CacheBytes sets what the cache's entries take.
+func (m *Metrics) CacheBytes(n int64) {
+	if m != nil {
+		m.cacheBytes.Set(float64(n))
+	}
+}
+
+// CacheEvicted counts entries removed to keep the cache within its size.
+func (m *Metrics) CacheEvicted(n int) {
+	if m != nil {
+		m.cacheEvict.Add(float64(n))
 	}
 }

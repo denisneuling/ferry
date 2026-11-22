@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"net/http"
 	"time"
@@ -20,8 +21,8 @@ const metaConcurrency = 4
 const metaTimeout = 15 * time.Second
 
 // GetMetadata reads what a file says about itself from its own bytes,
-// within meta.Budget. Nothing is stored, and nothing of it — values,
-// names, paths — goes to the log, a metric or a trace.
+// within meta.Budget. Nothing of it — values, names, paths — goes to the
+// log, a metric or a trace; the answer may be kept in the cache.
 func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.GetMetadataParams) {
 	conn, ctx, done, ok := a.onShare(w, r, share, smb.PoolBackground)
 	if !ok {
@@ -58,7 +59,30 @@ func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.Share
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	writeJSON(w, http.StatusOK, metadata(meta.Read(f, f.Size, p)))
+	// As for thumbnails: the file is open for reading under this person's
+	// session, so what was read of it may be given from the cache.
+	key := derivedKey("metadata", "", share, p, f)
+	if a.cache != nil {
+		if body, ok := a.cache.Get(key); ok {
+			writeJSONBytes(w, body)
+			return
+		}
+	}
+	body, err := json.Marshal(metadata(meta.Read(f, f.Size, p)))
+	if err != nil {
+		probInternal.write(w)
+		return
+	}
+	if a.cache != nil {
+		a.cache.Put(key, body)
+	}
+	writeJSONBytes(w, body)
+}
+
+func writeJSONBytes(w http.ResponseWriter, body []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
 }
 
 // metadata turns what meta read into the API's shape, leaving out what the

@@ -16,7 +16,8 @@ back. Point the liveness probe at `/healthz`.
 
 ## Memory
 
-ferry keeps nothing on disk, so its memory is what a deployment has to size.
+ferry keeps nothing on disk but its optional cache, so its memory is what a
+deployment has to size.
 A container that exceeds its limit is killed, and every session with it.
 Measured on Linux with Samba 4.21, ferry built with Go 1.27
 (`internal/thumb/memory_test.go`, and the process under load):
@@ -101,6 +102,47 @@ garbage collector works harder before the kernel steps in. Where memory is
 short, lower `FERRY_THUMBNAIL_MEMORY`: at 128 MiB, JPEGs up to about
 25 megapixels still get thumbnails.
 
+## Cache
+
+Off by default. With `FERRY_CACHE_DIR` (in the chart, `cache.enabled`),
+ferry keeps what it derives from a file — thumbnails in their three sizes,
+a file's details — in that directory, so that after a restart, and for the
+next person who may read the same file, they come at once instead of being
+made again.
+
+- **What is on the volume.** Entries only: a thumbnail's JPEG or the details'
+  JSON, encrypted (AES-256-GCM) under a key derived from `FERRY_CACHE_KEY`
+  and the file's identity — share, path, size, time of the last write, the
+  variant, and the SMB server. Each is named by an HMAC of the same: 64 hex
+  digits, in folders of their first two. No file name, path, share or user
+  appears on the volume, no file itself and no credential.
+- **What the encryption protects.** The volume on its own — a backup, a disk
+  taken out, a snapshot: without the key, nothing in it can be read or
+  matched to a file. Whoever has the volume *and* the key can read an entry
+  if they also know the file's share, path, size and time to the
+  nanosecond — which takes the file's listing, at least. The key is the
+  chart's Secret; keep it as you keep the volume.
+- **Who gets an entry.** Only a person whose session has just opened the file
+  for reading on the share — the same open the thumbnail would be made
+  from. Samba decides that open; a person who sees a file in a listing but
+  may not read it gets `403`, whatever the cache holds. A changed file has
+  another size or time and so another entry; the old one is never given
+  again and ages out.
+- **Size.** `FERRY_CACHE_MAX_BYTES` (default 1 GiB). Over it, the entries
+  used longest ago are removed until 90 % of it is left; a hit sets the
+  entry's modification time, since many file systems do not keep access
+  times. A thumbnail of 320 pixels is some 10–30 KB, so 1 GiB holds tens of
+  thousands of pictures in all three sizes. In the chart, keep
+  `cache.persistence.size` above `cache.maxBytes`.
+- **Failures.** A full, read-only or slow volume (a read waits 2 s at most) is
+  a miss and a warning at most once a minute — never a failed request.
+  Entries are written whole or not at all (a temporary file, synced,
+  renamed), in the background; when the writer is behind, new entries are
+  dropped rather than held in memory.
+- **Deleting it** is always safe, running or not: entries are made again as
+  they are asked for. A new key makes every entry unreadable, with the same
+  effect; unreadable ones are removed when met.
+
 ## Logs
 
 One JSON object per line on stdout (`FERRY_LOG_FORMAT=text` for people). What
@@ -141,7 +183,10 @@ name or a path: routes are patterns, errors are kinds from a fixed list
 | `ferry_transfer_bytes_total` | counter | `direction` | file bytes `up` (uploads) and `down` (downloads and previews) |
 | `ferry_smb_errors_total` | counter | `kind` | SMB errors answered to a request: `access_denied`, `not_found`, `exists`, `busy`, `not_empty`, `not_dir`, `is_dir`, `invalid_path`, `limit`, `unreachable`, `session_lost`, `canceled`, `internal` |
 | `ferry_archives_total` | counter | `outcome` | ZIP downloads: `ok`, `failed` (broken off when a file failed), `canceled` (the client left); their bytes count in `ferry_transfer_bytes_total{direction="down"}` |
-| `ferry_thumbnails_total` | counter | `outcome` | `made`, `not_modified`, `unsupported`, `too_large`, `failed` |
+| `ferry_thumbnails_total` | counter | `outcome` | `made`, `cached` (from the cache), `not_modified`, `unsupported`, `too_large`, `failed` |
+| `ferry_cache_requests_total` | counter | `kind`, `outcome` | lookups in the cache by `kind` (`thumbnail`, `metadata`): `hit`, `miss`, `error` (the volume failed; failed writes count here too) |
+| `ferry_cache_bytes` | gauge | | what the cache's entries take, as last counted |
+| `ferry_cache_evictions_total` | counter | | entries removed to stay within `FERRY_CACHE_MAX_BYTES` |
 | `ferry_thumbnail_memory_bytes` | gauge | | taken from the thumbnail budget now |
 | `ferry_thumbnail_memory_limit_bytes` | gauge | | the budget, `FERRY_THUMBNAIL_MEMORY` |
 | `ferry_http_requests_total` | counter | `method`, `route`, `code` | HTTP requests by route pattern, e.g. `GET /api/v1/shares/{share}/content` |

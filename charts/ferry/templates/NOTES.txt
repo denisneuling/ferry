@@ -13,3 +13,6 @@ To try it:
 
 Metrics are on the Service's port "metrics" ({{ .Values.service.metricsPort }}), path /metrics.
 Sessions live in memory: a restart or an upgrade logs everyone out.
+{{- if .Values.cache.enabled }}
+Thumbnails and details are kept, encrypted, on the claim {{ .Values.cache.persistence.existingClaim | default (printf "%s-cache" (include "ferry.fullname" .)) }}; deleting it loses nothing.
+{{- end }}

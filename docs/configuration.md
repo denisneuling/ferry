@@ -1,9 +1,10 @@
 # Configuration
 
 `ferry serve` is configured through environment variables, and only those.
-None of them is a secret: ferry has no credentials of its own. The passwords
-it sees are the ones people type at the login, and those are used for one SMB
-session setup and kept nowhere.
+ferry has no credentials of its own: the passwords it sees are the ones
+people type at the login, and those are used for one SMB session setup and
+kept nowhere. The one secret among the variables is `FERRY_CACHE_KEY`, and
+only when the optional cache is on.
 
 ## The SMB server
 
@@ -46,6 +47,9 @@ session setup and kept nowhere.
 | `FERRY_THUMBNAIL_MAX_PIXELS` | `50000000` | The most pixels an image may have to be decoded — checked from its header before decoding, so a small file claiming a huge image cannot exhaust memory. |
 | `FERRY_THUMBNAIL_MEMORY` | `320Mi` | The memory all thumbnails in the making may take together, by ferry's estimate from each image's header — which is above every measured peak. Thumbnails wait until theirs fit; one that alone exceeds it is `413`. The largest single use of memory in ferry: see [operations.md](operations.md#memory) for the measurements and for sizing the container's limit. |
 | `FERRY_THUMBNAIL_CONCURRENCY` | `2` | Thumbnails decoded at once, whatever the memory allows: the CPU bound. A 12-megapixel photo takes about a quarter of a second of one core. |
+| `FERRY_CACHE_DIR` | — | A directory for the cache of thumbnails and details; empty, ferry writes nothing anywhere. Entries are encrypted and named by a keyed hash, and given only to a session that has opened the file for reading ([operations.md](operations.md#cache)). |
+| `FERRY_CACHE_MAX_BYTES` | `1Gi` | The most the cache's entries may take; the least recently used are removed beyond it. |
+| `FERRY_CACHE_KEY` | — | Required with `FERRY_CACHE_DIR`: at least 32 bytes that name and encrypt the entries. A secret: with the volume and the key, an entry can be read by whoever knows the file's path and state. A new key makes every entry unreadable, which costs only their making again. |
 | `FERRY_REQUEST_TIMEOUT` | `60s` | Every API request but uploads and downloads; and each single SMB call, of transfers too. A call the SMB server does not answer within it ends the session: a connection cancelled in the middle of a request cannot be trusted (docs/spike.md). |
 | `FERRY_STALL_TIMEOUT` | `60s` | An upload or download ends when no bytes move for this long, in either direction — whether the client or the SMB server stopped. Its total duration is not bounded. |
 

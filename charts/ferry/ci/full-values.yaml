@@ -7,6 +7,12 @@ smb:
   connections: 2
 limits:
   maxUpload: 8Gi
+cache:
+  enabled: true
+  maxBytes: 10Gi
+  persistence:
+    size: 12Gi
+    storageClass: local-path
 trustedProxies: [198.51.100.0/24]
 cookieSecure: "true"
 tracing:

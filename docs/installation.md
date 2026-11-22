@@ -2,7 +2,10 @@
 
 ferry needs one thing: an SMB server to log people in to. It keeps nothing —
 no database, no volume, no secret — so installing it is installing a
-stateless web server.
+stateless web server. The one exception is optional: a cache of thumbnails
+and details on a volume (`cache.enabled`, [operations.md](operations.md#cache)),
+which makes thumbnails come at once after a restart and for everyone who may
+read the file.
 
 ## Helm
 
@@ -46,7 +49,8 @@ worth deciding:
   `goMemLimit` together with `thumbnails.memory`.
 
 One replica, always: sessions live in the process's memory. An upgrade logs
-everyone out; nothing else is lost.
+everyone out; nothing else is lost — the cache, when there is one, survives
+it, and losing the cache costs only the time to make its entries again.
 
 ## Metrics
 

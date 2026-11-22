@@ -1046,7 +1046,9 @@ type ClientInterface interface {
 	// title, a recording's length, codec and tags, a text's encoding and
 	// lines. Only a bounded part of the file is read — its start, and for
 	// formats that keep their index at the end, box headers and the tail —
-	// and nothing is stored or logged. A format ferry does not read, or a
+	// and nothing is logged; the result may be kept in the deployment's
+	// cache (`FERRY_CACHE_DIR`), given only once the file is open for
+	// reading under the requesting session. A format ferry does not read, or a
 	// file it cannot make sense of, is `kind: other` with whatever was
 	// found, not an error. Every value comes out of the file: show it as
 	// text. `ETag` follows the file; with `v`, see `FileVersion`.
@@ -1088,7 +1090,8 @@ type ClientInterface interface {
 	// tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
 	// the front cover when it says which. Anything else, a recording
 	// without a cover included, is `415`. Made anew
-	// for every request and never stored; `ETag` follows the file, so the
+	// for every request, or taken from the deployment's cache once the file
+	// is open for reading under the requesting session; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
 	// file is unchanged; with `v`, see `FileVersion`. Images beyond the
 	// deployment's bounds — bytes or pixels — are `413`.
@@ -1408,7 +1411,9 @@ func (c *Client) CreateFolder(ctx context.Context, share ShareName, params *Crea
 // title, a recording's length, codec and tags, a text's encoding and
 // lines. Only a bounded part of the file is read — its start, and for
 // formats that keep their index at the end, box headers and the tail —
-// and nothing is stored or logged. A format ferry does not read, or a
+// and nothing is logged; the result may be kept in the deployment's
+// cache (`FERRY_CACHE_DIR`), given only once the file is open for
+// reading under the requesting session. A format ferry does not read, or a
 // file it cannot make sense of, is `kind: other` with whatever was
 // found, not an error. Every value comes out of the file: show it as
 // text. `ETag` follows the file; with `v`, see `FileVersion`.
@@ -1490,7 +1495,8 @@ func (c *Client) GetSpace(ctx context.Context, share ShareName, params *GetSpace
 // tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
 // the front cover when it says which. Anything else, a recording
 // without a cover included, is `415`. Made anew
-// for every request and never stored; `ETag` follows the file, so the
+// for every request, or taken from the deployment's cache once the file
+// is open for reading under the requesting session; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
 // file is unchanged; with `v`, see `FileVersion`. Images beyond the
 // deployment's bounds — bytes or pixels — are `413`.
@@ -2677,7 +2683,9 @@ type ClientWithResponsesInterface interface {
 	// title, a recording's length, codec and tags, a text's encoding and
 	// lines. Only a bounded part of the file is read — its start, and for
 	// formats that keep their index at the end, box headers and the tail —
-	// and nothing is stored or logged. A format ferry does not read, or a
+	// and nothing is logged; the result may be kept in the deployment's
+	// cache (`FERRY_CACHE_DIR`), given only once the file is open for
+	// reading under the requesting session. A format ferry does not read, or a
 	// file it cannot make sense of, is `kind: other` with whatever was
 	// found, not an error. Every value comes out of the file: show it as
 	// text. `ETag` follows the file; with `v`, see `FileVersion`.
@@ -2723,7 +2731,8 @@ type ClientWithResponsesInterface interface {
 	// tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
 	// the front cover when it says which. Anything else, a recording
 	// without a cover included, is `415`. Made anew
-	// for every request and never stored; `ETag` follows the file, so the
+	// for every request, or taken from the deployment's cache once the file
+	// is open for reading under the requesting session; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
 	// file is unchanged; with `v`, see `FileVersion`. Images beyond the
 	// deployment's bounds — bytes or pixels — are `413`.
@@ -4188,7 +4197,9 @@ func (c *ClientWithResponses) CreateFolderWithResponse(ctx context.Context, shar
 // title, a recording's length, codec and tags, a text's encoding and
 // lines. Only a bounded part of the file is read — its start, and for
 // formats that keep their index at the end, box headers and the tail —
-// and nothing is stored or logged. A format ferry does not read, or a
+// and nothing is logged; the result may be kept in the deployment's
+// cache (`FERRY_CACHE_DIR`), given only once the file is open for
+// reading under the requesting session. A format ferry does not read, or a
 // file it cannot make sense of, is `kind: other` with whatever was
 // found, not an error. Every value comes out of the file: show it as
 // text. `ETag` follows the file; with `v`, see `FileVersion`.
@@ -4258,7 +4269,8 @@ func (c *ClientWithResponses) GetSpaceWithResponse(ctx context.Context, share Sh
 // tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
 // the front cover when it says which. Anything else, a recording
 // without a cover included, is `415`. Made anew
-// for every request and never stored; `ETag` follows the file, so the
+// for every request, or taken from the deployment's cache once the file
+// is open for reading under the requesting session; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
 // file is unchanged; with `v`, see `FileVersion`. Images beyond the
 // deployment's bounds — bytes or pixels — are `413`.

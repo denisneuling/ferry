@@ -1,6 +1,7 @@
-# ferry has no users, no database and no secrets of its own: what it needs is
-# the SMB server to log people in to. docs/configuration.md describes every
-# setting; the values here map onto it.
+# ferry has no users and no database: what it needs is the SMB server to log
+# people in to. Its one secret is the key of the optional cache, which the
+# chart makes itself. docs/configuration.md describes every setting; the
+# values here map onto it.
 
 image:
   # -- The image; the default is the public one the GitHub mirror publishes.
@@ -62,6 +63,21 @@ thumbnails:
   # -- Thumbnails decoded at once (FERRY_THUMBNAIL_CONCURRENCY).
   concurrency: 2
 
+cache:
+  # -- Keep thumbnails and details on a volume, encrypted, across restarts and for everyone who may read the file (FERRY_CACHE_DIR). Off, ferry writes nothing anywhere. Needs a PersistentVolumeClaim; the Deployment then replaces its pod rather than rolling, as the volume is ReadWriteOnce.
+  enabled: false
+  # -- The most the entries may take (FERRY_CACHE_MAX_BYTES), the least recently used removed beyond it. Keep it below `cache.persistence.size`.
+  maxBytes: 1Gi
+  persistence:
+    # -- The volume's size.
+    size: 2Gi
+    # -- The StorageClass; empty uses the cluster's default.
+    storageClass: ""
+    # -- A claim to use instead of making one.
+    existingClaim: ""
+  # -- A Secret holding the key that names and encrypts the entries, at least 32 bytes, under `key` (FERRY_CACHE_KEY). Empty: the chart makes one and keeps it across upgrades. A new key makes every entry unreadable, which costs only their making again.
+  existingSecret: ""
+
 # -- Addresses or CIDRs of the proxies in front of ferry whose X-Forwarded-For it believes (FERRY_TRUSTED_PROXIES). Without them, every client behind the ingress shares its address — and its login rate.
 trustedProxies: []
 
@@ -116,6 +132,9 @@ podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65532
   runAsGroup: 65532
+  # The cache's volume, when there is one, becomes writable for ferry.
+  fsGroup: 65532
+  fsGroupChangePolicy: OnRootMismatch
   seccompProfile:
     type: RuntimeDefault
 

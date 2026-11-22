@@ -1,6 +1,6 @@
 // Package thumb makes thumbnails of images in memory: decode, turn upright,
-// scale, encode as JPEG. Nothing is written anywhere; ferry makes a
-// thumbnail every time it is asked for one, and the browser caches it.
+// scale, encode as JPEG. Nothing is written here; the browser caches a
+// thumbnail, and so may ferry's own cache (internal/cache).
 //
 // Every input is bounded before it is decoded: the caller limits the bytes,
 // and Make reads the image's dimensions first and refuses one with more

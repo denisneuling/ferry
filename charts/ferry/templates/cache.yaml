@@ -1,0 +1,36 @@
+{{- if .Values.cache.enabled }}
+{{- $name := printf "%s-cache" (include "ferry.fullname" .) }}
+{{- if not .Values.cache.persistence.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ferry.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.cache.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.cache.persistence.size | quote }}
+{{- end }}
+{{- if not .Values.cache.existingSecret }}
+---
+# The key that names and encrypts the cache's entries. Made once and kept
+# across upgrades: a new one would make every entry unreadable.
+{{- $old := lookup "v1" "Secret" .Release.Namespace $name }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ferry.labels" . | nindent 4 }}
+type: Opaque
+data:
+  key: {{ if and $old $old.data $old.data.key }}{{ $old.data.key }}{{ else }}{{ randAlphaNum 64 | b64enc }}{{ end }}
+{{- end }}
+{{- end }}

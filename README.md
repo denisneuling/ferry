@@ -53,7 +53,8 @@ your Samba username and password; ferry opens an SMB session as you and
 ferries files between the share and the browser. Samba checks the password
 and decides every access, exactly as it does for Explorer. ferry adds no
 rights and removes none, and keeps nothing: no users, no database, no tokens,
-no volumes.
+no volumes — but an optional, encrypted cache of thumbnails, served only to
+whoever may read the file.
 
 ## How it works
 
@@ -87,7 +88,8 @@ flowchart LR
   sandboxed and served with non-active content types, so an uploaded HTML or
   SVG file cannot run script in ferry's origin.
 - **Small.** One static binary with the interface embedded, on a distroless
-  image, non-root, read-only root filesystem, no volumes.
+  image, non-root, read-only root filesystem, no volumes unless the cache
+  is on.
 
 ## Scope
 

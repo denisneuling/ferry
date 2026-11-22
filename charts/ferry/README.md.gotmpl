@@ -7,7 +7,8 @@
 ferry logs people in to an SMB server with their own accounts and shows
 them, in the browser, exactly what the server lets them see. It keeps
 nothing: no users, no database, no volumes, no secrets — sessions live in
-the process's memory.
+the process's memory. An optional cache of thumbnails and details
+(`cache.enabled`) is the one exception: a volume and a key the chart makes.
 
 ```sh
 helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version {{ template "chart.version" . }} \
@@ -26,7 +27,13 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 - **One replica.** Sessions are in memory; a second replica would not know
   them. An upgrade logs everyone out and loses nothing else.
 - **No privileges.** Non-root, read-only root filesystem, every capability
-  dropped, no service-account token, no volume.
+  dropped, no service-account token, no volume — but the cache's, when it
+  is on.
+- **The cache, when on.** A ReadWriteOnce claim mounted at
+  `/var/cache/ferry`, a Secret with the key that names and encrypts the
+  entries (made once, kept across upgrades by `lookup`; or
+  `cache.existingSecret`), and the `Recreate` strategy, so that the old pod
+  lets go of the volume before the new one starts.
 - **Memory.** The defaults — a 512 MiB limit, `GOMEMLIMIT` at 450 MiB, a CPU
   limit — follow [docs/operations.md](https://github.com/metapatrol/ferry/blob/main/docs/operations.md#memory):
   they fit a household with 2 CPUs, a dozen sessions and ten transfers at

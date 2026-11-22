@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/metapatrol/ferry/internal/api"
+	"github.com/metapatrol/ferry/internal/cache"
 	"github.com/metapatrol/ferry/internal/config"
 	"github.com/metapatrol/ferry/internal/metrics"
 	"github.com/metapatrol/ferry/internal/server"
@@ -88,6 +89,19 @@ func serve(args []string, stderr io.Writer) int {
 		ThumbnailMemory: func() (int64, int64) { return a.ThumbnailMemory() },
 	})
 	a = api.New(cfg, sessions, smb.LoginGroup, log, version, m)
+	if cfg.CacheDir != "" {
+		c, err := cache.Open(cache.Options{
+			Dir: cfg.CacheDir, MaxBytes: cfg.CacheMaxBytes, Secret: []byte(cfg.CacheKey),
+			Scope: cfg.SMBServer, Log: log, Observer: m,
+		})
+		if err != nil {
+			log.Error("ferry cannot start", "err", err)
+			return 1
+		}
+		defer c.Close()
+		a.UseCache(c)
+		log.Info("cache in use", "max_bytes", cfg.CacheMaxBytes)
+	}
 	srv := server.New(cfg, sessions, a, m, log)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
