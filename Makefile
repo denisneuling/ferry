@@ -229,9 +229,16 @@ bin/gitleaks:
 	@chmod +x bin/gitleaks
 
 # What ci.yml runs. The working tree, so the result depends only on the commit
-# under test and not on how much history the checkout happened to fetch.
+# under test and not on how much history the checkout happened to fetch — and
+# only the files git knows (tracked, or new and not ignored), copied into
+# bin/secret-scan-tree, so that a local run sees what CI's fresh checkout sees
+# and not the caches and builds .gitignore keeps out (ui/.angular,
+# node_modules, internal/ui/dist).
 secret-scan: bin/gitleaks
-	bin/gitleaks dir . --no-banner --redact
+	@rm -rf bin/secret-scan-tree && mkdir -p bin/secret-scan-tree
+	@git ls-files -z --cached --others --exclude-standard \
+		| tar --null --ignore-failed-read -T - -cf - 2>/dev/null | tar -xf - -C bin/secret-scan-tree
+	bin/gitleaks dir bin/secret-scan-tree --no-banner --redact
 
 # The whole history, for an audit. Deliberately not in CI: a leak in an old
 # commit would turn every run red until the history is rewritten, which is a
