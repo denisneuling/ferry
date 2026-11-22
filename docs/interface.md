@@ -119,6 +119,10 @@ HTML and SVG among them — are shown as text, the first 512 KB. Anything else
 offers a download. HEIC photos and videos get an icon rather than a
 thumbnail.
 
+While an image is shown, the next and the previous one load ahead, so that
+stepping to them shows them at once; videos and PDFs do not, and nothing
+loads ahead when the browser is set to save data.
+
 ## Downloading
 
 A file downloads through the browser's own download, with Range, so a large

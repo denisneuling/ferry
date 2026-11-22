@@ -14,6 +14,7 @@ import { Actions } from '../core/actions';
 import { Browser } from '../core/browser';
 import { describe } from '../core/errors';
 import { Format } from '../core/format';
+import { Preloader, neighbours } from '../core/preloader';
 import { hasThumbnail, kindIcon, kindLabel, kindOf, previewKind } from '../core/kinds';
 import { Icon } from '../ui/icon';
 import { FileDetails } from '../ui/file-details';
@@ -75,7 +76,7 @@ import { FileDetails } from '../ui/file-details';
       <div class="lb-stage">
         @switch (kind()) {
           @case ('image') {
-            <img [src]="url()" [alt]="e.name" />
+            <img [src]="url()" [alt]="e.name" (load)="shown.set(url())" (error)="shown.set(url())" />
           }
           @case ('video') {
             <video [src]="url()" controls preload="metadata" playsinline></video>
@@ -171,6 +172,7 @@ export class Preview {
   protected readonly format = inject(Format);
   private readonly api = inject(Api);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly preloader = inject(Preloader);
   private readonly box = viewChild<ElementRef<HTMLElement>>('box');
 
   protected readonly info = signal(false);
@@ -193,6 +195,8 @@ export class Preview {
   protected readonly where = computed(() =>
     [this.browser.share(), ...(this.browser.path() ? this.browser.path().split('/') : [])].join(' / '),
   );
+  /** The URL of the image last shown, loaded or failed. */
+  protected readonly shown = signal('');
   protected readonly text = signal<string | null>(null);
   protected readonly truncated = signal(false);
   private opener: HTMLElement | null = null;
@@ -214,6 +218,20 @@ export class Preview {
           (err) => this.entry() === e && this.text.set(describe(err)),
         );
       }
+    });
+    // The next and the previous image load ahead — after the one shown, so
+    // that they do not hold it up; the preview closed, they are let go.
+    effect(() => {
+      const e = this.entry();
+      const share = this.browser.share();
+      if (!e || !share) {
+        this.preloader.want([]);
+        return;
+      }
+      if (this.kind() === 'image' && this.shown() !== this.url()) return;
+      this.preloader.want(
+        neighbours(this.files(), this.index()).map((f) => this.api.contentUrl(share, f.path, true)),
+      );
     });
     // Focus moves into the preview while it is open and back afterwards.
     effect(() => {
