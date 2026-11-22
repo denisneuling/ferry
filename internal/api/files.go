@@ -59,28 +59,6 @@ func (a *API) ListShares(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (a *API) ListEntries(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.ListEntriesParams) {
-	conn, ctx, done, ok := a.onShare(w, r, share)
-	if !ok {
-		return
-	}
-	defer done()
-	dir, ok := cleanParam(w, params.Path)
-	if !ok {
-		return
-	}
-	entries, err := conn.ReadDir(ctx, share, dir, a.cfg.MaxListing)
-	if err != nil {
-		a.fail(w, r, err)
-		return
-	}
-	out := v1.EntryList{Path: dir, Entries: make([]v1.Entry, 0, len(entries))}
-	for _, e := range entries {
-		out.Entries = append(out.Entries, entry(dir, e))
-	}
-	writeJSON(w, http.StatusOK, out)
-}
-
 func (a *API) CreateFolder(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.CreateFolderParams) {
 	conn, ctx, done, ok := a.onShare(w, r, share)
 	if !ok {
@@ -135,7 +113,7 @@ func (a *API) DeleteEntry(w http.ResponseWriter, r *http.Request, share v1.Share
 	if !ok {
 		return
 	}
-	if err := conn.Remove(ctx, share, p, params.Recursive != nil && *params.Recursive, a.cfg.MaxListing); err != nil {
+	if err := conn.Remove(ctx, share, p, params.Recursive != nil && *params.Recursive, a.cfg.MaxDelete); err != nil {
 		a.fail(w, r, err)
 		return
 	}

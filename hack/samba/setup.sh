@@ -36,6 +36,12 @@ echo "sam only" > /srv/sam/private.txt
 echo "public" > /srv/public/readme.txt
 # A file large enough to measure streaming, made once.
 [ -f /srv/alex/big.bin ] || head -c 268435456 /dev/urandom > /srv/alex/big.bin
+# A folder of 60000 empty files, made once: listings that are larger than a
+# batch, larger than the old bound and larger than a browser wants as DOM.
+if [ ! -d /srv/alex/Many ]; then
+	mkdir -p /srv/alex/Many
+	(cd /srv/alex/Many && seq -w 1 60000 | sed 's/^/photo-/; s/$/.jpg/' | xargs touch)
+fi
 chown -R alex:family /srv/alex /srv/hidden && chmod 0700 /srv/alex
 chown -R sam:family /srv/sam && chmod 0700 /srv/sam
 chown -R root:family /srv/family && chmod 2775 /srv/family

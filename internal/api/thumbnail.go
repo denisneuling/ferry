@@ -11,7 +11,7 @@ import (
 	"github.com/metapatrol/ferry/internal/thumb"
 )
 
-var probNotAnImage = problem{http.StatusUnsupportedMediaType, "not_an_image", "ferry cannot make a thumbnail of this file."}
+var probNotAnImage = problem{status: http.StatusUnsupportedMediaType, code: "not_an_image", title: "ferry cannot make a thumbnail of this file."}
 
 func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.GetThumbnailParams) {
 	size := 320

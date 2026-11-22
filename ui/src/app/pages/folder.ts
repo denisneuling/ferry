@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  LOCALE_ID,
   computed,
   effect,
   inject,
@@ -20,6 +21,9 @@ import { Prefs } from '../core/prefs';
 import { Transfers } from '../core/transfers';
 import { Icon } from '../ui/icon';
 import { Menu, MenuItem } from '../ui/menu';
+
+/** Entries rendered at once, and added each time the end comes near. */
+const PAGE = 600;
 
 /**
  * A folder of a share: its entries as tiles or a list, with selection,
@@ -48,6 +52,7 @@ export class Folder {
   private readonly transfers = inject(Transfers);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly locale = inject(LOCALE_ID);
 
   private readonly params = toSignal(this.route.paramMap);
   private readonly query = toSignal(this.route.queryParamMap);
@@ -67,6 +72,22 @@ export class Folder {
   });
   protected readonly selecting = computed(() => this.browser.selected().size > 0);
   protected readonly count = computed(() => (this.browser.entries() ?? []).length);
+  protected readonly countText = computed(() => this.count().toLocaleString(this.locale));
+
+  /**
+   * How many entries are rendered. A folder of fifty thousand tiles would
+   * stall any browser, so the page renders a window from the top and widens
+   * it as the end comes into view; selection, sorting and the filter still
+   * work on the whole folder.
+   */
+  protected readonly shown = signal(PAGE);
+  protected readonly shownFolders = computed(() => this.browser.folders().slice(0, this.shown()));
+  protected readonly shownFiles = computed(() =>
+    this.browser.files().slice(0, Math.max(0, this.shown() - this.browser.folders().length)),
+  );
+  protected readonly shownRows = computed(() => this.browser.visible().slice(0, this.shown()));
+  protected readonly more = computed(() => this.browser.visible().length > this.shown());
+  private readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   constructor() {
     // The URL is the truth: /browse/<share>?path=<folder>.
@@ -74,8 +95,24 @@ export class Folder {
       const share = this.params()?.get('share');
       const path = this.query()?.get('path') ?? '';
       if (share) {
-        untracked(() => void this.browser.open(share, path));
+        untracked(() => {
+          this.shown.set(PAGE);
+          void this.browser.open(share, path);
+        });
       }
+    });
+    // The window widens when its end comes near the viewport.
+    effect((cleanup) => {
+      const el = this.sentinel()?.nativeElement;
+      if (!el || typeof IntersectionObserver === 'undefined') return;
+      const io = new IntersectionObserver(
+        (seen) => {
+          if (seen.some((s) => s.isIntersecting)) this.shown.update((n) => n + PAGE);
+        },
+        { rootMargin: '1200px 0px' },
+      );
+      io.observe(el);
+      cleanup(() => io.disconnect());
     });
   }
 

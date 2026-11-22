@@ -54,7 +54,8 @@ type Config struct {
 	ThumbnailMaxPixels   int
 	ThumbnailMemory      int64
 	ThumbnailConcurrency int
-	MaxListing           int // FERRY_MAX_LISTING: entries in one folder, and in a recursive delete
+	MaxListing           int // FERRY_MAX_LISTING: entries in one folder listing
+	MaxDelete            int // FERRY_MAX_DELETE: entries in one recursive delete
 
 	// LoginRatePerAddress and LoginRatePerUser bound login attempts per
 	// minute, per client address and per username (FERRY_LOGIN_RATE_ADDRESS,
@@ -78,20 +79,23 @@ type Config struct {
 // FromEnv reads the configuration through getenv (os.Getenv).
 func FromEnv(getenv func(string) string) (Config, error) {
 	c := Config{
-		ListenAddr:           or(getenv("FERRY_LISTEN"), ":8080"),
-		OpsListenAddr:        or(getenv("FERRY_OPS_LISTEN"), ":8081"),
-		CookieSecure:         or(getenv("FERRY_COOKIE_SECURE"), "auto"),
-		LogLevel:             or(getenv("FERRY_LOG_LEVEL"), "info"),
-		LogFormat:            or(getenv("FERRY_LOG_FORMAT"), "json"),
-		ServerName:           getenv("FERRY_SERVER_NAME"),
-		IdleTimeout:          30 * time.Minute,
-		SessionLifetime:      12 * time.Hour,
-		MaxSessions:          200,
-		LoginTimeout:         10 * time.Second,
-		RequestTimeout:       60 * time.Second,
-		StallTimeout:         60 * time.Second,
-		MaxUpload:            0,
-		MaxListing:           10000,
+		ListenAddr:      or(getenv("FERRY_LISTEN"), ":8080"),
+		OpsListenAddr:   or(getenv("FERRY_OPS_LISTEN"), ":8081"),
+		CookieSecure:    or(getenv("FERRY_COOKIE_SECURE"), "auto"),
+		LogLevel:        or(getenv("FERRY_LOG_LEVEL"), "info"),
+		LogFormat:       or(getenv("FERRY_LOG_FORMAT"), "json"),
+		ServerName:      getenv("FERRY_SERVER_NAME"),
+		IdleTimeout:     30 * time.Minute,
+		SessionLifetime: 12 * time.Hour,
+		MaxSessions:     200,
+		LoginTimeout:    10 * time.Second,
+		RequestTimeout:  60 * time.Second,
+		StallTimeout:    60 * time.Second,
+		MaxUpload:       0,
+		// A listing is written out as it is read, so the bound protects the
+		// browser, which holds the folder, rather than ferry.
+		MaxListing:           200000,
+		MaxDelete:            10000,
 		ThumbnailMaxBytes:    64 << 20,
 		ThumbnailMaxPixels:   50_000_000,
 		ThumbnailMemory:      320 << 20,
@@ -148,6 +152,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	}{
 		{"FERRY_MAX_SESSIONS", &c.MaxSessions, 1},
 		{"FERRY_MAX_LISTING", &c.MaxListing, 1},
+		{"FERRY_MAX_DELETE", &c.MaxDelete, 1},
 		{"FERRY_LOGIN_RATE_ADDRESS", &c.LoginRatePerAddress, 1},
 		{"FERRY_LOGIN_RATE_USER", &c.LoginRatePerUser, 1},
 		{"FERRY_THUMBNAIL_MAX_PIXELS", &c.ThumbnailMaxPixels, 1},

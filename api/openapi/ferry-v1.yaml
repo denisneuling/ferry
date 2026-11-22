@@ -147,12 +147,33 @@ paths:
       operationId: listEntries
       tags: [files]
       summary: The entries of a folder.
+      description: |
+        The entries come unsorted, in the order the server lists them, and
+        are written out as they are read, a few hundred at a time: a large
+        folder costs ferry no more memory than a small one.
+
+        Ask for `application/x-ndjson` to read them as they arrive. Each line
+        is one JSON object: an `Entry`, then a last line that is either
+        `{"end": {"count": N}}` or `{"problem": Problem}` when the listing
+        failed part-way. A stream without either last line was cut off and
+        is incomplete. Errors before the first entry are ordinary problem
+        responses.
+
+        `application/json` is one `EntryList`. A listing that fails after
+        it has begun ends the connection, so that a partial list never
+        parses as a whole one.
+
+        A folder with more entries than the deployment shows
+        (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
+        number.
       responses:
         "200":
           description: The folder's entries, unsorted.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EntryList" }
+            application/x-ndjson:
+              schema: { $ref: "#/components/schemas/EntryStreamLine" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -425,7 +446,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     TooLarge:
-      description: "A bound of ferry's own was reached (`too_large`): the upload limit, or the number of entries in a folder."
+      description: "A bound of ferry's own was reached (`too_large`): the upload limit, the entries of a folder shown, or the entries of a recursive delete. `limit` says which number it was."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -468,6 +489,13 @@ components:
             `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
             `range_not_satisfiable`, `server_unreachable`, `session_lost`,
             `too_many_sessions`, `not_an_image`, `internal`.
+        limit:
+          type: integer
+          format: int64
+          description: |
+            For `too_large`: the bound that was reached — entries for a
+            listing or a recursive delete, bytes for an upload. Absent when
+            the bound is not a number worth telling.
 
     Info:
       type: object
@@ -534,6 +562,28 @@ components:
         entries:
           type: array
           items: { $ref: "#/components/schemas/Entry" }
+    EntryStreamLine:
+      description: |
+        One line of an `application/x-ndjson` listing: an entry, or the last
+        line, which says how the listing ended.
+      oneOf:
+        - $ref: "#/components/schemas/Entry"
+        - $ref: "#/components/schemas/EntryStreamEnd"
+        - $ref: "#/components/schemas/EntryStreamProblem"
+    EntryStreamEnd:
+      type: object
+      required: [end]
+      properties:
+        end:
+          type: object
+          required: [count]
+          properties:
+            count: { type: integer, description: "The entries listed." }
+    EntryStreamProblem:
+      type: object
+      required: [problem]
+      properties:
+        problem: { $ref: "#/components/schemas/Problem" }
 
     MoveRequest:
       type: object

@@ -38,7 +38,8 @@ session setup and kept nowhere.
 | variable | default | meaning |
 |---|---|---|
 | `FERRY_MAX_UPLOAD` | `0` (none) | The largest upload, in bytes, with an optional binary suffix: `512Mi`, `4Gi`. Larger is `413`, and nothing is left on the share. |
-| `FERRY_MAX_LISTING` | `10000` | Entries in one folder listing, and in one recursive delete. Beyond it, `413`. |
+| `FERRY_MAX_LISTING` | `200000` | Entries in one folder listing. ferry writes a listing out as it reads it, a few hundred entries at a time, so its own memory does not grow with the folder; the bound protects the browser, which holds the whole folder. Beyond it, the folder does not open, and the interface says how many entries this ferry shows. |
+| `FERRY_MAX_DELETE` | `10000` | Entries in one recursive delete, counted before anything is deleted: a larger tree is refused whole (`413`) rather than deleted in part. |
 | `FERRY_THUMBNAIL_MAX_BYTES` | `64Mi` | The largest image ferry reads to make a thumbnail; larger is `413` and the interface shows an icon. |
 | `FERRY_THUMBNAIL_MAX_PIXELS` | `50000000` | The most pixels an image may have to be decoded — checked from its header before decoding, so a small file claiming a huge image cannot exhaust memory. |
 | `FERRY_THUMBNAIL_MEMORY` | `320Mi` | The memory all thumbnails in the making may take together, by ferry's estimate from each image's header — which is above every measured peak. Thumbnails wait until theirs fit; one that alone exceeds it is `413`. The largest single use of memory in ferry: see [operations.md](operations.md#memory) for the measurements and for sizing the container's limit. |

@@ -1615,6 +1615,12 @@ dialog.fx-modal::backdrop {
   font-weight: 600;
   color: var(--ink);
 }
+/* The end of a long folder's rendered window: when it nears the viewport,
+   the folder renders the next part. */
+.more {
+  height: 1px;
+}
+
 .loading {
   color: var(--ink-3);
   padding: 60px 0;

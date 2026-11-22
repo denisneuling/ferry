@@ -133,7 +133,7 @@ export class Transfers {
       if (e instanceof ApiError && e.code === 'aborted') {
         return;
       }
-      this.set(job.id, { state: 'failed', error: describe(e) });
+      this.set(job.id, { state: 'failed', error: describe(e, 'upload') });
       this.batchFailed++;
     }
   }

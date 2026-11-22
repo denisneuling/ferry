@@ -30,6 +30,7 @@ func testConfig() config.Config {
 		RequestTimeout:       10 * time.Second,
 		StallTimeout:         10 * time.Second,
 		MaxListing:           1000,
+		MaxDelete:            1000,
 		LoginRatePerAddress:  100,
 		LoginRatePerUser:     3,
 		CookieSecure:         "auto",

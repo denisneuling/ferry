@@ -108,4 +108,8 @@ func TestSampleFiles(t *testing.T) {
 	if err != nil || len(entries) != 250 {
 		t.Errorf("Archiv/Briefe: %d entries, %v", len(entries), err)
 	}
+	entries, err = alex.ReadDir(ctx, "alex", "Fotoarchiv", 100000)
+	if err != nil || len(entries) != 60000 {
+		t.Errorf("Fotoarchiv: %d entries, %v", len(entries), err)
+	}
 }

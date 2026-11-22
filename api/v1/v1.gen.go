@@ -203,6 +203,26 @@ type EntryList struct {
 	Path string `json:"path"`
 }
 
+// EntryStreamEnd defines model for EntryStreamEnd.
+type EntryStreamEnd struct {
+	End struct {
+		// Count The entries listed.
+		Count int `json:"count"`
+	} `json:"end"`
+}
+
+// EntryStreamLine One line of an `application/x-ndjson` listing: an entry, or the last
+// line, which says how the listing ended.
+type EntryStreamLine struct {
+	union json.RawMessage
+}
+
+// EntryStreamProblem defines model for EntryStreamProblem.
+type EntryStreamProblem struct {
+	// Problem RFC 9457 problem details.
+	Problem Problem `json:"problem"`
+}
+
 // EntryType defines model for EntryType.
 type EntryType string
 
@@ -255,8 +275,13 @@ type Problem struct {
 	// `too_many_sessions`, `not_an_image`, `internal`.
 	Code   string  `json:"code"`
 	Detail *string `json:"detail,omitempty"`
-	Status int     `json:"status"`
-	Title  string  `json:"title"`
+
+	// Limit For `too_large`: the bound that was reached — entries for a
+	// listing or a recursive delete, bytes for an upload. Absent when
+	// the bound is not a number worth telling.
+	Limit  *int64 `json:"limit,omitempty"`
+	Status int    `json:"status"`
+	Title  string `json:"title"`
 
 	// Type A URI identifying the problem type.
 	Type string `json:"type"`
@@ -413,6 +438,94 @@ type LoginJSONRequestBody = LoginRequest
 
 // MoveEntryJSONRequestBody defines body for MoveEntry for application/json ContentType.
 type MoveEntryJSONRequestBody = MoveRequest
+
+// AsEntry returns the union data inside the EntryStreamLine as a Entry
+func (t EntryStreamLine) AsEntry() (Entry, error) {
+	var body Entry
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEntry overwrites any union data inside the EntryStreamLine as the provided Entry
+func (t *EntryStreamLine) FromEntry(v Entry) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEntry performs a merge with any union data inside the EntryStreamLine, using the provided Entry
+func (t *EntryStreamLine) MergeEntry(v Entry) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEntryStreamEnd returns the union data inside the EntryStreamLine as a EntryStreamEnd
+func (t EntryStreamLine) AsEntryStreamEnd() (EntryStreamEnd, error) {
+	var body EntryStreamEnd
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEntryStreamEnd overwrites any union data inside the EntryStreamLine as the provided EntryStreamEnd
+func (t *EntryStreamLine) FromEntryStreamEnd(v EntryStreamEnd) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEntryStreamEnd performs a merge with any union data inside the EntryStreamLine, using the provided EntryStreamEnd
+func (t *EntryStreamLine) MergeEntryStreamEnd(v EntryStreamEnd) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEntryStreamProblem returns the union data inside the EntryStreamLine as a EntryStreamProblem
+func (t EntryStreamLine) AsEntryStreamProblem() (EntryStreamProblem, error) {
+	var body EntryStreamProblem
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEntryStreamProblem overwrites any union data inside the EntryStreamLine as the provided EntryStreamProblem
+func (t *EntryStreamLine) FromEntryStreamProblem(v EntryStreamProblem) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEntryStreamProblem performs a merge with any union data inside the EntryStreamLine, using the provided EntryStreamProblem
+func (t *EntryStreamLine) MergeEntryStreamProblem(v EntryStreamProblem) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t EntryStreamLine) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *EntryStreamLine) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -580,6 +693,25 @@ type ClientInterface interface {
 	DeleteEntry(ctx context.Context, share ShareName, params *DeleteEntryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListEntries The entries of a folder.
+	//
+	// The entries come unsorted, in the order the server lists them, and
+	// are written out as they are read, a few hundred at a time: a large
+	// folder costs ferry no more memory than a small one.
+	//
+	// Ask for `application/x-ndjson` to read them as they arrive. Each line
+	// is one JSON object: an `Entry`, then a last line that is either
+	// `{"end": {"count": N}}` or `{"problem": Problem}` when the listing
+	// failed part-way. A stream without either last line was cut off and
+	// is incomplete. Errors before the first entry are ordinary problem
+	// responses.
+	//
+	// `application/json` is one `EntryList`. A listing that fails after
+	// it has begun ends the connection, so that a partial list never
+	// parses as a whole one.
+	//
+	// A folder with more entries than the deployment shows
+	// (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
+	// number.
 	//
 	// Corresponds with GET /api/v1/shares/{share}/entries (the `ListEntries` operationId).
 	ListEntries(ctx context.Context, share ShareName, params *ListEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -799,6 +931,25 @@ func (c *Client) DeleteEntry(ctx context.Context, share ShareName, params *Delet
 }
 
 // ListEntries The entries of a folder.
+//
+// The entries come unsorted, in the order the server lists them, and
+// are written out as they are read, a few hundred at a time: a large
+// folder costs ferry no more memory than a small one.
+//
+// Ask for `application/x-ndjson` to read them as they arrive. Each line
+// is one JSON object: an `Entry`, then a last line that is either
+// `{"end": {"count": N}}` or `{"problem": Problem}` when the listing
+// failed part-way. A stream without either last line was cut off and
+// is incomplete. Errors before the first entry are ordinary problem
+// responses.
+//
+// `application/json` is one `EntryList`. A listing that fails after
+// it has begun ends the connection, so that a partial list never
+// parses as a whole one.
+//
+// A folder with more entries than the deployment shows
+// (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
+// number.
 //
 // Corresponds with GET /api/v1/shares/{share}/entries (the `ListEntries` operationId).
 func (c *Client) ListEntries(ctx context.Context, share ShareName, params *ListEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1722,6 +1873,25 @@ type ClientWithResponsesInterface interface {
 	DeleteEntryWithResponse(ctx context.Context, share ShareName, params *DeleteEntryParams, reqEditors ...RequestEditorFn) (*DeleteEntryResponse, error)
 
 	// ListEntriesWithResponse The entries of a folder.
+	//
+	// The entries come unsorted, in the order the server lists them, and
+	// are written out as they are read, a few hundred at a time: a large
+	// folder costs ferry no more memory than a small one.
+	//
+	// Ask for `application/x-ndjson` to read them as they arrive. Each line
+	// is one JSON object: an `Entry`, then a last line that is either
+	// `{"end": {"count": N}}` or `{"problem": Problem}` when the listing
+	// failed part-way. A stream without either last line was cut off and
+	// is incomplete. Errors before the first entry are ordinary problem
+	// responses.
+	//
+	// `application/json` is one `EntryList`. A listing that fails after
+	// it has begun ends the connection, so that a partial list never
+	// parses as a whole one.
+	//
+	// A folder with more entries than the deployment shows
+	// (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
+	// number.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2794,6 +2964,25 @@ func (c *ClientWithResponses) DeleteEntryWithResponse(ctx context.Context, share
 
 // ListEntriesWithResponse The entries of a folder.
 //
+// The entries come unsorted, in the order the server lists them, and
+// are written out as they are read, a few hundred at a time: a large
+// folder costs ferry no more memory than a small one.
+//
+// Ask for `application/x-ndjson` to read them as they arrive. Each line
+// is one JSON object: an `Entry`, then a last line that is either
+// `{"end": {"count": N}}` or `{"problem": Problem}` when the listing
+// failed part-way. A stream without either last line was cut off and
+// is incomplete. Errors before the first entry are ordinary problem
+// responses.
+//
+// `application/json` is one `EntryList`. A listing that fails after
+// it has begun ends the connection, so that a partial list never
+// parses as a whole one.
+//
+// A folder with more entries than the deployment shows
+// (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
+// number.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/shares/{share}/entries (the `ListEntries` operationId).
@@ -3356,6 +3545,9 @@ func ParseListEntriesResponse(rsp *http.Response) (*ListEntriesResponse, error) 
 			return nil, err
 		}
 		response.ApplicationproblemJSON502 = &dest
+
+	case rsp.StatusCode == 200:
+		// Content-type (application/x-ndjson) unsupported
 
 	}
 

@@ -14,6 +14,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    /** For too_large: the bound that was reached, entries or bytes. */
+    readonly limit?: number,
   ) {
     super(code);
   }
@@ -58,6 +60,61 @@ export class Api {
 
   entries(share: string, path: string): Promise<EntryList> {
     return this.json('GET', `${shareBase(share)}/entries?path=${q(path)}`);
+  }
+
+  /**
+   * Lists a folder as the server reads it: onEntries gets the entries in
+   * batches while they arrive, and the promise ends with their count. A
+   * problem in the stream's last line, or a stream cut off before it, is an
+   * ApiError like any other: a partial folder never passes for a whole one.
+   */
+  async entriesStream(
+    share: string,
+    path: string,
+    onEntries: (batch: Entry[]) => void,
+    signal?: AbortSignal,
+  ): Promise<number> {
+    const res = await this.fetch(
+      'GET',
+      `${BASE}${shareBase(share)}/entries?path=${q(path)}`,
+      undefined,
+      { Accept: 'application/x-ndjson' },
+      signal,
+    );
+    if (!res.body) {
+      throw new ApiError(0, 'network');
+    }
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let rest = '';
+    for (;;) {
+      let chunk: ReadableStreamReadResult<string>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        throw new ApiError(0, 'network');
+      }
+      if (chunk.done) {
+        throw new ApiError(0, 'network'); // Cut off before the last line.
+      }
+      const lines = (rest + chunk.value).split('\n');
+      rest = lines.pop() ?? '';
+      const batch: Entry[] = [];
+      for (const line of lines) {
+        if (!line) continue;
+        const v = JSON.parse(line) as Entry & { end?: { count: number }; problem?: Problem };
+        if (v.end) {
+          if (batch.length) onEntries(batch);
+          void reader.cancel();
+          return v.end.count;
+        }
+        if (v.problem) {
+          void reader.cancel();
+          throw this.problemOf(v.problem.status, v.problem);
+        }
+        batch.push(v);
+      }
+      if (batch.length) onEntries(batch);
+    }
   }
 
   mkdir(share: string, path: string): Promise<Entry> {
@@ -142,6 +199,7 @@ export class Api {
     url: string,
     body?: unknown,
     headers: Record<string, string> = {},
+    signal?: AbortSignal,
   ): Promise<Response> {
     const h: Record<string, string> = { ...headers };
     if (method !== 'GET') {
@@ -157,6 +215,7 @@ export class Api {
         headers: h,
         body: body === undefined ? undefined : JSON.stringify(body),
         credentials: 'same-origin',
+        signal,
       });
     } catch {
       throw new ApiError(0, 'network');
@@ -168,13 +227,18 @@ export class Api {
   }
 
   private problem(status: number, text: string): ApiError {
-    let code = 'internal';
+    let p: Partial<Problem> = {};
     try {
-      code = (JSON.parse(text) as Problem).code ?? code;
+      p = JSON.parse(text) as Problem;
     } catch {
       // Not a problem response: a proxy in front, or the network.
     }
-    const err = new ApiError(status, code);
+    return this.problemOf(status, p);
+  }
+
+  private problemOf(status: number, p: Partial<Problem>): ApiError {
+    const code = p.code ?? 'internal';
+    const err = new ApiError(status, code, typeof p.limit === 'number' ? p.limit : undefined);
     if (status === 401 && code === 'unauthenticated') {
       this.session.ended();
     }

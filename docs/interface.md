@@ -22,6 +22,12 @@ the login and says why.
   JPEG, PNG, GIF, WebP and BMP — or as a sortable list.
 - **Search this folder** filters the names of the folder open; it searches
   nothing else.
+- **Large folders** open at once: the entries arrive as the server lists
+  them, and the first ones show while the rest come in. The page renders a
+  few hundred tiles or rows and more as the end comes into view; sorting,
+  the search and "select all" work on the whole folder. A folder with more
+  entries than the deployment shows (`FERRY_MAX_LISTING`, 200000 by default)
+  says how many that is.
 
 ## Selecting and acting
 

@@ -153,7 +153,7 @@ export class Actions {
         await this.api.remove(share, e.path, e.type === 'folder');
         deleted++;
       } catch (err) {
-        failures.push(`${e.name}: ${describe(err)}`);
+        failures.push(`${e.name}: ${describe(err, 'delete')}`);
       }
     }
     this.browser.clear();

@@ -27,6 +27,9 @@ func TestDefaults(t *testing.T) {
 	if !c.AllowsShare("anything") {
 		t.Error("an empty FERRY_SHARES must allow every share")
 	}
+	if c.MaxListing != 200000 || c.MaxDelete != 10000 {
+		t.Errorf("max listing %d, max delete %d", c.MaxListing, c.MaxDelete)
+	}
 }
 
 func TestValues(t *testing.T) {
@@ -38,6 +41,8 @@ func TestValues(t *testing.T) {
 		"FERRY_MAX_UPLOAD":      "4Gi",
 		"FERRY_TRUSTED_PROXIES": "198.51.100.0/24, 192.0.2.7",
 		"FERRY_COOKIE_SECURE":   "true",
+		"FERRY_MAX_LISTING":     "500000",
+		"FERRY_MAX_DELETE":      "25",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +55,9 @@ func TestValues(t *testing.T) {
 	}
 	if c.MaxUpload != 4<<30 || c.IdleTimeout != 10*time.Minute {
 		t.Errorf("max upload %d idle %v", c.MaxUpload, c.IdleTimeout)
+	}
+	if c.MaxListing != 500000 || c.MaxDelete != 25 {
+		t.Errorf("max listing %d, max delete %d", c.MaxListing, c.MaxDelete)
 	}
 	if len(c.TrustedProxies) != 2 || c.TrustedProxies[1].String() != "192.0.2.7/32" {
 		t.Errorf("proxies %v", c.TrustedProxies)

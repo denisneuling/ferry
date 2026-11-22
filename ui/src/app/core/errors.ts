@@ -1,12 +1,28 @@
 import { ApiError } from './api';
+import { formatSize } from './format';
+
+/** What was being done when it failed, where a message depends on it. */
+export type Doing = 'list' | 'delete' | 'upload';
 
 /**
  * What to tell a person when something fails, in everyday words. The codes
  * are the API's (api/openapi/ferry-v1.yaml); the server's own wording, file
  * names and paths never reach these messages.
  */
-export function describe(err: unknown): string {
+export function describe(err: unknown, doing?: Doing): string {
   const code = err instanceof ApiError ? err.code : 'internal';
+  if (code === 'too_large' && err instanceof ApiError && err.limit) {
+    const locale = typeof $localize !== 'undefined' ? $localize.locale : undefined;
+    const n = err.limit.toLocaleString(locale);
+    switch (doing) {
+      case 'list':
+        return $localize`:@@err.tooLarge.list:This folder has more than ${n}:count: entries — more than this ferry shows.`;
+      case 'delete':
+        return $localize`:@@err.tooLarge.delete:This folder holds more than ${n}:count: entries — more than ferry deletes at once. Delete what is inside it in parts.`;
+      case 'upload':
+        return $localize`:@@err.tooLarge.upload:The file is larger than ${formatSize(err.limit, locale)}:size:, the most this ferry accepts.`;
+    }
+  }
   switch (code) {
     case 'access_denied':
       return $localize`:@@err.accessDenied:The NAS does not allow you to do this here.`;

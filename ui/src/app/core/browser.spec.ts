@@ -67,3 +67,58 @@ describe('Browser', () => {
     expect(b.selected().size).toBe(0);
   });
 });
+
+describe('Browser loading a folder', () => {
+  const page = (names: string[]) => names.map((n) => entry(n, 'file'));
+  let batches: Entry[][];
+  let release: () => void;
+  let b: Browser;
+  beforeEach(() => {
+    batches = [];
+    const api = {
+      // A listing in two batches, the second held back until release().
+      entriesStream: (_s: string, _p: string, on: (b: Entry[]) => void) => {
+        on(batches[0]);
+        return new Promise<number>((resolve) => {
+          release = () => {
+            on(batches[1]);
+            resolve(batches[0].length + batches[1].length);
+          };
+        });
+      },
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: LOCALE_ID, useValue: 'en' },
+        { provide: Api, useValue: api },
+      ],
+    });
+    b = TestBed.inject(Browser);
+  });
+
+  it("shows a new folder's first entries while the rest arrive", async () => {
+    batches = [page(['a', 'b']), page(['c'])];
+    const done = b.open('alex', 'Many');
+    await Promise.resolve();
+    expect(b.entries()?.map((e) => e.name)).toEqual(['a', 'b']);
+    expect(b.loading()).toBe(true);
+    release();
+    await done;
+    expect(b.entries()?.map((e) => e.name)).toEqual(['a', 'b', 'c']);
+    expect(b.loading()).toBe(false);
+  });
+
+  it('replaces a folder already shown only when its new listing is complete', async () => {
+    batches = [page(['a']), page(['b'])];
+    const first = b.open('alex', 'Many');
+    release();
+    await first;
+    batches = [page(['x']), page(['y'])];
+    const again = b.reload();
+    await Promise.resolve();
+    expect(b.entries()?.map((e) => e.name)).toEqual(['a', 'b']);
+    release();
+    await again;
+    expect(b.entries()?.map((e) => e.name)).toEqual(['x', 'y']);
+  });
+});

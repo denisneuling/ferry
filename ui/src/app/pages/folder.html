@@ -14,7 +14,13 @@
     <h1>{{ browser.title() }}</h1>
     <div class="meta">
       @if (browser.entries()) {
-        <ng-container i18n="@@count">{count(), plural, =1 {1 item} other {{{ count() }} items}}</ng-container>
+        <ng-container i18n="@@count">{count(), plural,
+          =1 {1 item}
+          other {{{ countText() }} items}
+        }</ng-container>
+        @if (browser.loading() && count()) {
+          · <ng-container i18n="@@loadingMore">loading more…</ng-container>
+        }
         @if (browser.filter()) {
           · <ng-container i18n="@@matching">{{ browser.visible().length }} matching</ng-container>
         }
@@ -136,7 +142,7 @@
     @if (browser.folders().length) {
       <div class="section-label" i18n="@@sec.folders">Folders</div>
       <div class="folders">
-        @for (e of browser.folders(); track e.name) {
+        @for (e of shownFolders(); track e.name) {
           <button
             type="button"
             class="folder"
@@ -166,10 +172,10 @@
         }
       </div>
     }
-    @if (browser.files().length) {
+    @if (shownFiles().length) {
       <div class="section-label" i18n="@@sec.files">Files</div>
       <div class="grid">
-        @for (e of browser.files(); track e.name) {
+        @for (e of shownFiles(); track e.name) {
           <button
             type="button"
             class="tile"
@@ -252,7 +258,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (e of browser.visible(); track e.name) {
+        @for (e of shownRows(); track e.name) {
           <tr
             class="row"
             [class.is-sel]="browser.selected().has(e.name)"
@@ -291,6 +297,9 @@
         }
       </tbody>
     </table>
+  }
+  @if (more()) {
+    <div #sentinel class="more" aria-hidden="true"></div>
   }
 </section>
 

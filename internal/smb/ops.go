@@ -143,7 +143,7 @@ func (s *Session) walk(c *call, m *smb2.Share, dir string, depth, max int, order
 		children = append(children, batch...)
 		if len(*order)+len(children) > max {
 			_ = f.Close()
-			return &Error{Kind: KindLimit}
+			return &Error{Kind: KindLimit, Limit: int64(max)}
 		}
 		if errors.Is(rerr, io.EOF) || (rerr == nil && len(batch) == 0) {
 			break
@@ -169,7 +169,7 @@ func (s *Session) walk(c *call, m *smb2.Share, dir string, depth, max int, order
 	}
 	*order = append(*order, dir)
 	if len(*order) > max {
-		return &Error{Kind: KindLimit}
+		return &Error{Kind: KindLimit, Limit: int64(max)}
 	}
 	return nil
 }
@@ -320,7 +320,7 @@ func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, over
 			written += int64(n)
 			if max > 0 && written > max {
 				cleanup()
-				return Entry{}, &Error{Kind: KindLimit}
+				return Entry{}, &Error{Kind: KindLimit, Limit: max}
 			}
 			if werr := s.writeChunk(ctx, fcancel, f, buf[:n]); werr != nil {
 				cleanup()

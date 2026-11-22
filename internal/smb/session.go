@@ -287,57 +287,25 @@ type Entry struct {
 	ModTime time.Time
 }
 
-// ReadDir lists a folder. It reads at most max entries (a bound of ferry's
-// own, KindLimit beyond it) and returns them unsorted: sorting is the
-// interface's.
-func (s *Session) ReadDir(ctx context.Context, share, p string, max int) ([]Entry, error) {
-	sp, err := CleanPath(p)
+// ReadDir lists a folder whole: at most max entries (a bound of ferry's own,
+// KindLimit beyond it), unsorted — sorting is the interface's. A listing
+// that is written out as it is read uses OpenDir instead, and holds one
+// batch at a time rather than the folder.
+func (s *Session) ReadDir(ctx context.Context, share, p string, max int) (_ []Entry, err error) {
+	d, err := s.OpenDir(ctx, share, p, max)
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.start(ctx, "smb.readdir")
-	if err != nil {
-		return nil, err
-	}
-	defer c.end()
-	m, err := s.mount(c.ctx, share)
-	if err != nil {
-		return nil, err
-	}
-	dir := sp
-	if dir == "" {
-		dir = "."
-	}
-	f, err := m.Open(dir)
-	if err != nil {
-		return nil, s.fail(err)
-	}
-	defer func() { _ = f.Close() }()
-
+	defer func() { _ = d.Close() }()
 	var out []Entry
 	for {
-		if err := c.canceled(); err != nil {
-			return nil, err
-		}
-		c.kick()
-		batch, err := f.Readdir(256)
-		for _, fi := range batch {
-			if fi.Name() == "." || fi.Name() == ".." {
-				continue
-			}
-			if len(out) == max {
-				return nil, &Error{Kind: KindLimit}
-			}
-			out = append(out, Entry{Name: fi.Name(), Dir: fi.IsDir(), Size: fi.Size(), ModTime: fi.ModTime()})
-		}
+		batch, err := d.Next()
+		out = append(out, batch...)
 		if errors.Is(err, io.EOF) {
 			return out, nil
 		}
 		if err != nil {
-			return nil, s.fail(err)
-		}
-		if len(batch) == 0 {
-			return out, nil
+			return nil, err
 		}
 	}
 }

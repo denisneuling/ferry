@@ -297,7 +297,9 @@ func (a *API) PutContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 		return
 	}
 	if a.cfg.MaxUpload > 0 && r.ContentLength > a.cfg.MaxUpload {
-		probTooLarge.write(w)
+		p := probTooLarge
+		p.limit = a.cfg.MaxUpload
+		p.write(w)
 		return
 	}
 	wd := newWatchdog(r.Context(), a.cfg.RequestTimeout)

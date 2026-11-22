@@ -22,6 +22,8 @@ export class Browser {
   /** The folder, slash-separated, '' for the share's root. */
   readonly path = signal('');
   readonly entries = signal<Entry[] | null>(null);
+  /** Whether a listing is still arriving: entries() may be its first part. */
+  readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly errorCode = signal<string | null>(null);
 
@@ -34,6 +36,7 @@ export class Browser {
   readonly preview = signal<number | null>(null);
 
   private loads = 0;
+  private abort: AbortController | null = null;
 
   /** The folder's entries, filtered and sorted: folders first, then files. */
   readonly visible = computed(() => {
@@ -90,27 +93,59 @@ export class Browser {
     }
     const path = this.path();
     const n = ++this.loads;
+    this.abort?.abort();
+    const abort = new AbortController();
+    this.abort = abort;
+    // A folder opened afresh shows its first entries at once and fills in
+    // while the rest arrive; a folder already shown is replaced only when
+    // its new listing is complete, so that an action's reload does not
+    // flicker. Updates come at most every few hundred milliseconds: each one
+    // sorts the whole folder again.
+    const progressive = this.entries() === null;
+    const got: Entry[] = [];
+    let shownAt = -Infinity;
+    this.loading.set(true);
     try {
-      const list = await this.api.entries(share, path);
+      await this.api.entriesStream(
+        share,
+        path,
+        (batch) => {
+          if (n !== this.loads) return;
+          for (const e of batch) got.push(e);
+          const now = performance.now();
+          if (progressive && now - shownAt > 400) {
+            this.entries.set(got.slice());
+            shownAt = now;
+          }
+        },
+        abort.signal,
+      );
       if (n !== this.loads) {
         return; // A newer load is on its way.
       }
-      this.entries.set(list.entries);
+      this.entries.set(got);
       this.error.set(null);
       this.errorCode.set(null);
-      const names = new Set(list.entries.map((e) => e.name));
+      const names = new Set(got.map((e) => e.name));
       this.selected.update((s) => new Set([...s].filter((x) => names.has(x))));
     } catch (e) {
       if (n !== this.loads) {
         return;
       }
       this.entries.set(null);
-      this.error.set(describe(e));
+      this.error.set(describe(e, 'list'));
       this.errorCode.set(e instanceof ApiError ? e.code : 'internal');
+    } finally {
+      if (n === this.loads) {
+        this.loading.set(false);
+      }
     }
   }
 
   leave(): void {
+    this.abort?.abort();
+    this.loads++;
+    this.loading.set(false);
     this.share.set(null);
     this.path.set('');
     this.entries.set(null);

@@ -70,6 +70,19 @@ func (k Kind) String() string {
 type Error struct {
 	Kind   Kind
 	Status uint32 // the NTSTATUS, when the server sent one; 0 otherwise
+	// Limit is the bound a KindLimit error reached — entries or bytes,
+	// ferry's own configuration, never anything from the server — so that
+	// the person can be told what it was. 0 when it is not one of those.
+	Limit int64
+}
+
+// LimitOf is the bound a KindLimit error reached, or 0.
+func LimitOf(err error) int64 {
+	var e *Error
+	if errors.As(err, &e) && e.Kind == KindLimit {
+		return e.Limit
+	}
+	return 0
 }
 
 func (e *Error) Error() string {

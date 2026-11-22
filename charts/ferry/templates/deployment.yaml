@@ -80,7 +80,9 @@ spec:
             - name: FERRY_MAX_UPLOAD
               value: {{ .Values.limits.maxUpload | quote }}
             - name: FERRY_MAX_LISTING
-              value: {{ .Values.limits.maxListing | quote }}
+              value: {{ .Values.limits.maxListing | int | quote }}
+            - name: FERRY_MAX_DELETE
+              value: {{ .Values.limits.maxDelete | int | quote }}
             - name: FERRY_REQUEST_TIMEOUT
               value: {{ .Values.limits.requestTimeout | quote }}
             - name: FERRY_STALL_TIMEOUT

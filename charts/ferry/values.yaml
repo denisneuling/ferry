@@ -39,8 +39,10 @@ login:
 limits:
   # -- The largest upload, e.g. `4Gi`; `0` for none (FERRY_MAX_UPLOAD).
   maxUpload: "0"
-  # -- Entries in one folder listing and one recursive delete (FERRY_MAX_LISTING).
-  maxListing: 10000
+  # -- Entries in one folder listing (FERRY_MAX_LISTING). A listing is streamed, so this protects the browser, not ferry's memory.
+  maxListing: 200000
+  # -- Entries in one recursive delete, refused whole beyond it (FERRY_MAX_DELETE).
+  maxDelete: 10000
   # -- Every API request but transfers, and each single SMB call (FERRY_REQUEST_TIMEOUT).
   requestTimeout: 60s
   # -- A transfer that moves no bytes for this long ends (FERRY_STALL_TIMEOUT).

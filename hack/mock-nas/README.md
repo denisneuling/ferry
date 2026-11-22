@@ -26,7 +26,7 @@ Demo values, valid only in this container.
 
 | share | who | what |
 |---|---|---|
-| `alex` | alex only | photos (two albums, a panorama, a screenshot), documents with deep folders, 250 letters in one folder, a voice note, a 1.5 GB video |
+| `alex` | alex only | photos (two albums, a panorama, a screenshot), documents with deep folders, 250 letters in one folder, a photo archive of 60000 files in one folder, a voice note, a 1.5 GB video |
 | `sam` | sam only | concert photos, a thesis PDF, notes |
 | `Family` | both, read and write; `force group = family`, `create mask = 0664` | holiday and birthday photos, recipes, insurance PDFs, a CSV |
 | `Public` | both, read only | manuals (PDF), two tones (WAV), a wallpaper |
@@ -46,6 +46,10 @@ ship it, on with `make dev-nas DEV_NAS_ABSE=yes`.
 - **Video:** `Urlaub am Meer 🌊 2025.mp4` is 1.5 GB of zeros
   (`MOCK_NAS_VIDEO_SIZE`) with a video's name: enough to stream, seek and
   cancel, not to watch. It is made sparse when the container starts.
+- **A large folder:** `alex/Fotoarchiv` holds 60000 empty files named
+  `IMG_00001.jpg` and on (`MOCK_NAS_ARCHIVE_SIZE`), made when the container
+  starts: a listing far beyond one batch, and more tiles than a browser can
+  render at once.
 - **Names** with umlauts, spaces, `&` and emoji, folders five levels deep,
   an empty folder, modification times spread over two years.
 
