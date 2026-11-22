@@ -115,6 +115,10 @@ spec:
               value: {{ .Values.thumbnails.concurrency | quote }}
             - name: FERRY_PREVIEW_PDF
               value: {{ .Values.previews.pdf | quote }}
+            - name: FERRY_PREVIEW_HEIC
+              value: {{ .Values.previews.heic | quote }}
+            - name: FERRY_PREVIEW_HEIC_MEMORY
+              value: {{ .Values.previews.heicMemory | quote }}
             - name: FERRY_PREVIEW_CONCURRENCY
               value: {{ .Values.previews.concurrency | int | quote }}
             {{- if .Values.cache.enabled }}

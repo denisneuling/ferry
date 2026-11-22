@@ -172,7 +172,10 @@ jobs:
               -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.builtAt=$BUILT_AT" \
               -o "dist/ferry-linux-$arch" ./cmd/ferry
           done
-          (cd dist && sha256sum ferry-linux-* > SHA256SUMS)
+          # The HEIF module the binaries embed, with its licences (LGPL):
+          # third_party/heif/README.md.
+          hack/heif-asset.sh dist
+          (cd dist && sha256sum ferry-linux-* ferry-heif.wasm ferry-heif-LICENSES.md > SHA256SUMS)
 
       - name: Chart
         env:
@@ -194,12 +197,13 @@ jobs:
             /^#+ \[?[0-9]+\.[0-9]+\.[0-9]+/ { if (on) exit; if (index($0, "[" v "]")) { on = 1; next } }
             on { print }' CHANGELOG.md > dist/notes.md
           [ -s dist/notes.md ] || echo "Release $TAG" > dist/notes.md
+          hack/heif-asset.sh notes >> dist/notes.md
 
       - name: GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          assets=(dist/ferry-linux-* dist/SHA256SUMS dist/ferry-*.tgz)
+          assets=(dist/ferry-linux-* dist/ferry-heif.wasm dist/ferry-heif-LICENSES.md dist/SHA256SUMS dist/ferry-*.tgz)
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${assets[@]}" --clobber
           else

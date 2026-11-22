@@ -174,7 +174,7 @@ Illustrative. The contract is `api/openapi/ferry-v1.yaml`.
 | GET | `/api/v1/shares/{share}/archive/{ticket}` | the ZIP, stored, streamed from the share; broken off when a file fails |
 | POST | `/api/v1/shares/{share}/move` | rename or move within a share, `{from, to}` |
 | DELETE | `/api/v1/shares/{share}/entries?path=` | delete a file or an empty folder; recursive only when asked |
-| GET | `/api/v1/shares/{share}/thumbnail?path=&v=` | thumbnail of an image, a recording's cover or a PDF's first page, made on the fly or taken from the cache once the file is open for reading; with the entry's version `v`, cached by the browser until the file changes |
+| GET | `/api/v1/shares/{share}/thumbnail?path=&v=` | thumbnail of an image, a recording's cover, a PDF's first page or a HEIC photo, made on the fly or taken from the cache once the file is open for reading; with the entry's version `v`, cached by the browser until the file changes |
 
 - **Paths** are cleaned and resolved within the share. `..`, absolute paths and
   NUL bytes are refused before anything reaches SMB.

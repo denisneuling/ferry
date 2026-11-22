@@ -70,6 +70,12 @@ type Config struct {
 	PreviewPDF         bool
 	PreviewConcurrency int
 	WASMDir            string
+	// HEIC photos (FERRY_PREVIEW_HEIC), the memory one may take
+	// (FERRY_PREVIEW_HEIC_MEMORY), and a module to use instead of the one
+	// ferry carries (FERRY_HEIF_WASM, a file; third_party/heif/README.md).
+	PreviewHEIC       bool
+	PreviewHEICMemory int64
+	HEIFWASM          string
 	// SMBConnections is how many SMB connections a login sets up
 	// (FERRY_SMB_CONNECTIONS, 1 to 4): one for browsing, the others for
 	// thumbnails, details and content (smb.Group).
@@ -122,6 +128,8 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		ThumbnailConcurrency: 2,
 		CacheMaxBytes:        1 << 30,
 		PreviewPDF:           true,
+		PreviewHEIC:          true,
+		PreviewHEICMemory:    96 << 20,
 		PreviewConcurrency:   1,
 		WASMDir:              "/usr/lib/ferry/wasm",
 		LoginRatePerAddress:  10,
@@ -232,6 +240,21 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		}
 		c.PreviewPDF = b
 	}
+	if v := getenv("FERRY_PREVIEW_HEIC"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			fail("FERRY_PREVIEW_HEIC", fmt.Errorf("%q is not true or false", v))
+		}
+		c.PreviewHEIC = b
+	}
+	if v := getenv("FERRY_PREVIEW_HEIC_MEMORY"); v != "" {
+		n, err := parseBytes(v)
+		if err != nil || n < 32<<20 {
+			fail("FERRY_PREVIEW_HEIC_MEMORY", fmt.Errorf("%q is not a byte count of at least 32Mi", v))
+		}
+		c.PreviewHEICMemory = n
+	}
+	c.HEIFWASM = strings.TrimSpace(getenv("FERRY_HEIF_WASM"))
 	if v := strings.TrimSpace(getenv("FERRY_WASM_DIR")); v != "" {
 		c.WASMDir = v
 	}

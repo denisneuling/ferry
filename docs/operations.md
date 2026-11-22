@@ -29,7 +29,8 @@ Measured on Linux with Samba 4.21, ferry built with Go 1.27
 | a running download | ~1.5 + 1 × GOMAXPROCS MB: 3.5 MB at 2 CPUs, 6.5 MB at 4 |
 | a running upload | ~2.5 MB |
 | thumbnails in the making, all together | at most `FERRY_THUMBNAIL_MEMORY` (default 320 MiB) |
-| a PDF page in the making | up to 208 MB of `FERRY_THUMBNAIL_MEMORY` while it runs; pdfium's code, ~40 MB, stays loaded until 5 minutes without one |
+| a PDF page or a HEIC photo in the making | up to 208 MB of `FERRY_THUMBNAIL_MEMORY` (and the photo's bytes) while it runs |
+| the previews' compiled code | ~45 MB for pdfium, ~12 MB for libheif, loaded with the first job and let go 5 minutes after the last — outside Go's heap and outside `GOMEMLIMIT` |
 | recordings' covers decoded before the budget counts them | at most ~24 MiB × `FERRY_THUMBNAIL_CONCURRENCY`, rarely more than a few hundred KB |
 
 Downloads spread over a session's background connections take a little
@@ -98,8 +99,9 @@ bounds the CPU separately.
 
 For a household with 2 CPUs, a dozen sessions and ten transfers at once:
 20 + 1 + 35 + 320 MB, plus a quarter: a limit of **512 MiB**. Set
-`GOMEMLIMIT` a little below the limit (`450MiB` for 512 MiB), so that the
-garbage collector works harder before the kernel steps in. Where memory is
+`GOMEMLIMIT` below the limit (`400MiB` for 512 MiB), so that the garbage
+collector works harder before the kernel steps in; the previews' compiled
+code, some 60 MB, is not Go's and not under it. Where memory is
 short, lower `FERRY_THUMBNAIL_MEMORY`: at 128 MiB, JPEGs up to about
 25 megapixels still get thumbnails.
 
@@ -141,10 +143,46 @@ refuses as damaged, is not used, and ferry compiles anew if the budget
 allows it — otherwise PDF previews are off for the process, with a
 warning, and PDFs show an icon.
 
-Under the chart's limits (512 MiB, `GOMEMLIMIT` 450 MiB, the default
-thumbnail budget) a scanned PDF at 640 pixels three times over, a wall of
-50 thumbnails of 12-megapixel JPEGs twice over and a 256 MB download at
-once peaked at 314 MB (VmHWM), without an OOM.
+Under the chart's limits (512 MiB, the default thumbnail budget;
+`hack/loadtest/run.sh`) a scanned PDF at 640 pixels three times over, a wall
+of 50 thumbnails of 12-megapixel JPEGs twice over and a 256 MB download at
+once peaked at 314 MB (VmHWM), without an OOM. With two 12.6-megapixel HEIC
+photos at 640 and 320 on top (`--heic`), the peak was 466–484 MB at a
+`GOMEMLIMIT` of 450 MiB — too close to 512 — and 442–444 MB at 400 MiB, the
+chart's default since, again without an OOM.
+
+### Previews of HEIC photos
+
+HEIC photos, as phones write them, are decoded by libheif and libde265
+compiled to one WebAssembly module (third_party/heif, LGPL 3.0), run like
+pdfium: no file system, a memory limit (`FERRY_PREVIEW_HEIC_MEMORY`), a new
+instance for every photo, aborted when the request ends.
+
+A phone's photo carries a thumbnail of its own, about 512 pixels wide. A
+thumbnail of up to 320 pixels is made from it: ferry takes that item out of
+the file as a file of its own and decodes it alone, in about 0.15 s. The
+640-pixel one, which the preview shows where the browser cannot show HEIC
+itself (all but Safari), is made from the photo: 12.6 megapixels took 7 s
+and 80 MB in the instance — once per file with the cache on. The interface
+shows the 320-pixel one meanwhile. A photo without a thumbnail item is
+decoded whole for every size.
+
+| | time | instance memory |
+|---|---|---|
+| compiling libheif | 0.2 s | 50 MB at its peak |
+| loading the compiled code | 15 ms | ~12 MB |
+| a thumbnail item (512²) | 0.15 s | small |
+| a photo of 1.8 MP | 1.2 s | small |
+| a photo of 12.6 MP | 7 s | 80 MB |
+| a photo of 16.8 MP | 10 s | 112 MB |
+
+A photo is charged twice `FERRY_PREVIEW_HEIC_MEMORY` and 16 MB, and its
+bytes, against `FERRY_THUMBNAIL_MEMORY`; it must be within
+`FERRY_THUMBNAIL_MAX_BYTES` and `FERRY_THUMBNAIL_MAX_PIXELS`, checked from
+its header before it is decoded. One that needs more than the instance may
+hold fails inside the module and gets an icon — at the default of 96 MiB
+that is above about 15 megapixels; a 24-megapixel photo needs 160Mi, and
+then `FERRY_THUMBNAIL_MEMORY` of at least 336 MB.
 
 ## Cache
 

@@ -43,6 +43,7 @@ import (
 	"github.com/tetratelabs/wazero/experimental"
 
 	"github.com/metapatrol/ferry/internal/thumb"
+	"github.com/metapatrol/ferry/third_party/heif"
 )
 
 var (
@@ -85,6 +86,11 @@ type Options struct {
 	PDF bool
 	// PDFMemory is a pdfium instance's limit; 0 is PDFMemory.
 	PDFMemory int64
+	// HEIC turns HEIC previews on; HEIFModule replaces the module ferry
+	// carries (FERRY_HEIF_WASM); HEIFMemory is an instance's limit.
+	HEIC       bool
+	HEIFModule []byte
+	HEIFMemory int64
 	// CodeDir holds compiled code made by Precompile; it may be read-only.
 	// Empty or not matching this build: modules are compiled when needed.
 	CodeDir string
@@ -104,17 +110,28 @@ type Engine struct {
 	o     Options
 	slots chan struct{}
 	pdf   *slot
+	heic  *slot
 }
 
 // slot is one format's runtime: made with the first job, closed when idle.
 type slot struct {
+	name string // in the log: "pdf", "heic"
+	// load compiles the module, or loads it from cache when given one.
+	load func(cache wazero.CompilationCache) (closer, error)
+	// compile is what compiling takes at its peak, charged to the budget.
+	compile int64
+	// key and want find the module in the compiled code's marker.
+	key, want string
+
 	mu    sync.Mutex
-	pool  pdfium.Pool
+	res   closer
 	cache wazero.CompilationCache
 	off   error // why the format is off for this process
 	jobs  int
 	timer *time.Timer
 }
+
+type closer interface{ Close() error }
 
 // New makes an Engine; nothing is compiled or loaded yet.
 func New(o Options) *Engine {
@@ -130,6 +147,9 @@ func New(o Options) *Engine {
 	if o.PDFMemory <= 0 {
 		o.PDFMemory = PDFMemory
 	}
+	if o.HEIFMemory <= 0 {
+		o.HEIFMemory = HEIFMemory
+	}
 	if o.Budget == nil {
 		o.Budget = func(context.Context, int64) (func(), error) { return func() {}, nil }
 	}
@@ -141,7 +161,31 @@ func New(o Options) *Engine {
 			o.Log.Warn("pdf previews are off: a page needs more than the thumbnail budget",
 				"needs", JobCost(o.PDFMemory), "budget", o.BudgetSize)
 		} else {
-			e.pdf = &slot{}
+			limit := o.PDFMemory
+			e.pdf = &slot{
+				name: "pdf", compile: compileCost, key: "pdf", want: current().Modules["pdf"],
+				load: func(c wazero.CompilationCache) (closer, error) { return initPDF(c, limit) },
+			}
+		}
+	}
+	if o.HEIC {
+		module := o.HEIFModule
+		var err error
+		if module == nil {
+			module, err = heif.Module()
+		}
+		switch {
+		case err != nil:
+			o.Log.Warn("heic previews are off", "error", err.Error())
+		case o.BudgetSize > 0 && JobCost(o.HEIFMemory) > o.BudgetSize:
+			o.Log.Warn("heic previews are off: a photo needs more than the thumbnail budget",
+				"needs", JobCost(o.HEIFMemory), "budget", o.BudgetSize)
+		default:
+			limit := o.HEIFMemory
+			e.heic = &slot{
+				name: "heic", compile: heifCompileCost, key: "heif", want: moduleHash(module),
+				load: func(c wazero.CompilationCache) (closer, error) { return initHEIF(module, c, limit) },
+			}
 		}
 	}
 	return e
@@ -153,15 +197,20 @@ func (e *Engine) Formats() []string {
 	if e.pdf != nil {
 		f = append(f, "pdf")
 	}
+	if e.heic != nil {
+		f = append(f, "heic")
+	}
 	return f
 }
 
 // Close closes the runtimes.
 func (e *Engine) Close() {
-	if e.pdf != nil {
-		e.pdf.mu.Lock()
-		e.pdf.close()
-		e.pdf.mu.Unlock()
+	for _, s := range []*slot{e.pdf, e.heic} {
+		if s != nil {
+			s.mu.Lock()
+			s.close()
+			s.mu.Unlock()
+		}
 	}
 }
 
@@ -181,11 +230,12 @@ func (e *Engine) PDF(ctx context.Context, r io.ReadSeeker, size int64, box int) 
 	// The runtime first, then the job's share: a compile charges the budget
 	// while it holds the slot's lock, and a job that held its share while
 	// waiting for that lock could leave the compile waiting for ever.
-	pool, done, err := e.pdf.acquire(ctx, e)
+	res, done, err := e.pdf.acquire(ctx, e)
 	if err != nil {
 		return nil, err
 	}
 	defer done()
+	pool := res.(pdfium.Pool)
 	release, err := e.o.Budget(ctx, JobCost(e.o.PDFMemory))
 	if err != nil {
 		if ctx.Err() != nil {
@@ -199,7 +249,7 @@ func (e *Engine) PDF(ctx context.Context, r io.ReadSeeker, size int64, box int) 
 
 // acquire returns the pool, preparing it first, and counts the job so that
 // the runtime is not closed under it.
-func (s *slot) acquire(ctx context.Context, e *Engine) (pdfium.Pool, func(), error) {
+func (s *slot) acquire(ctx context.Context, e *Engine) (closer, func(), error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.off != nil {
@@ -209,21 +259,21 @@ func (s *slot) acquire(ctx context.Context, e *Engine) (pdfium.Pool, func(), err
 		s.timer.Stop()
 		s.timer = nil
 	}
-	if s.pool == nil {
+	if s.res == nil {
 		if err := s.open(ctx, e); err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 				s.off = fmt.Errorf("%w: %w", ErrUnavailable, err)
-				e.o.Log.Warn("pdf previews are off", "error", err.Error())
+				e.o.Log.Warn(s.name+" previews are off", "error", err.Error())
 				return nil, nil, s.off
 			}
 			return nil, nil, err
 		}
 	}
 	s.jobs++
-	return s.pool, func() {
+	return s.res, func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		if s.jobs--; s.jobs == 0 && s.pool != nil {
+		if s.jobs--; s.jobs == 0 && s.res != nil {
 			s.timer = time.AfterFunc(e.o.Idle, func() {
 				s.mu.Lock()
 				defer s.mu.Unlock()
@@ -240,9 +290,9 @@ func (s *slot) close() {
 		s.timer.Stop()
 		s.timer = nil
 	}
-	if s.pool != nil {
-		_ = s.pool.Close()
-		s.pool = nil
+	if s.res != nil {
+		_ = s.res.Close()
+		s.res = nil
 	}
 	if s.cache != nil {
 		_ = s.cache.Close(context.Background())
@@ -260,30 +310,30 @@ func (s *slot) close() {
 // same way.
 func (s *slot) open(ctx context.Context, e *Engine) error {
 	start := time.Now()
-	if e.o.CodeDir != "" && markerMatches(e.o.CodeDir, "pdf") {
+	if e.o.CodeDir != "" && markerMatches(e.o.CodeDir, s.key, s.want) {
 		cache, err := wazero.NewCompilationCacheWithDir(e.o.CodeDir)
 		if err == nil {
-			pool, err := initPDF(cache, e.o.PDFMemory)
+			res, err := s.load(cache)
 			if err == nil {
-				s.pool, s.cache = pool, cache
-				e.o.Log.Info("pdf previews ready", "compiled", false, "seconds", time.Since(start).Seconds())
+				s.res, s.cache = res, cache
+				e.o.Log.Info(s.name+" previews ready", "compiled", false, "seconds", time.Since(start).Seconds())
 				return nil
 			}
 			_ = cache.Close(context.Background())
-			e.o.Log.Warn("compiled pdf code refused, compiling anew", "error", err.Error())
+			e.o.Log.Warn("compiled "+s.name+" code refused, compiling anew", "error", err.Error())
 		}
 	}
-	release, err := e.o.Budget(ctx, compileCost)
+	release, err := e.o.Budget(ctx, s.compile)
 	if err != nil {
 		return fmt.Errorf("no compiled code, and no budget to compile: %w", err)
 	}
 	defer release()
-	pool, err := initPDF(nil, e.o.PDFMemory)
+	res, err := s.load(nil)
 	if err != nil {
 		return err
 	}
-	s.pool = pool
-	e.o.Log.Info("pdf previews ready", "compiled", true, "seconds", time.Since(start).Seconds())
+	s.res = res
+	e.o.Log.Info(s.name+" previews ready", "compiled", true, "seconds", time.Since(start).Seconds())
 	return nil
 }
 
@@ -413,7 +463,7 @@ func current() marker {
 	return m
 }
 
-func markerMatches(dir, kind string) bool {
+func markerMatches(dir, key, want string) bool {
 	b, err := os.ReadFile(filepath.Join(dir, markerName))
 	if err != nil {
 		return false
@@ -424,7 +474,7 @@ func markerMatches(dir, kind string) bool {
 	}
 	c := current()
 	return c.Wazero != "" && m.Wazero == c.Wazero && m.GOARCH == c.GOARCH &&
-		c.Modules[kind] != "" && m.Modules[kind] == c.Modules[kind]
+		want != "" && m.Modules[key] == want
 }
 
 // Precompile compiles every module into dir and writes the marker last, so
@@ -444,7 +494,17 @@ func Precompile(dir string) error {
 		return err
 	}
 	_ = pool.Close()
+	module, err := heif.Module()
+	if err != nil {
+		return err
+	}
+	h, err := initHEIF(module, cache, HEIFMemory)
+	if err != nil {
+		return err
+	}
+	_ = h.Close()
 	m := current()
+	m.Modules["heif"] = moduleHash(module)
 	if m.Wazero == "" {
 		return errors.New("preview: no build information, cannot mark the compiled code")
 	}

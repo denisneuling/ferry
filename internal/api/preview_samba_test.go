@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"image/jpeg"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -115,5 +118,69 @@ func TestPreviewsOffBelowBudget(t *testing.T) {
 	info := decode[map[string]any](t, h.do(t, "GET", "/api/v1/info", nil, nil, nil))
 	if _, ok := info["previews"]; ok {
 		t.Fatalf("previews listed with a budget below a page: %v", info["previews"])
+	}
+}
+
+// A HEIC photo's thumbnail through the API: the sample from gen2brain/heic's
+// test data, fetched like a module (internal/preview has the variants).
+func TestHEICThumbnail(t *testing.T) {
+	addr := os.Getenv("FERRY_TEST_SMB_SERVER")
+	if addr == "" {
+		t.Skip("FERRY_TEST_SMB_SERVER is not set (make dev-samba)")
+	}
+	out, err := exec.Command("go", "mod", "download", "-json", "github.com/gen2brain/heic@v0.4.9").Output()
+	if err != nil {
+		t.Skipf("the HEIC sample cannot be fetched: %v", err)
+	}
+	var m struct{ Dir string }
+	_ = json.Unmarshal(out, &m)
+	photo, err := os.ReadFile(filepath.Join(m.Dir, "testdata", "test.heic"))
+	if err != nil {
+		t.Skip(err)
+	}
+	cfg := testConfig()
+	cfg.SMBServer = addr
+	cfg.MaxUpload = 8 << 20
+	cfg.SMBConnections = 3
+	cfg.PreviewHEIC = true
+	cfg.PreviewHEICMemory = 96 << 20
+	cfg.PreviewConcurrency = 1
+	cfg.ThumbnailMaxPixels = 50_000_000
+	cfg.WASMDir = t.TempDir()
+	if err := preview.Precompile(cfg.WASMDir); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, cfg, smb.LoginGroup)
+	c := h.login(t, "alex", alexPassword)
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	dir := "heic-" + hex.EncodeToString(b)
+	h.do(t, "POST", "/api/v1/shares/alex/folders?path="+q(dir), nil, ferryReq, c)
+	t.Cleanup(func() {
+		h.do(t, "DELETE", "/api/v1/shares/alex/entries?recursive=true&path="+q(dir), nil, ferryReq, c)
+	})
+	h.do(t, "PUT", "/api/v1/shares/alex/content?path="+q(dir+"/IMG_2117.HEIC"), bytes.NewReader(photo), ferryReq, c)
+
+	info := decode[map[string]any](t, h.do(t, "GET", "/api/v1/info", nil, nil, nil))
+	if p, _ := info["previews"].([]any); len(p) != 1 || p[0] != "heic" {
+		t.Fatalf("info's previews: %v", info["previews"])
+	}
+	res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=160&path="+q(dir+"/IMG_2117.HEIC"), nil, nil, c)
+	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("a photo's thumbnail: %d", res.StatusCode)
+	}
+	img, err := jpeg.Decode(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := img.Bounds(); b.Dx() != 160 || b.Dy() != 160 {
+		t.Fatalf("the 1346² photo in 160: %v", b)
+	}
+	h.api.cfg.ThumbnailMaxPixels = 1_000_000
+	if res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=640&path="+q(dir+"/IMG_2117.HEIC"), nil, nil, c); res.StatusCode != 413 {
+		t.Fatalf("over the pixel bound: %d", res.StatusCode)
+	}
+	if used, _ := h.api.ThumbnailMemory(); used != 0 {
+		t.Fatalf("%d bytes still taken from the budget", used)
 	}
 }

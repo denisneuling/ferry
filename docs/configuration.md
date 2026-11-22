@@ -50,7 +50,10 @@ only when the optional cache is on.
 | `FERRY_CACHE_DIR` | — | A directory for the cache of thumbnails and details; empty, ferry writes nothing anywhere. Entries are encrypted and named by a keyed hash, and given only to a session that has opened the file for reading ([operations.md](operations.md#cache)). |
 | `FERRY_CACHE_MAX_BYTES` | `1Gi` | The most the cache's entries may take; the least recently used are removed beyond it. |
 | `FERRY_PREVIEW_PDF` | `true` | Thumbnails of PDFs, their first page, rendered by pdfium compiled to WebAssembly inside ferry ([operations.md](operations.md#previews-of-pdfs)). `false` loads nothing of it. |
-| `FERRY_PREVIEW_CONCURRENCY` | `1` | PDF pages rendered at once. Each takes up to 208 MB of `FERRY_THUMBNAIL_MEMORY` while it runs; with less than that budget, PDF previews are off. |
+| `FERRY_PREVIEW_HEIC` | `true` | Thumbnails of HEIC photos by libheif compiled to WebAssembly inside ferry: up to 320 pixels from the thumbnail the photo carries, larger from the photo itself ([operations.md](operations.md#previews-of-heic-photos)). `false` loads nothing of it. |
+| `FERRY_PREVIEW_HEIC_MEMORY` | `96Mi` | The memory one photo may take while it is decoded: 96Mi decodes 12 megapixels, 160Mi 24. Each photo is charged twice this and 16 MB against `FERRY_THUMBNAIL_MEMORY`; a photo beyond it gets the smaller thumbnail or an icon. |
+| `FERRY_HEIF_WASM` | — | A HEIF module to load instead of the one ferry carries — built from changed sources, as the LGPL allows ([third_party/heif](../third_party/heif/README.md)). Compiled when first needed, about 80 MB of the thumbnail budget. |
+| `FERRY_PREVIEW_CONCURRENCY` | `1` | PDF pages and HEIC photos made at once. Each takes up to 208 MB of `FERRY_THUMBNAIL_MEMORY` while it runs; with less than that budget, the format is off. |
 | `FERRY_WASM_DIR` | `/usr/lib/ferry/wasm` | The previews' compiled code, which the image ships (`ferry precompile DIR` makes it). Used while its marker matches the build; otherwise the module is compiled when needed, which takes 400 MB of `FERRY_THUMBNAIL_MEMORY` — more than the default allows, so without the code PDF previews are off. |
 | `FERRY_CACHE_KEY` | — | Required with `FERRY_CACHE_DIR`: at least 32 bytes that name and encrypt the entries. A secret: with the volume and the key, an entry can be read by whoever knows the file's path and state. A new key makes every entry unreadable, which costs only their making again. |
 | `FERRY_REQUEST_TIMEOUT` | `60s` | Every API request but uploads and downloads; and each single SMB call, of transfers too. A call the SMB server does not answer within it ends the session: a connection cancelled in the middle of a request cannot be trusted (docs/spike.md). |
@@ -61,7 +64,7 @@ only when the optional cache is on.
 | variable | default | meaning |
 |---|---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none | Where to send traces, over OTLP/HTTP; without it (and without `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) ferry sends none. The other standard `OTEL_*` variables apply too. [operations.md](operations.md#traces) |
-| `GOMEMLIMIT` | none | The Go runtime's soft memory limit; set it a little below the container's memory limit ([operations.md](operations.md#sizing-the-limit)). The chart sets 450MiB. |
+| `GOMEMLIMIT` | none | The Go runtime's soft memory limit; set it a little below the container's memory limit ([operations.md](operations.md#sizing-the-limit)). The chart sets 400MiB, leaving room for the previews' compiled code, which lives outside it. |
 
 The metrics need no setting: they are on `FERRY_OPS_LISTEN`, path `/metrics`.
 

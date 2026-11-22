@@ -15,3 +15,18 @@ func TestZipName(t *testing.T) {
 		}
 	}
 }
+
+func TestIsHEIC(t *testing.T) {
+	for h, want := range map[string]bool{
+		"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic": true,
+		"\x00\x00\x00\x18ftypmif1\x00\x00\x00\x00mif1heic": true,
+		"\x00\x00\x00\x18ftypavif\x00\x00\x00\x00mif1avif": false,
+		"\x00\x00\x00\x14ftypM4A \x00\x00\x00\x00M4A ":     false,
+		"\x00\x00\x00\x10ftyp":                             false,
+		"%PDF-1.7":                                         false,
+	} {
+		if isHEIC([]byte(h)) != want {
+			t.Errorf("isHEIC(%q) is not %v", h, want)
+		}
+	}
+}

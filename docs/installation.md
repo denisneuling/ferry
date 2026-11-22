@@ -78,8 +78,8 @@ chmod +x ferry-linux-arm64
 FERRY_SMB_SERVER=nas.example.lan ./ferry-linux-arm64 serve
 ```
 
-A binary has no compiled code for PDF previews, which the image ships;
-make it once, where ferry can read it, or PDFs show an icon:
+A binary has no compiled code for PDF and HEIC previews, which the image
+ships; make it once, where ferry can read it, or PDFs show an icon:
 
 ```sh
 ./ferry-linux-arm64 precompile /var/lib/ferry/wasm

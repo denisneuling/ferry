@@ -373,8 +373,9 @@ paths:
         its EXIF orientation says, never larger than the original. JPEG,
         PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
         tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
-        the front cover when it says which; of a PDF, its first page, when
-        the deployment makes PDF previews (`Info.previews`). Anything else,
+        the front cover when it says which; of a PDF, its first page, and of
+        a HEIC photo, the photo — up to 320 from the thumbnail it carries —
+        when the deployment makes those previews (`Info.previews`). Anything else,
         a recording without a cover included, is `415`. Made anew
         for every request, or taken from the deployment's cache once the file
         is open for reading under the requesting session; `ETag` follows the file, so the
@@ -666,8 +667,8 @@ components:
           type: array
           description: |
             Formats beyond images and recordings this deployment makes
-            thumbnails of (`pdf`); the interface asks for those only.
-          items: { type: string, enum: [pdf] }
+            thumbnails of (`pdf`, `heic`); the interface asks for those only.
+          items: { type: string, enum: [pdf, heic] }
     Limits:
       type: object
       description: |

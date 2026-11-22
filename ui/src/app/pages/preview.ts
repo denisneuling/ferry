@@ -78,6 +78,22 @@ import { FileDetails } from '../ui/file-details';
           @case ('image') {
             <img [src]="url()" [alt]="e.name" (load)="shown.set(url())" (error)="shown.set(url())" />
           }
+          @case ('derived') {
+            <!-- The 320-pixel thumbnail, at the size of the 640 one, until that
+                 one has come: a photo's 640 can take seconds to make. -->
+            <div class="lb-derived">
+              @if (derivedSmall(); as s) {
+                <img class="lb-small" [src]="s" alt="" [class.gone]="derivedShown() === derivedLarge()" />
+              }
+              <img
+                class="lb-large"
+                [src]="derivedLarge()"
+                [alt]="e.name"
+                [class.on]="derivedShown() === derivedLarge()"
+                (load)="derivedShown.set(derivedLarge())"
+              />
+            </div>
+          }
           @case ('video') {
             <video [src]="url()" controls preload="metadata" playsinline></video>
           }
@@ -204,6 +220,11 @@ export class Preview {
   protected readonly shown = signal('');
   /** Files the server made no thumbnail of — recordings without a cover among them. */
   private readonly broken = signal<ReadonlySet<string>>(new Set());
+  /** The server's thumbnails of a picture the browser cannot show itself. */
+  protected readonly derivedLarge = computed(() => this.derived(640));
+  protected readonly derivedSmall = computed(() => this.derived(320));
+  /** The 640 last loaded: the small one is hidden once it has come. */
+  protected readonly derivedShown = signal('');
   /** A recording's cover, large, above the player; none when it carries none. */
   protected readonly cover = computed(() => {
     const e = this.entry();
@@ -266,6 +287,14 @@ export class Preview {
 
   protected label(e: Entry): string {
     return kindLabel(kindOf(e.name, false));
+  }
+
+  private derived(size: 320 | 640): string {
+    const e = this.entry();
+    const share = this.browser.share();
+    return e && share && this.kind() === 'derived'
+      ? this.api.thumbnailUrl(share, e.path, size, e.version)
+      : '';
   }
 
   protected thumb(e: Entry): string | null {

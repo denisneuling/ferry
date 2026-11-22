@@ -167,6 +167,7 @@ jobs:
           curl -sfL "https://github.com/orhun/git-cliff/releases/download/v2.12.0/git-cliff-2.12.0-x86_64-unknown-linux-musl.tar.gz" \
             | tar xz -C /tmp && install /tmp/git-cliff-2.12.0/git-cliff /usr/local/bin/git-cliff
           BODY=$(git-cliff --config cliff.toml --latest --strip header 2>/dev/null || echo "Release $TAG")
+          BODY=$(printf '%s\n%s' "$BODY" "$(hack/heif-asset.sh notes)")
           PAYLOAD=$(jq -n --arg tag "$TAG" --arg body "$BODY" \
             '{tag_name: $tag, name: $tag, body: $body, draft: false, prerelease: false}')
           HTTP=$(curl -k -s -w "%{http_code}" -o /tmp/release.json \
@@ -217,6 +218,10 @@ jobs:
               -o "ferry-linux-$GOARCH" ./cmd/ferry
             ASSETS="$ASSETS ferry-linux-$GOARCH"
           done
+          # The HEIF module the binaries embed, with its licences (LGPL):
+          # third_party/heif/README.md.
+          hack/heif-asset.sh .
+          ASSETS="$ASSETS ferry-heif.wasm ferry-heif-LICENSES.md"
           # The same checksum file as the GitHub release, so a download from
           # either can be checked with sha256sum -c.
           sha256sum $ASSETS > SHA256SUMS

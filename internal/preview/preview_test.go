@@ -234,12 +234,12 @@ func TestPDFTimeout(t *testing.T) {
 // go-pdfium mounts the host's root unless told otherwise.
 func TestNoFileSystem(t *testing.T) {
 	e := engine(t, Options{})
-	pool, done, err := e.pdf.acquire(context.Background(), e)
+	res, done, err := e.pdf.acquire(context.Background(), e)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer done()
-	inst, err := pool.GetInstanceWithContext(context.Background())
+	inst, err := res.(pdfium.Pool).GetInstanceWithContext(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestIdle(t *testing.T) {
 	}
 	time.Sleep(300 * time.Millisecond)
 	e.pdf.mu.Lock()
-	closed := e.pdf.pool == nil
+	closed := e.pdf.res == nil
 	e.pdf.mu.Unlock()
 	if !closed {
 		t.Fatal("the runtime is still open")

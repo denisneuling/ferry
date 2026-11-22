@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -116,10 +117,22 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		metaSlots:   make(chan struct{}, metaConcurrency),
 		thumbMemory: semaphore.NewWeighted(max(1, cfg.ThumbnailMemory)),
 	}
-	a.preview = preview.New(preview.Options{
+	o := preview.Options{
 		PDF: cfg.PreviewPDF, CodeDir: cfg.WASMDir, Budget: a.budget, BudgetSize: cfg.ThumbnailMemory,
 		Concurrency: cfg.PreviewConcurrency, Log: log,
-	})
+		HEIC: cfg.PreviewHEIC, HEIFMemory: cfg.PreviewHEICMemory,
+	}
+	if cfg.PreviewHEIC && cfg.HEIFWASM != "" {
+		// The operator's module (third_party/heif/README.md); one that cannot
+		// be read leaves HEIC previews off rather than ferry down.
+		if b, err := os.ReadFile(cfg.HEIFWASM); err != nil {
+			log.Warn("heic previews are off: FERRY_HEIF_WASM cannot be read", "error", err.Error())
+			o.HEIC = false
+		} else {
+			o.HEIFModule = b
+		}
+	}
+	a.preview = preview.New(o)
 	return a
 }
 

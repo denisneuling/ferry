@@ -91,6 +91,10 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		a.pdfThumbnail(ctx, w, r, f, key, size)
 		return
 	}
+	if isHEIC(peek) {
+		a.heicThumbnail(ctx, w, r, f, key, size)
+		return
+	}
 	if meta.IsAudio(peek) {
 		at := &firstError{r: f}
 		gate := func() error {
@@ -209,6 +213,51 @@ func (a *API) pdfThumbnail(ctx context.Context, w http.ResponseWriter, r *http.R
 	default:
 		a.thumbProblem(w, err)
 	}
+}
+
+// heicThumbnail makes a HEIC photo's thumbnail through the preview engine:
+// up to 320 from the thumbnail the photo carries, larger from the photo,
+// within FERRY_THUMBNAIL_MAX_BYTES and FERRY_THUMBNAIL_MAX_PIXELS.
+func (a *API) heicThumbnail(ctx context.Context, w http.ResponseWriter, r *http.Request, f *smb.File, key cache.Key, size int) {
+	src := &firstError{r: f}
+	out, err := a.preview.HEIC(ctx, src, f.Size, size, a.cfg.ThumbnailMaxBytes, a.cfg.ThumbnailMaxPixels)
+	switch {
+	case src.err != nil:
+		a.fail(w, r, src.err)
+	case err == nil:
+		a.metrics.Thumbnail("made")
+		if a.cache != nil {
+			a.cache.Put(key, out)
+		}
+		writeThumbnail(w, out)
+	case ctx.Err() != nil:
+		probUnreachable.write(w)
+	case errors.Is(err, preview.ErrTooLarge):
+		a.thumbProblem(w, thumb.ErrTooLarge)
+	default:
+		// Off, unreadable, or more than the instance may hold: an icon.
+		a.thumbProblem(w, thumb.ErrUnsupported)
+	}
+}
+
+// isHEIC tells a HEIF photo coded in HEVC by its ftyp brands; AVIF and
+// other HEIF flavours libheif is not built for are left alone.
+func isHEIC(h []byte) bool {
+	if len(h) < 12 || string(h[4:8]) != "ftyp" {
+		return false
+	}
+	n := int(h[0])<<24 | int(h[1])<<16 | int(h[2])<<8 | int(h[3])
+	n = min(n, len(h))
+	for i := 8; i+4 <= n; i += 4 {
+		if i == 12 {
+			continue // the minor version
+		}
+		switch string(h[i : i+4]) {
+		case "heic", "heix", "heim", "heis", "hevc", "hevx":
+			return true
+		}
+	}
+	return false
 }
 
 // firstErrorSeeker is a file read by pdfium: its first failure of the

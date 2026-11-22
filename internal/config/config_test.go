@@ -33,6 +33,9 @@ func TestDefaults(t *testing.T) {
 	if c.SMBConnections != 3 || c.MaxArchive != 10000 {
 		t.Errorf("smb connections %d", c.SMBConnections)
 	}
+	if !c.PreviewHEIC || c.PreviewHEICMemory != 96<<20 || c.HEIFWASM != "" {
+		t.Errorf("heic %v %d %q", c.PreviewHEIC, c.PreviewHEICMemory, c.HEIFWASM)
+	}
 	if !c.PreviewPDF || c.PreviewConcurrency != 1 || c.WASMDir != "/usr/lib/ferry/wasm" {
 		t.Errorf("previews %v %d %q", c.PreviewPDF, c.PreviewConcurrency, c.WASMDir)
 	}
@@ -43,21 +46,23 @@ func TestDefaults(t *testing.T) {
 
 func TestValues(t *testing.T) {
 	c, err := FromEnv(env(map[string]string{
-		"FERRY_SMB_SERVER":      "[fd00::5]:4445",
-		"FERRY_SERVER_NAME":     "The NAS",
-		"FERRY_SHARES":          " alex, Family ,,",
-		"FERRY_IDLE_TIMEOUT":    "10m",
-		"FERRY_MAX_UPLOAD":      "4Gi",
-		"FERRY_TRUSTED_PROXIES": "198.51.100.0/24, 192.0.2.7",
-		"FERRY_COOKIE_SECURE":   "true",
-		"FERRY_MAX_LISTING":     "500000",
-		"FERRY_MAX_DELETE":      "25",
-		"FERRY_SMB_CONNECTIONS": "1",
-		"FERRY_CACHE_DIR":       "/var/cache/ferry",
-		"FERRY_CACHE_MAX_BYTES": "10Gi",
-		"FERRY_CACHE_KEY":       strings.Repeat("k", 32),
-		"FERRY_PREVIEW_PDF":     "false",
-		"FERRY_WASM_DIR":        "/opt/wasm",
+		"FERRY_SMB_SERVER":          "[fd00::5]:4445",
+		"FERRY_SERVER_NAME":         "The NAS",
+		"FERRY_SHARES":              " alex, Family ,,",
+		"FERRY_IDLE_TIMEOUT":        "10m",
+		"FERRY_MAX_UPLOAD":          "4Gi",
+		"FERRY_TRUSTED_PROXIES":     "198.51.100.0/24, 192.0.2.7",
+		"FERRY_COOKIE_SECURE":       "true",
+		"FERRY_MAX_LISTING":         "500000",
+		"FERRY_MAX_DELETE":          "25",
+		"FERRY_SMB_CONNECTIONS":     "1",
+		"FERRY_CACHE_DIR":           "/var/cache/ferry",
+		"FERRY_CACHE_MAX_BYTES":     "10Gi",
+		"FERRY_CACHE_KEY":           strings.Repeat("k", 32),
+		"FERRY_PREVIEW_PDF":         "false",
+		"FERRY_WASM_DIR":            "/opt/wasm",
+		"FERRY_PREVIEW_HEIC_MEMORY": "160Mi",
+		"FERRY_HEIF_WASM":           "/opt/heif.wasm",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -73,6 +78,9 @@ func TestValues(t *testing.T) {
 	}
 	if c.MaxListing != 500000 || c.MaxDelete != 25 || c.SMBConnections != 1 {
 		t.Errorf("max listing %d, max delete %d, smb connections %d", c.MaxListing, c.MaxDelete, c.SMBConnections)
+	}
+	if c.PreviewHEICMemory != 160<<20 || c.HEIFWASM != "/opt/heif.wasm" {
+		t.Errorf("heic %d %q", c.PreviewHEICMemory, c.HEIFWASM)
 	}
 	if c.PreviewPDF || c.WASMDir != "/opt/wasm" {
 		t.Errorf("previews %v %q", c.PreviewPDF, c.WASMDir)
@@ -100,6 +108,7 @@ func TestErrors(t *testing.T) {
 		"FERRY_CACHE_KEY":       {"FERRY_SMB_SERVER": "nas", "FERRY_CACHE_DIR": "/c", "FERRY_CACHE_KEY": "short"},
 		"like 1Gi":              {"FERRY_SMB_SERVER": "nas", "FERRY_CACHE_MAX_BYTES": "1GB"},
 		"true or false":         {"FERRY_SMB_SERVER": "nas", "FERRY_PREVIEW_PDF": "maybe"},
+		"at least 32Mi":         {"FERRY_SMB_SERVER": "nas", "FERRY_PREVIEW_HEIC_MEMORY": "1Mi"},
 	}
 	for want, e := range cases {
 		_, err := FromEnv(env(e))

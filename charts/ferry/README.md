@@ -63,7 +63,7 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 | containerSecurityContext.readOnlyRootFilesystem | bool | `true` |  |
 | cookieSecure | string | `"auto"` | Whether the session cookie is Secure: `auto` (when the request came over HTTPS, as X-Forwarded-Proto says), `true` or `false` (FERRY_COOKIE_SECURE). |
 | extraEnv | list | `[]` | Further environment variables for the container. |
-| goMemLimit | string | `"450MiB"` | The Go runtime's soft memory limit (GOMEMLIMIT), a little below `resources.limits.memory`, so that the garbage collector works harder before the kernel would kill the pod — and every session with it. Empty leaves it unset. |
+| goMemLimit | string | `"400MiB"` | The Go runtime's soft memory limit (GOMEMLIMIT), below `resources.limits.memory`, so that the garbage collector works harder before the kernel would kill the pod — and every session with it. It leaves room for the previews' compiled code (~60 MB), which lives outside Go's heap and outside this limit. Empty leaves it unset. |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"ghcr.io/metapatrol/ferry"` | The image; the default is the public one the GitHub mirror publishes. |
 | image.tag | string | `""` | The tag; empty means the chart's appVersion. |
@@ -93,7 +93,9 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 | podSecurityContext.runAsNonRoot | bool | `true` |  |
 | podSecurityContext.runAsUser | int | `65532` |  |
 | podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
-| previews.concurrency | int | `1` | PDF pages rendered at once (FERRY_PREVIEW_CONCURRENCY). Each takes up to 208 MB of `thumbnails.memory` while it runs; below 208Mi of it, PDF previews are off. |
+| previews.concurrency | int | `1` | PDF pages and HEIC photos made at once (FERRY_PREVIEW_CONCURRENCY). Each takes up to 208 MB of `thumbnails.memory` while it runs (twice its limit and 16 MB); below that, the format is off. |
+| previews.heic | bool | `true` | Thumbnails of HEIC photos, by libheif as WebAssembly inside ferry: up to 320 pixels from the photo's own thumbnail, larger from the photo (FERRY_PREVIEW_HEIC). Off, nothing of it is loaded. |
+| previews.heicMemory | string | `"96Mi"` | The memory one photo may take while it is decoded (FERRY_PREVIEW_HEIC_MEMORY): 96Mi decodes a 12-megapixel photo; a 24-megapixel one needs 160Mi, and `thumbnails.memory` at least twice that and 16 MB more. |
 | previews.pdf | bool | `true` | Thumbnails of PDFs, their first page, rendered by pdfium as WebAssembly inside ferry: no file system, no network, a fixed memory limit per page (FERRY_PREVIEW_PDF). Off, nothing of it is loaded. |
 | resources | object | `{"limits":{"cpu":"2","memory":"512Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}` | Resources. The memory limit follows docs/operations.md: a household with 2 CPUs, a dozen sessions and ten transfers at once fits in 512 MiB with the default thumbnail budget. Keep a CPU limit: Go sizes GOMAXPROCS from it, and a download's memory grows with GOMAXPROCS. |
 | service.metricsPort | int | `8081` | The port of /metrics (and the probes), named `metrics`. How it is scraped is the installation's business. |

@@ -27,6 +27,13 @@ describe('kinds', () => {
     expect(hasThumbnail('a.PDF')).toBe(true);
     setPreviews(undefined);
     expect(hasThumbnail('a.pdf')).toBe(false);
+    // HEIC photos: a thumbnail, and the server's 640 as their preview.
+    expect(previewKind('IMG_2117.HEIC')).toBe('none');
+    setPreviews(['heic']);
+    expect(hasThumbnail('IMG_2117.HEIC')).toBe(true);
+    expect(hasThumbnail('x.heif')).toBe(true);
+    expect(previewKind('IMG_2117.HEIC')).toBe('derived');
+    setPreviews([]);
   });
 
   it('previews HTML and SVG as text, never rendered', () => {

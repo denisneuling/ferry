@@ -68,8 +68,11 @@ const thumbnailed = new Set([
  */
 const previewed = signal<ReadonlySet<string>>(new Set());
 
+/** The extensions each format of `Info.previews` covers. */
+const previewExtensions: Record<string, string[]> = { pdf: ['pdf'], heic: ['heic', 'heif'] };
+
 export function setPreviews(formats: readonly string[] | undefined): void {
-  previewed.set(new Set(formats ?? []));
+  previewed.set(new Set((formats ?? []).flatMap((f) => previewExtensions[f] ?? [])));
 }
 
 export function hasThumbnail(name: string): boolean {
@@ -77,8 +80,12 @@ export function hasThumbnail(name: string): boolean {
   return thumbnailed.has(ext) || previewed().has(ext);
 }
 
-/** How the preview shows a file: the browser's own viewers, or as text. */
-export type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'none';
+/**
+ * How the preview shows a file: the browser's own viewers, or as text;
+ * `derived` is a picture the browser cannot show itself (HEIC, outside
+ * Safari), shown as the server's 640-pixel thumbnail.
+ */
+export type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'derived' | 'none';
 
 const browserImages = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif']);
 const browserVideo = new Set(['mp4', 'm4v', 'webm', 'mov', 'ogv']);
@@ -90,6 +97,7 @@ export function previewKind(name: string): PreviewKind {
   if (browserVideo.has(ext)) return 'video';
   if (browserAudio.has(ext)) return 'audio';
   if (ext === 'pdf') return 'pdf';
+  if ((ext === 'heic' || ext === 'heif') && previewed().has(ext)) return 'derived';
   const k = byExtension[ext];
   if (k === 'text' || ext === 'csv' || ext === 'tsv' || ext === 'svg') return 'text';
   return 'none';
