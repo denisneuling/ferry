@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+
 /** What a file is, as the interface treats it: by its name, as the server gives no type. */
 export type Kind = 'dir' | 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'sheet' | 'archive' | 'file';
 
@@ -59,8 +61,20 @@ const thumbnailed = new Set([
   'opus',
 ]);
 
+/**
+ * Formats the server says it makes previews of (`Info.previews`): a
+ * deployment may run without them. A signal, so that a folder shown before
+ * the server answered asks again once it has.
+ */
+const previewed = signal<ReadonlySet<string>>(new Set());
+
+export function setPreviews(formats: readonly string[] | undefined): void {
+  previewed.set(new Set(formats ?? []));
+}
+
 export function hasThumbnail(name: string): boolean {
-  return thumbnailed.has(extension(name));
+  const ext = extension(name);
+  return thumbnailed.has(ext) || previewed().has(ext);
 }
 
 /** How the preview shows a file: the browser's own viewers, or as text. */

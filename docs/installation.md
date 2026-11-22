@@ -78,6 +78,14 @@ chmod +x ferry-linux-arm64
 FERRY_SMB_SERVER=nas.example.lan ./ferry-linux-arm64 serve
 ```
 
+A binary has no compiled code for PDF previews, which the image ships;
+make it once, where ferry can read it, or PDFs show an icon:
+
+```sh
+./ferry-linux-arm64 precompile /var/lib/ferry/wasm
+FERRY_WASM_DIR=/var/lib/ferry/wasm FERRY_SMB_SERVER=nas.example.lan ./ferry-linux-arm64 serve
+```
+
 ferry then listens on `:8080`, and on `:8081` for the probes and the
 metrics. The same rule holds without Kubernetes: TLS in front, from a
 reverse proxy. [configuration.md](configuration.md) has every variable.

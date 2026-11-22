@@ -36,8 +36,9 @@ and sign out.
 - **Shares** come as the server lists them. One the person may not open
   says so when opened; docs/samba.md has the setting that hides such shares.
 - **Folders** show as tiles — folders first, then files with thumbnails for
-  JPEG, PNG, GIF, WebP and BMP, and the cover a recording carries (MP3,
-  FLAC, M4A, Ogg, Opus) — or as a sortable list. The browser keeps a
+  JPEG, PNG, GIF, WebP and BMP, the cover a recording carries (MP3,
+  FLAC, M4A, Ogg, Opus), and a PDF's first page where the deployment makes
+  PDF previews — or as a sortable list. The browser keeps a
   thumbnail, and a file's details, until the file changes: their URLs carry
   the version the listing gave (size and time of the last write), so coming
   back to a folder asks the server for its listing and nothing else.

@@ -33,6 +33,9 @@ func TestDefaults(t *testing.T) {
 	if c.SMBConnections != 3 || c.MaxArchive != 10000 {
 		t.Errorf("smb connections %d", c.SMBConnections)
 	}
+	if !c.PreviewPDF || c.PreviewConcurrency != 1 || c.WASMDir != "/usr/lib/ferry/wasm" {
+		t.Errorf("previews %v %d %q", c.PreviewPDF, c.PreviewConcurrency, c.WASMDir)
+	}
 	if c.CacheDir != "" || c.CacheMaxBytes != 1<<30 {
 		t.Errorf("cache %q %d", c.CacheDir, c.CacheMaxBytes)
 	}
@@ -53,6 +56,8 @@ func TestValues(t *testing.T) {
 		"FERRY_CACHE_DIR":       "/var/cache/ferry",
 		"FERRY_CACHE_MAX_BYTES": "10Gi",
 		"FERRY_CACHE_KEY":       strings.Repeat("k", 32),
+		"FERRY_PREVIEW_PDF":     "false",
+		"FERRY_WASM_DIR":        "/opt/wasm",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -68,6 +73,9 @@ func TestValues(t *testing.T) {
 	}
 	if c.MaxListing != 500000 || c.MaxDelete != 25 || c.SMBConnections != 1 {
 		t.Errorf("max listing %d, max delete %d, smb connections %d", c.MaxListing, c.MaxDelete, c.SMBConnections)
+	}
+	if c.PreviewPDF || c.WASMDir != "/opt/wasm" {
+		t.Errorf("previews %v %q", c.PreviewPDF, c.WASMDir)
 	}
 	if c.CacheDir != "/var/cache/ferry" || c.CacheMaxBytes != 10<<30 || len(c.CacheKey) != 32 {
 		t.Errorf("cache %q %d", c.CacheDir, c.CacheMaxBytes)
@@ -91,6 +99,7 @@ func TestErrors(t *testing.T) {
 		"integer of at least 1": {"FERRY_SMB_SERVER": "nas", "FERRY_MAX_SESSIONS": "0"},
 		"FERRY_CACHE_KEY":       {"FERRY_SMB_SERVER": "nas", "FERRY_CACHE_DIR": "/c", "FERRY_CACHE_KEY": "short"},
 		"like 1Gi":              {"FERRY_SMB_SERVER": "nas", "FERRY_CACHE_MAX_BYTES": "1GB"},
+		"true or false":         {"FERRY_SMB_SERVER": "nas", "FERRY_PREVIEW_PDF": "maybe"},
 	}
 	for want, e := range cases {
 		_, err := FromEnv(env(e))

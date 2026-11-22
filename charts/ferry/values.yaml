@@ -63,6 +63,12 @@ thumbnails:
   # -- Thumbnails decoded at once (FERRY_THUMBNAIL_CONCURRENCY).
   concurrency: 2
 
+previews:
+  # -- Thumbnails of PDFs, their first page, rendered by pdfium as WebAssembly inside ferry: no file system, no network, a fixed memory limit per page (FERRY_PREVIEW_PDF). Off, nothing of it is loaded.
+  pdf: true
+  # -- PDF pages rendered at once (FERRY_PREVIEW_CONCURRENCY). Each takes up to 208 MB of `thumbnails.memory` while it runs; below 208Mi of it, PDF previews are off.
+  concurrency: 1
+
 cache:
   # -- Keep thumbnails and details on a volume, encrypted, across restarts and for everyone who may read the file (FERRY_CACHE_DIR). Off, ferry writes nothing anywhere. Needs a PersistentVolumeClaim; the Deployment then stops the old pod before it starts the new one (maxSurge 0), as the volume is ReadWriteOnce.
   enabled: false

@@ -29,6 +29,7 @@ Measured on Linux with Samba 4.21, ferry built with Go 1.27
 | a running download | ~1.5 + 1 × GOMAXPROCS MB: 3.5 MB at 2 CPUs, 6.5 MB at 4 |
 | a running upload | ~2.5 MB |
 | thumbnails in the making, all together | at most `FERRY_THUMBNAIL_MEMORY` (default 320 MiB) |
+| a PDF page in the making | up to 208 MB of `FERRY_THUMBNAIL_MEMORY` while it runs; pdfium's code, ~40 MB, stays loaded until 5 minutes without one |
 | recordings' covers decoded before the budget counts them | at most ~24 MiB × `FERRY_THUMBNAIL_CONCURRENCY`, rarely more than a few hundred KB |
 
 Downloads spread over a session's background connections take a little
@@ -101,6 +102,49 @@ For a household with 2 CPUs, a dozen sessions and ten transfers at once:
 garbage collector works harder before the kernel steps in. Where memory is
 short, lower `FERRY_THUMBNAIL_MEMORY`: at 128 MiB, JPEGs up to about
 25 megapixels still get thumbnails.
+
+### Previews of PDFs
+
+A PDF's thumbnail is its first page, rendered by pdfium — Google's PDF
+library, as Chrome uses it — compiled to WebAssembly and run by wazero
+inside ferry. The module sees only the bytes pdfium asks for: no file
+system (go-pdfium would mount the host's root by default; ferry mounts
+nothing), no network, at most 96 MiB of memory. Every page gets a new
+instance, killed afterwards, never reused; one that runs past the
+request's time is aborted inside the module. pdfium reads the file as it
+needs it — the cross-reference table, the first page's objects — not all
+of it, so `FERRY_THUMBNAIL_MAX_BYTES` does not bound PDFs.
+
+A page pdfium runs out of memory on comes out white rather than as an
+error. A thumbnail of one colour is therefore never trusted: the interface
+shows an icon, and nothing is cached — a truly empty first page gets the
+icon too.
+
+Measured (amd64, 2 CPUs):
+
+| | time | memory |
+|---|---|---|
+| compiling pdfium | 1.8 s | 340 MB at its peak |
+| loading the compiled code (the image ships it) | 50 ms | ~45 MB, freed again 5 minutes after the last page |
+| a page of text | 0.1 s | ~10 MB |
+| a page that is a 12-megapixel scan | 0.4 s | ~80 MB of Go heap (wazero keeps an instance's memory in a slice and copies it as it grows) |
+
+Each page is charged 208 MB (twice the instance's limit and 16 MB) against
+`FERRY_THUMBNAIL_MEMORY`, `FERRY_PREVIEW_CONCURRENCY` (default 1) at a
+time — so PDF previews need a budget of at least 208 MiB; below that they
+are off, with one warning at the start. A compile is charged 400 MB, more than the default budget: the image
+therefore compiles pdfium when it is built (`ferry precompile`, into
+`/usr/lib/ferry/wasm`, read-only) and ferry only loads it. It trusts that
+code while the marker written with it names the same wazero, go-pdfium and
+architecture as the binary; code that does not match, or that wazero
+refuses as damaged, is not used, and ferry compiles anew if the budget
+allows it — otherwise PDF previews are off for the process, with a
+warning, and PDFs show an icon.
+
+Under the chart's limits (512 MiB, `GOMEMLIMIT` 450 MiB, the default
+thumbnail budget) a scanned PDF at 640 pixels three times over, a wall of
+50 thumbnails of 12-megapixel JPEGs twice over and a 256 MB download at
+once peaked at 314 MB (VmHWM), without an OOM.
 
 ## Cache
 

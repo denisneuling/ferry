@@ -26,6 +26,7 @@ import (
 	"github.com/metapatrol/ferry/internal/cache"
 	"github.com/metapatrol/ferry/internal/config"
 	"github.com/metapatrol/ferry/internal/metrics"
+	"github.com/metapatrol/ferry/internal/preview"
 	"github.com/metapatrol/ferry/internal/session"
 	"github.com/metapatrol/ferry/internal/smb"
 )
@@ -63,7 +64,30 @@ type API struct {
 	// cache keeps thumbnails and details across restarts and people; nil
 	// without FERRY_CACHE_DIR.
 	cache *cache.Cache
+	// preview makes thumbnails of PDFs, as WebAssembly, charged to
+	// thumbMemory like any thumbnail.
+	preview *preview.Engine
 }
+
+// budget takes n bytes from the thumbnail budget for the previews; more
+// than the whole budget fails at once instead of waiting for ever.
+func (a *API) budget(ctx context.Context, n int64) (func(), error) {
+	if n > a.cfg.ThumbnailMemory {
+		return nil, fmt.Errorf("%d bytes is more than FERRY_THUMBNAIL_MEMORY", n)
+	}
+	if err := a.thumbMemory.Acquire(ctx, n); err != nil {
+		return nil, err
+	}
+	a.thumbUsed.Add(n)
+	return func() {
+		a.thumbUsed.Add(-n)
+		a.thumbMemory.Release(n)
+	}, nil
+}
+
+// Close lets go of what the API holds beyond requests: the previews'
+// runtimes.
+func (a *API) Close() { a.preview.Close() }
 
 // UseCache makes the API keep thumbnails and details in c. An entry is
 // looked up only after the person's own session has opened the file for
@@ -78,7 +102,7 @@ func derivedKey(kind, variant, share, p string, f *smb.File) cache.Key {
 
 // New makes the API. login is smb.LoginGroup outside tests; m may be nil.
 func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.Logger, version string, m *metrics.Metrics) *API {
-	return &API{
+	a := &API{
 		metrics:     m,
 		cfg:         cfg,
 		sessions:    sessions,
@@ -92,6 +116,11 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		metaSlots:   make(chan struct{}, metaConcurrency),
 		thumbMemory: semaphore.NewWeighted(max(1, cfg.ThumbnailMemory)),
 	}
+	a.preview = preview.New(preview.Options{
+		PDF: cfg.PreviewPDF, CodeDir: cfg.WASMDir, Budget: a.budget, BudgetSize: cfg.ThumbnailMemory,
+		Concurrency: cfg.PreviewConcurrency, Log: log,
+	})
+	return a
 }
 
 var _ v1.ServerInterface = (*API)(nil)
@@ -276,7 +305,19 @@ func (a *API) GetInfo(w http.ResponseWriter, r *http.Request) {
 			Upload:  a.cfg.MaxUpload,
 			Archive: a.cfg.MaxArchive,
 		},
+		Previews: previews(a.preview.Formats()),
 	})
+}
+
+func previews(formats []string) *[]v1.InfoPreviews {
+	if len(formats) == 0 {
+		return nil
+	}
+	out := make([]v1.InfoPreviews, len(formats))
+	for i, f := range formats {
+		out[i] = v1.InfoPreviews(f)
+	}
+	return &out
 }
 
 const (

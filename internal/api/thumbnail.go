@@ -2,13 +2,16 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"strconv"
 
 	v1 "github.com/metapatrol/ferry/api/v1"
+	"github.com/metapatrol/ferry/internal/cache"
 	"github.com/metapatrol/ferry/internal/meta"
+	"github.com/metapatrol/ferry/internal/preview"
 	"github.com/metapatrol/ferry/internal/smb"
 	"github.com/metapatrol/ferry/internal/thumb"
 )
@@ -77,9 +80,15 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		}
 	}
 	defer release()
-	peek := make([]byte, min(f.Size, 64))
+	// 1 KB: pdfium takes a PDF whose header comes after other bytes, up to
+	// 1024 of them.
+	peek := make([]byte, min(f.Size, 1024))
 	if _, err := f.ReadAt(peek, 0); err != nil && !errors.Is(err, io.EOF) {
 		a.fail(w, r, err)
+		return
+	}
+	if bytes.Contains(peek, []byte("%PDF-")) {
+		a.pdfThumbnail(ctx, w, r, f, key, size)
 		return
 	}
 	if meta.IsAudio(peek) {
@@ -171,6 +180,58 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		a.cache.Put(key, out)
 	}
 	writeThumbnail(w, out)
+}
+
+// pdfThumbnail renders a PDF's first page through the preview engine,
+// which charges the thumbnail budget itself. The engine reads the file as
+// pdfium asks — the cross-reference table, the first page's objects —
+// rather than all of it, so FERRY_THUMBNAIL_MAX_BYTES does not apply.
+func (a *API) pdfThumbnail(ctx context.Context, w http.ResponseWriter, r *http.Request, f *smb.File, key cache.Key, size int) {
+	src := &firstErrorSeeker{f: f}
+	out, err := a.preview.PDF(ctx, src, f.Size, size)
+	switch {
+	case src.err != nil:
+		// The share failed under pdfium; what pdfium made of that is beside
+		// the point.
+		a.fail(w, r, src.err)
+	case err == nil:
+		a.metrics.Thumbnail("made")
+		if a.cache != nil {
+			a.cache.Put(key, out)
+		}
+		writeThumbnail(w, out)
+	case ctx.Err() != nil:
+		probUnreachable.write(w)
+	case errors.Is(err, preview.ErrUnsupported), errors.Is(err, preview.ErrBlank), errors.Is(err, preview.ErrUnavailable):
+		// Off, unreadable, or white — perhaps for want of memory: an icon,
+		// and nothing cached.
+		a.thumbProblem(w, thumb.ErrUnsupported)
+	default:
+		a.thumbProblem(w, err)
+	}
+}
+
+// firstErrorSeeker is a file read by pdfium: its first failure of the
+// share is kept, as pdfium reports any failed read as a damaged file.
+type firstErrorSeeker struct {
+	f   *smb.File
+	err error
+}
+
+func (s *firstErrorSeeker) Read(p []byte) (int, error) {
+	n, err := s.f.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && s.err == nil {
+		s.err = err
+	}
+	return n, err
+}
+
+func (s *firstErrorSeeker) Seek(off int64, whence int) (int64, error) {
+	n, err := s.f.Seek(off, whence)
+	if err != nil && s.err == nil {
+		s.err = err
+	}
+	return n, err
 }
 
 func writeThumbnail(w http.ResponseWriter, out []byte) {

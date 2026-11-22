@@ -41,10 +41,17 @@ COPY --from=ui-builder /src/internal/ui/dist/app/ internal/ui/dist/app/
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
     -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILT_AT}" \
     -o /ferry ./cmd/ferry
+# The previews' WebAssembly, compiled to machine code here rather than in
+# the running container: compiling pdfium takes 1.8 s and 340 MB at its
+# peak, more than ferry's memory limit can spare next to its thumbnails.
+# The code is read-only in the image; ferry trusts it only while its
+# marker matches the build (internal/preview).
+RUN /ferry precompile /wasm
 
 # nonroot, no shell, no package manager; the chart adds a read-only root
 # filesystem and drops every capability.
 FROM gcr.io/distroless/static:nonroot
 COPY --from=builder /ferry /ferry
+COPY --from=builder /wasm /usr/lib/ferry/wasm
 ENTRYPOINT ["/ferry"]
 CMD ["serve"]

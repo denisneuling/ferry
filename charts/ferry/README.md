@@ -93,6 +93,8 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 | podSecurityContext.runAsNonRoot | bool | `true` |  |
 | podSecurityContext.runAsUser | int | `65532` |  |
 | podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` |  |
+| previews.concurrency | int | `1` | PDF pages rendered at once (FERRY_PREVIEW_CONCURRENCY). Each takes up to 208 MB of `thumbnails.memory` while it runs; below 208Mi of it, PDF previews are off. |
+| previews.pdf | bool | `true` | Thumbnails of PDFs, their first page, rendered by pdfium as WebAssembly inside ferry: no file system, no network, a fixed memory limit per page (FERRY_PREVIEW_PDF). Off, nothing of it is loaded. |
 | resources | object | `{"limits":{"cpu":"2","memory":"512Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}` | Resources. The memory limit follows docs/operations.md: a household with 2 CPUs, a dozen sessions and ten transfers at once fits in 512 MiB with the default thumbnail budget. Keep a CPU limit: Go sizes GOMAXPROCS from it, and a download's memory grows with GOMAXPROCS. |
 | service.metricsPort | int | `8081` | The port of /metrics (and the probes), named `metrics`. How it is scraped is the installation's business. |
 | service.port | int | `80` | The port of the interface and the API. |

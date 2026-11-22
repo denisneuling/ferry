@@ -57,7 +57,7 @@ func newHarness(t testing.TB, cfg config.Config, login LoginFunc) *harness {
 	tab := session.New(session.Options{IdleTimeout: cfg.IdleTimeout, Lifetime: cfg.SessionLifetime, MaxSessions: cfg.MaxSessions})
 	a := New(cfg, tab, login, log, "test", nil)
 	srv := httptest.NewServer(a.Handler())
-	t.Cleanup(func() { srv.Close(); tab.CloseAll() })
+	t.Cleanup(func() { srv.Close(); tab.CloseAll(); a.Close() })
 	return &harness{srv: srv, log: &buf, api: a, tab: tab}
 }
 

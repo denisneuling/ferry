@@ -122,6 +122,21 @@ func (e FileMetadataLineEndings) Valid() bool {
 	}
 }
 
+// Defines values for InfoPreviews.
+const (
+	InfoPreviewsPdf InfoPreviews = "pdf"
+)
+
+// Valid indicates whether the value is a known member of the InfoPreviews enum.
+func (e InfoPreviews) Valid() bool {
+	switch e {
+	case InfoPreviewsPdf:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FerryRequest.
 const (
 	FerryRequestN1 FerryRequest = "1"
@@ -432,11 +447,18 @@ type Info struct {
 	// before they run into one.
 	Limits Limits `json:"limits"`
 
+	// Previews Formats beyond images and recordings this deployment makes
+	// thumbnails of (`pdf`); the interface asks for those only.
+	Previews *[]InfoPreviews `json:"previews,omitempty"`
+
 	// Server The SMB server's display name, for "with your account on …".
 	Server                 string `json:"server"`
 	SessionLifetimeSeconds int    `json:"sessionLifetimeSeconds"`
 	Version                string `json:"version"`
 }
+
+// InfoPreviews defines model for Info.Previews.
+type InfoPreviews string
 
 // Limits The deployment's bounds, so that the interface can tell a person
 // before they run into one.
@@ -1088,8 +1110,9 @@ type ClientInterface interface {
 	// its EXIF orientation says, never larger than the original. JPEG,
 	// PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
 	// tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
-	// the front cover when it says which. Anything else, a recording
-	// without a cover included, is `415`. Made anew
+	// the front cover when it says which; of a PDF, its first page, when
+	// the deployment makes PDF previews (`Info.previews`). Anything else,
+	// a recording without a cover included, is `415`. Made anew
 	// for every request, or taken from the deployment's cache once the file
 	// is open for reading under the requesting session; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
@@ -1493,8 +1516,9 @@ func (c *Client) GetSpace(ctx context.Context, share ShareName, params *GetSpace
 // its EXIF orientation says, never larger than the original. JPEG,
 // PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
 // tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
-// the front cover when it says which. Anything else, a recording
-// without a cover included, is `415`. Made anew
+// the front cover when it says which; of a PDF, its first page, when
+// the deployment makes PDF previews (`Info.previews`). Anything else,
+// a recording without a cover included, is `415`. Made anew
 // for every request, or taken from the deployment's cache once the file
 // is open for reading under the requesting session; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
@@ -2729,8 +2753,9 @@ type ClientWithResponsesInterface interface {
 	// its EXIF orientation says, never larger than the original. JPEG,
 	// PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
 	// tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
-	// the front cover when it says which. Anything else, a recording
-	// without a cover included, is `415`. Made anew
+	// the front cover when it says which; of a PDF, its first page, when
+	// the deployment makes PDF previews (`Info.previews`). Anything else,
+	// a recording without a cover included, is `415`. Made anew
 	// for every request, or taken from the deployment's cache once the file
 	// is open for reading under the requesting session; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
@@ -4267,8 +4292,9 @@ func (c *ClientWithResponses) GetSpaceWithResponse(ctx context.Context, share Sh
 // its EXIF orientation says, never larger than the original. JPEG,
 // PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
 // tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
-// the front cover when it says which. Anything else, a recording
-// without a cover included, is `415`. Made anew
+// the front cover when it says which; of a PDF, its first page, when
+// the deployment makes PDF previews (`Info.previews`). Anything else,
+// a recording without a cover included, is `415`. Made anew
 // for every request, or taken from the deployment's cache once the file
 // is open for reading under the requesting session; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the

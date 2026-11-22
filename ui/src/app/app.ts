@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Api } from './core/api';
+import { setPreviews } from './core/kinds';
 import { Prefs } from './core/prefs';
 import { Session } from './core/session';
 import { Login } from './pages/login';
@@ -38,7 +39,10 @@ export class App {
   /** Is there a session already? The cookie is HttpOnly: only the server can say. */
   private async start(): Promise<void> {
     this.api.info().then(
-      (i) => this.session.info.set(i),
+      (i) => {
+        this.session.info.set(i);
+        setPreviews(i.previews);
+      },
       () => undefined,
     );
     try {

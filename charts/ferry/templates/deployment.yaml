@@ -113,6 +113,10 @@ spec:
               value: {{ .Values.thumbnails.memory | quote }}
             - name: FERRY_THUMBNAIL_CONCURRENCY
               value: {{ .Values.thumbnails.concurrency | quote }}
+            - name: FERRY_PREVIEW_PDF
+              value: {{ .Values.previews.pdf | quote }}
+            - name: FERRY_PREVIEW_CONCURRENCY
+              value: {{ .Values.previews.concurrency | int | quote }}
             {{- if .Values.cache.enabled }}
             - name: FERRY_CACHE_DIR
               value: /var/cache/ferry

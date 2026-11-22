@@ -1,4 +1,4 @@
-import { hasThumbnail, kindOf, previewKind, shareIcon } from './kinds';
+import { hasThumbnail, kindOf, previewKind, setPreviews, shareIcon } from './kinds';
 
 describe('kinds', () => {
   it('tells files apart by their extension, case aside', () => {
@@ -21,6 +21,12 @@ describe('kinds', () => {
     expect(hasThumbnail('a.FLAC')).toBe(true);
     expect(hasThumbnail('a.opus')).toBe(true);
     expect(hasThumbnail('a.wav')).toBe(false);
+    // PDFs only when the server makes their previews.
+    expect(hasThumbnail('a.pdf')).toBe(false);
+    setPreviews(['pdf']);
+    expect(hasThumbnail('a.PDF')).toBe(true);
+    setPreviews(undefined);
+    expect(hasThumbnail('a.pdf')).toBe(false);
   });
 
   it('previews HTML and SVG as text, never rendered', () => {

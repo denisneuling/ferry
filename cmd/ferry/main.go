@@ -19,6 +19,7 @@ import (
 	"github.com/metapatrol/ferry/internal/cache"
 	"github.com/metapatrol/ferry/internal/config"
 	"github.com/metapatrol/ferry/internal/metrics"
+	"github.com/metapatrol/ferry/internal/preview"
 	"github.com/metapatrol/ferry/internal/server"
 	"github.com/metapatrol/ferry/internal/session"
 	"github.com/metapatrol/ferry/internal/smb"
@@ -35,8 +36,9 @@ var (
 const usage = `ferry — SMB shares in the browser
 
 Usage:
-  ferry serve     run the server (configured through FERRY_* variables)
-  ferry version   print the build
+  ferry serve            run the server (configured through FERRY_* variables)
+  ferry precompile DIR   compile the previews' WebAssembly into DIR (the image does)
+  ferry version          print the build
   ferry help      this text
 `
 
@@ -52,6 +54,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "serve":
 		return serve(args[1:], stderr)
+	case "precompile":
+		if len(args) != 2 {
+			_, _ = fmt.Fprint(stderr, usage)
+			return 2
+		}
+		if err := preview.Precompile(args[1]); err != nil {
+			_, _ = fmt.Fprintf(stderr, "ferry precompile: %v\n", err)
+			return 1
+		}
+		return 0
 	case "version", "--version":
 		_, _ = fmt.Fprintf(stdout, "ferry %s (commit %s, built %s)\n", version, commit, builtAt)
 		return 0
@@ -89,6 +101,7 @@ func serve(args []string, stderr io.Writer) int {
 		ThumbnailMemory: func() (int64, int64) { return a.ThumbnailMemory() },
 	})
 	a = api.New(cfg, sessions, smb.LoginGroup, log, version, m)
+	defer a.Close()
 	if cfg.CacheDir != "" {
 		c, err := cache.Open(cache.Options{
 			Dir: cfg.CacheDir, MaxBytes: cfg.CacheMaxBytes, Secret: []byte(cfg.CacheKey),

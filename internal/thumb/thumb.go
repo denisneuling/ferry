@@ -92,7 +92,12 @@ func Make(src []byte, size, maxPixels int) ([]byte, error) {
 	if format == "jpeg" {
 		orientation = exifOrientation(src)
 	}
+	return FromImage(img, orientation, size)
+}
 
+// FromImage is Make for an image decoded elsewhere — a PDF's page, a HEIC
+// photo — with its EXIF orientation (1 when upright).
+func FromImage(img image.Image, orientation, size int) ([]byte, error) {
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
 	if orientation >= 5 {

@@ -64,6 +64,12 @@ type Config struct {
 	CacheDir      string
 	CacheMaxBytes int64
 	CacheKey      string
+	// Previews of formats Go cannot decode, run as WebAssembly: PDF's first
+	// page (FERRY_PREVIEW_PDF), how many at once (FERRY_PREVIEW_CONCURRENCY),
+	// and where the compiled code is (FERRY_WASM_DIR; the image ships it).
+	PreviewPDF         bool
+	PreviewConcurrency int
+	WASMDir            string
 	// SMBConnections is how many SMB connections a login sets up
 	// (FERRY_SMB_CONNECTIONS, 1 to 4): one for browsing, the others for
 	// thumbnails, details and content (smb.Group).
@@ -115,6 +121,9 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		ThumbnailMemory:      320 << 20,
 		ThumbnailConcurrency: 2,
 		CacheMaxBytes:        1 << 30,
+		PreviewPDF:           true,
+		PreviewConcurrency:   1,
+		WASMDir:              "/usr/lib/ferry/wasm",
 		LoginRatePerAddress:  10,
 		LoginRatePerUser:     5,
 	}
@@ -173,6 +182,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		{"FERRY_LOGIN_RATE_USER", &c.LoginRatePerUser, 1},
 		{"FERRY_THUMBNAIL_MAX_PIXELS", &c.ThumbnailMaxPixels, 1},
 		{"FERRY_THUMBNAIL_CONCURRENCY", &c.ThumbnailConcurrency, 1},
+		{"FERRY_PREVIEW_CONCURRENCY", &c.PreviewConcurrency, 1},
 	}
 	for _, i := range ints {
 		if v := getenv(i.name); v != "" {
@@ -214,6 +224,16 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			fail("FERRY_THUMBNAIL_MEMORY", fmt.Errorf("%q is not a positive byte count like 320Mi", v))
 		}
 		c.ThumbnailMemory = n
+	}
+	if v := getenv("FERRY_PREVIEW_PDF"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			fail("FERRY_PREVIEW_PDF", fmt.Errorf("%q is not true or false", v))
+		}
+		c.PreviewPDF = b
+	}
+	if v := strings.TrimSpace(getenv("FERRY_WASM_DIR")); v != "" {
+		c.WASMDir = v
 	}
 	c.CacheDir = strings.TrimSpace(getenv("FERRY_CACHE_DIR"))
 	c.CacheKey = getenv("FERRY_CACHE_KEY")
