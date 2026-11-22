@@ -5,6 +5,12 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.5.1](https://github.com/metapatrol/ferry/compare/v0.5.0...v0.5.1) (2026-11-22)
+
+### Bug Fixes
+
+* **release:** write the HEIF assets into the directory asked for ([3bf9a69](https://github.com/metapatrol/ferry/commit/3bf9a69b56a31dc997ef018735ccb0af1b95d9b9))
+
 ## [0.5.0](https://github.com/metapatrol/ferry/compare/v0.4.1...v0.5.0) (2026-11-22)
 
 ### Features
