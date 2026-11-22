@@ -119,11 +119,12 @@ func (a *API) GetContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 		probNotFound.write(w)
 		return
 	}
-	conn, ok := s.Conn.(*smb.Session)
+	conn, given, ok := connFor(s, smb.PoolBackground)
 	if !ok {
 		probInternal.write(w)
 		return
 	}
+	defer given()
 	p, ok := cleanParam(w, params.Path)
 	if !ok {
 		return
@@ -307,11 +308,12 @@ func (a *API) PutContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 		probNotFound.write(w)
 		return
 	}
-	conn, ok := s.Conn.(*smb.Session)
+	conn, given, ok := connFor(s, smb.PoolBackground)
 	if !ok {
 		probInternal.write(w)
 		return
 	}
+	defer given()
 	p, ok := cleanParam(w, params.Path)
 	if !ok {
 		return

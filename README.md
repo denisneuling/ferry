@@ -74,9 +74,11 @@ flowchart LR
   Samba says no — or would only offer a guest session — the answer is 401.
   Otherwise ferry keeps the live SMB session under a random session cookie
   and forgets the password.
-- **One SMB connection per browser session.** Identities never share a
-  connection; logout and the idle timeout close it; a restart ends every
-  session and loses nothing else.
+- **Its own SMB connections per browser session.** A login sets up a few
+  (three by default), all while the password is there: one for browsing,
+  the others for thumbnails and downloads, so a folder opens while pictures
+  load. Identities never share a connection; logout and the idle timeout
+  close them; a restart ends every session and loses nothing else.
 - **Samba decides.** Shares come from the server's own share enumeration on
   your session; every listing, download, upload, rename and delete is an SMB
   call as you. What Samba refuses is a precise problem response (403, 404,

@@ -82,7 +82,8 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 | service.type | string | `"ClusterIP"` |  |
 | session.idleTimeout | string | `"30m"` | A session without a request for this long ends (FERRY_IDLE_TIMEOUT). |
 | session.lifetime | string | `"12h"` | A session ends this long after its login, whatever its activity (FERRY_SESSION_LIFETIME). |
-| session.maxSessions | int | `200` | Sessions at most, each one SMB connection (FERRY_MAX_SESSIONS). |
+| session.maxSessions | int | `200` | Sessions at most, each with `smb.connections` SMB connections (FERRY_MAX_SESSIONS). |
+| smb.connections | int | `3` | SMB connections per login, 1 to 4: one for browsing, the others for thumbnails, details and content; `1` puts everything on one (FERRY_SMB_CONNECTIONS). |
 | smb.server | required | `""` | The SMB server, `host` or `host:port` (FERRY_SMB_SERVER). |
 | smb.serverName | string | `""` | What the login page calls the server; the host of `smb.server` when empty (FERRY_SERVER_NAME). |
 | smb.shares | list | `[]` | The shares this ferry offers, compared without case; empty offers all the server lists (FERRY_SHARES). |

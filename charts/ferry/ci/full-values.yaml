@@ -4,6 +4,7 @@ smb:
   server: nas.example.lan:445
   serverName: The NAS
   shares: [alex, Family, Public]
+  connections: 2
 limits:
   maxUpload: 8Gi
 trustedProxies: [198.51.100.0/24]

@@ -69,6 +69,8 @@ spec:
               value: {{ .Values.session.idleTimeout | quote }}
             - name: FERRY_SESSION_LIFETIME
               value: {{ .Values.session.lifetime | quote }}
+            - name: FERRY_SMB_CONNECTIONS
+              value: {{ .Values.smb.connections | int | quote }}
             - name: FERRY_MAX_SESSIONS
               value: {{ .Values.session.maxSessions | quote }}
             - name: FERRY_LOGIN_RATE_ADDRESS

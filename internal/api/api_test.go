@@ -108,7 +108,7 @@ func problemCode(t testing.TB, res *http.Response) string {
 }
 
 func refuse(kind smb.Kind) LoginFunc {
-	return func(context.Context, smb.LoginOptions, smb.Credentials) (*smb.Session, error) {
+	return func(context.Context, smb.LoginOptions, smb.Credentials) (*smb.Group, error) {
 		return nil, &smb.Error{Kind: kind, Status: 0xC000006D}
 	}
 }

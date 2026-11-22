@@ -29,6 +29,9 @@ type Metrics struct {
 	thumbnails  *prometheus.CounterVec
 	httpCount   *prometheus.CounterVec
 	httpLatency *prometheus.HistogramVec
+	smbConns    prometheus.Gauge
+	smbLost     *prometheus.CounterVec
+	smbWait     *prometheus.HistogramVec
 }
 
 // Gauges are read at every scrape from where they are kept.
@@ -70,8 +73,22 @@ func New(version, commit string, g Gauges) *Metrics {
 			// takes minutes.
 			Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60, 300},
 		}, []string{"route"}),
+		smbConns: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "ferry_smb_connections",
+			Help: "SMB connections open now, of all sessions together: up to FERRY_SMB_CONNECTIONS each.",
+		}),
+		smbLost: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ferry_smb_connections_lost_total",
+			Help: "SMB connections that went away on their own, by pool: interactive (the session ends) or background (the session carries on with fewer).",
+		}, []string{"pool"}),
+		smbWait: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name: "ferry_smb_slot_wait_seconds",
+			Help: "How long a request waited for its SMB connection's one request slot, by pool: interactive or background.",
+			// From a free slot to one behind a slow server's call.
+			Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+		}, []string{"pool"}),
 	}
-	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency)
+	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency, m.smbConns, m.smbLost, m.smbWait)
 	build := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:        "ferry_build_info",
 		Help:        "Always 1; the labels say which build runs.",
@@ -82,7 +99,7 @@ func New(version, commit string, g Gauges) *Metrics {
 	if g.Sessions != nil {
 		reg.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: "ferry_sessions",
-			Help: "Sessions open now, each one SMB connection.",
+			Help: "Sessions open now, each one person's login with its SMB connections.",
 		}, func() float64 { return float64(g.Sessions()) }))
 	}
 	if g.ThumbnailMemory != nil {
@@ -145,4 +162,25 @@ func (m *Metrics) Request(method, route string, code int, d time.Duration) {
 	}
 	m.httpCount.WithLabelValues(method, route, strconv.Itoa(code)).Inc()
 	m.httpLatency.WithLabelValues(route).Observe(d.Seconds())
+}
+
+// Connections counts SMB connections opened (positive) and closed (negative).
+func (m *Metrics) Connections(delta int) {
+	if m != nil {
+		m.smbConns.Add(float64(delta))
+	}
+}
+
+// ConnectionLost counts an SMB connection that went away on its own.
+func (m *Metrics) ConnectionLost(pool string) {
+	if m != nil {
+		m.smbLost.WithLabelValues(pool).Inc()
+	}
+}
+
+// SlotWait records how long a request waited for its connection's slot.
+func (m *Metrics) SlotWait(pool string, d time.Duration) {
+	if m != nil {
+		m.smbWait.WithLabelValues(pool).Observe(d.Seconds())
+	}
 }

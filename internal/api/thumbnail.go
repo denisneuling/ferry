@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	v1 "github.com/metapatrol/ferry/api/v1"
+	"github.com/metapatrol/ferry/internal/smb"
 	"github.com/metapatrol/ferry/internal/thumb"
 )
 
@@ -24,7 +25,7 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		probInvalidRequest.write(w)
 		return
 	}
-	conn, ctx, done, ok := a.onShare(w, r, share)
+	conn, ctx, done, ok := a.onShare(w, r, share, smb.PoolBackground)
 	if !ok {
 		return
 	}
@@ -33,11 +34,12 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	if !ok {
 		return
 	}
-	f, err := conn.Open(ctx, share, p)
+	f, again, err := a.openDerived(ctx, r, conn, share, p)
 	if err != nil {
 		a.fail(w, r, err)
 		return
 	}
+	defer again()
 	defer func() { _ = f.Close() }()
 
 	// The ETag follows the file and the size asked for: revalidating costs

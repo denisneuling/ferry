@@ -8,6 +8,7 @@ import (
 
 	v1 "github.com/metapatrol/ferry/api/v1"
 	"github.com/metapatrol/ferry/internal/meta"
+	"github.com/metapatrol/ferry/internal/smb"
 )
 
 // metaConcurrency is how many files have their metadata read at once, each
@@ -22,7 +23,7 @@ const metaTimeout = 15 * time.Second
 // within meta.Budget. Nothing is stored, and nothing of it — values,
 // names, paths — goes to the log, a metric or a trace.
 func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.GetMetadataParams) {
-	conn, ctx, done, ok := a.onShare(w, r, share)
+	conn, ctx, done, ok := a.onShare(w, r, share, smb.PoolBackground)
 	if !ok {
 		return
 	}
@@ -40,11 +41,12 @@ func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.Share
 		probUnreachable.write(w)
 		return
 	}
-	f, err := conn.Open(ctx, share, p)
+	f, again, err := a.openDerived(ctx, r, conn, share, p)
 	if err != nil {
 		a.fail(w, r, err)
 		return
 	}
+	defer again()
 	defer func() { _ = f.Close() }()
 
 	tag := etag(f.Size, f.ModTime)

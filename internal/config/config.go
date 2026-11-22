@@ -56,6 +56,10 @@ type Config struct {
 	ThumbnailConcurrency int
 	MaxListing           int // FERRY_MAX_LISTING: entries in one folder listing
 	MaxDelete            int // FERRY_MAX_DELETE: entries in one recursive delete
+	// SMBConnections is how many SMB connections a login sets up
+	// (FERRY_SMB_CONNECTIONS, 1 to 4): one for browsing, the others for
+	// thumbnails, details and content (smb.Group).
+	SMBConnections int
 
 	// LoginRatePerAddress and LoginRatePerUser bound login attempts per
 	// minute, per client address and per username (FERRY_LOGIN_RATE_ADDRESS,
@@ -96,6 +100,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		// browser, which holds the folder, rather than ferry.
 		MaxListing:           200000,
 		MaxDelete:            10000,
+		SMBConnections:       3,
 		ThumbnailMaxBytes:    64 << 20,
 		ThumbnailMaxPixels:   50_000_000,
 		ThumbnailMemory:      320 << 20,
@@ -174,6 +179,16 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			fail("FERRY_MAX_UPLOAD", err)
 		}
 		c.MaxUpload = n
+	}
+	if v := getenv("FERRY_SMB_CONNECTIONS"); v != "" {
+		// At most smb.MaxConnections: each is one more connection, and one
+		// more session the server keeps, for every person logged in.
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 4 {
+			fail("FERRY_SMB_CONNECTIONS", fmt.Errorf("%q is not an integer from 1 to 4", v))
+		} else {
+			c.SMBConnections = n
+		}
 	}
 	if v := getenv("FERRY_THUMBNAIL_MAX_BYTES"); v != "" {
 		n, err := parseBytes(v)

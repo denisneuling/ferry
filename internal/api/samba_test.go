@@ -36,7 +36,9 @@ func sambaHarness(t testing.TB) *harness {
 	cfg := testConfig()
 	cfg.SMBServer = addr
 	cfg.MaxUpload = 8 << 20
-	return newHarness(t, cfg, smb.Login)
+	// As deployed: every test runs on a group of three connections.
+	cfg.SMBConnections = 3
+	return newHarness(t, cfg, smb.LoginGroup)
 }
 
 func (h *harness) login(t testing.TB, user, password string) *http.Cookie {
@@ -224,6 +226,37 @@ func TestSharesAllowList(t *testing.T) {
 	}
 }
 
+// A lost background connection leaves the person logged in: thumbnails and
+// content go over what is left of the group, the interactive connection in
+// the end.
+func TestLostBackgroundConnection(t *testing.T) {
+	h := sambaHarness(t)
+	c := h.login(t, "alex", alexPassword)
+	s, ok := h.tab.Acquire(c.Value)
+	if !ok {
+		t.Fatal("no session")
+	}
+	g := s.Conn.(*smb.Group)
+	if g.Size() != 3 {
+		t.Fatalf("a group of %d", g.Size())
+	}
+	for range 2 {
+		b, done := g.Background()
+		done()
+		_ = b.Close()
+	}
+	h.tab.Release(s)
+	if res := h.do(t, "GET", "/api/v1/shares/alex/content?path=big.bin", nil, map[string]string{"Range": "bytes=0-99"}, c); res.StatusCode != 206 {
+		t.Fatalf("content with no background connection left: %d", res.StatusCode)
+	}
+	if res := h.do(t, "GET", "/api/v1/me", nil, nil, c); res.StatusCode != 200 {
+		t.Fatalf("logged out: %d", res.StatusCode)
+	}
+	if g.Size() != 1 {
+		t.Fatalf("a group of %d", g.Size())
+	}
+}
+
 // A lost SMB connection ends the ferry session with a 502, and the next
 // request is a 401: nothing reconnects.
 func TestLostSession(t *testing.T) {
@@ -234,7 +267,7 @@ func TestLostSession(t *testing.T) {
 		t.Fatal("no session")
 	}
 	// Close the SMB session underneath, as a dropped connection would.
-	_ = s.Conn.(*smb.Session).Close()
+	_ = s.Conn.(*smb.Group).Interactive().Close()
 	h.tab.Release(s)
 	res := h.do(t, "GET", "/api/v1/shares", nil, nil, c)
 	if res.StatusCode != 401 && res.StatusCode != 502 {

@@ -23,7 +23,7 @@ const ndjson = "application/x-ndjson"
 // folder is opened and its first batch read before the status is written:
 // what fails that early is an ordinary problem response.
 func (a *API) ListEntries(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.ListEntriesParams) {
-	conn, ctx, done, ok := a.onShare(w, r, share)
+	conn, ctx, done, ok := a.onShare(w, r, share, smb.PoolInteractive)
 	if !ok {
 		return
 	}

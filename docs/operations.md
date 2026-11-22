@@ -24,10 +24,25 @@ Measured on Linux with Samba 4.21, ferry built with Go 1.27
 | what | memory |
 |---|---|
 | the idle process | ~10 MB |
-| a logged-in session, idle | ~0.1 MB (50 sessions: +5 MB) |
+| a logged-in session, idle | ~0.1 MB with one SMB connection, ~0.13 MB with three (50 sessions: +4.3 and +6.5 MB) |
 | a running download | ~1.5 + 1 × GOMAXPROCS MB: 3.5 MB at 2 CPUs, 6.5 MB at 4 |
 | a running upload | ~2.5 MB |
 | thumbnails in the making, all together | at most `FERRY_THUMBNAIL_MEMORY` (default 320 MiB) |
+
+Downloads spread over a session's background connections take a little
+more than on one, since each connection keeps its own buffers: three at
+once took 7 MB on one connection and 10.5 MB on two (2 CPUs).
+
+The SMB server pays for connections too: Samba runs one `smbd` process per
+connection, which took about 2.8 MB of its own memory each on Samba 4.21 —
+some 8.5 MB on the server per person logged in with three connections.
+Where the server is small and many log in, lower `FERRY_SMB_CONNECTIONS`.
+The server's own limits count connections, not people, and so see each
+login `FERRY_SMB_CONNECTIONS` times: in Samba, `max connections` on a share
+(each connection that opens the share counts) and `max smbd processes`.
+Its audit log shows a login's sessions too; a wrong password, though, is
+tried on one connection only, so failed attempts and lockout counts see
+one per login.
 
 A download's share grows with the CPUs because go-smb2 pools its receive
 buffers per connection in a `sync.Pool`, which keeps one per processor. Go
@@ -106,7 +121,10 @@ name or a path: routes are patterns, errors are kinds from a fixed list
 
 | metric | type | labels | what |
 |---|---|---|---|
-| `ferry_sessions` | gauge | | sessions open now, each one SMB connection |
+| `ferry_sessions` | gauge | | sessions open now: logins, each with its SMB connections |
+| `ferry_smb_connections` | gauge | | SMB connections open now, of all sessions together |
+| `ferry_smb_connections_lost_total` | counter | `pool` | connections that went away on their own: `interactive` (the session ended) or `background` (it carried on with fewer) |
+| `ferry_smb_slot_wait_seconds` | histogram | `pool` | how long requests waited for their connection's one request slot, `interactive` or `background`: the interactive one should stay near zero |
 | `ferry_logins_total` | counter | `outcome` | login attempts: `ok`, `auth`, `guest`, `unreachable`, `rate_limited`, `too_many_sessions`, `invalid`, `internal` |
 | `ferry_transfer_bytes_total` | counter | `direction` | file bytes `up` (uploads) and `down` (downloads and previews) |
 | `ferry_smb_errors_total` | counter | `kind` | SMB errors answered to a request: `access_denied`, `not_found`, `exists`, `busy`, `not_empty`, `not_dir`, `is_dir`, `invalid_path`, `limit`, `unreachable`, `session_lost`, `canceled`, `internal` |
@@ -119,7 +137,8 @@ name or a path: routes are patterns, errors are kinds from a fixed list
 
 and the Go runtime's and the process's (`go_*`, `process_*`). Worth an
 alert: `guest` or `auth` logins rising fast (someone guessing), `session_lost`
-errors (the server dropping connections), memory near the limit.
+errors and lost connections (the server dropping them), memory near the
+limit.
 
 ## Traces
 

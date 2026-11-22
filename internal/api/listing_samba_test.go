@@ -27,8 +27,9 @@ func sambaHarnessWith(t testing.TB, change func(*config.Config)) *harness {
 	}
 	cfg := testConfig()
 	cfg.SMBServer = addr
+	cfg.SMBConnections = 3
 	change(&cfg)
-	return newHarness(t, cfg, smb.Login)
+	return newHarness(t, cfg, smb.LoginGroup)
 }
 
 // listRaw asks for a listing without reading it in advance, unlike h.do:

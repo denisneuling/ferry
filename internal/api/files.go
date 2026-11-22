@@ -14,7 +14,10 @@ import (
 // onShare is the common start of every handler on a share: the session, the
 // deployment's allow-list, and a context bounded by the request timeout. A
 // share outside FERRY_SHARES is answered as if it did not exist.
-func (a *API) onShare(w http.ResponseWriter, r *http.Request, share string) (*smb.Session, context.Context, func(), bool) {
+// onShare finds the request's session and the connection of its group that
+// serves pool (smb.PoolInteractive, smb.PoolBackground), and bounds the
+// request's time. done ends it all.
+func (a *API) onShare(w http.ResponseWriter, r *http.Request, share, pool string) (*smb.Session, context.Context, func(), bool) {
 	s, ok := a.acquire(w, r)
 	if !ok {
 		return nil, nil, nil, false
@@ -24,14 +27,14 @@ func (a *API) onShare(w http.ResponseWriter, r *http.Request, share string) (*sm
 		probNotFound.write(w)
 		return nil, nil, nil, false
 	}
-	conn, ok := s.Conn.(*smb.Session)
+	c, given, ok := connFor(s, pool)
 	if !ok {
 		a.sessions.Release(s)
 		probInternal.write(w)
 		return nil, nil, nil, false
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), a.cfg.RequestTimeout)
-	return conn, ctx, func() { cancel(); a.sessions.Release(s) }, true
+	return c, ctx, func() { cancel(); given(); a.sessions.Release(s) }, true
 }
 
 func (a *API) ListShares(w http.ResponseWriter, r *http.Request) {
@@ -40,14 +43,15 @@ func (a *API) ListShares(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer a.sessions.Release(s)
-	conn, ok := s.Conn.(*smb.Session)
+	c, given, ok := connFor(s, smb.PoolInteractive)
 	if !ok {
 		probInternal.write(w)
 		return
 	}
+	defer given()
 	ctx, cancel := context.WithTimeout(r.Context(), a.cfg.RequestTimeout)
 	defer cancel()
-	shares, err := conn.Shares(ctx)
+	shares, err := c.Shares(ctx)
 	if err != nil {
 		a.fail(w, r, err)
 		return
@@ -66,7 +70,7 @@ func (a *API) ListShares(w http.ResponseWriter, r *http.Request) {
 const spaceTimeout = 5 * time.Second
 
 func (a *API) GetSpace(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.GetSpaceParams) {
-	conn, ctx, done, ok := a.onShare(w, r, share)
+	conn, ctx, done, ok := a.onShare(w, r, share, smb.PoolInteractive)
 	if !ok {
 		return
 	}
@@ -94,7 +98,7 @@ func clampInt64(n uint64) int64 {
 }
 
 func (a *API) CreateFolder(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.CreateFolderParams) {
-	conn, ctx, done, ok := a.onShare(w, r, share)
+	conn, ctx, done, ok := a.onShare(w, r, share, smb.PoolInteractive)
 	if !ok {
 		return
 	}
@@ -116,7 +120,7 @@ func (a *API) MoveEntry(w http.ResponseWriter, r *http.Request, share v1.ShareNa
 	if !decodeJSON(w, r, 16<<10, &req) {
 		return
 	}
-	conn, ctx, done, ok := a.onShare(w, r, share)
+	conn, ctx, done, ok := a.onShare(w, r, share, smb.PoolInteractive)
 	if !ok {
 		return
 	}
@@ -138,7 +142,7 @@ func (a *API) MoveEntry(w http.ResponseWriter, r *http.Request, share v1.ShareNa
 }
 
 func (a *API) DeleteEntry(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.DeleteEntryParams) {
-	conn, ctx, done, ok := a.onShare(w, r, share)
+	conn, ctx, done, ok := a.onShare(w, r, share, smb.PoolInteractive)
 	if !ok {
 		return
 	}

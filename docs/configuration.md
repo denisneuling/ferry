@@ -26,7 +26,8 @@ session setup and kept nowhere.
 |---|---|---|
 | `FERRY_IDLE_TIMEOUT` | `30m` | A session without a request for this long ends. A session in use — a long download — does not idle out. |
 | `FERRY_SESSION_LIFETIME` | `12h` | A session ends this long after its login, whatever its activity. At least `FERRY_IDLE_TIMEOUT`. |
-| `FERRY_MAX_SESSIONS` | `200` | Sessions at most, each one SMB connection. A login beyond it is `503` (`too_many_sessions`). |
+| `FERRY_SMB_CONNECTIONS` | `3` | SMB connections one login sets up, `1` to `4`, each an SMB session of its own with the person's credentials, all during the login — the only moment the password exists. One serves browsing (listing, creating, renaming, deleting, free space); the others serve thumbnails, details, previews, downloads and uploads, so that a folder opens while thumbnails load. `1` puts everything on one connection. The SMB server sees up to sessions × this many connections; mind its own limits, such as Samba's `max smbd processes`. Memory per connection: [operations.md](operations.md#memory). |
+| `FERRY_MAX_SESSIONS` | `200` | Sessions at most — logins, each with `FERRY_SMB_CONNECTIONS` SMB connections. A login beyond it is `503` (`too_many_sessions`). |
 | `FERRY_LOGIN_TIMEOUT` | `10s` | Connecting to the server and the session setup, together. |
 | `FERRY_LOGIN_RATE_ADDRESS` | `10` | Login attempts per minute from one client address, successful or not. |
 | `FERRY_LOGIN_RATE_USER` | `5` | Login attempts per minute for one username, compared without case. The server's own lockout policy applies as well. |

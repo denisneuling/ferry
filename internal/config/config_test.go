@@ -30,6 +30,9 @@ func TestDefaults(t *testing.T) {
 	if c.MaxListing != 200000 || c.MaxDelete != 10000 {
 		t.Errorf("max listing %d, max delete %d", c.MaxListing, c.MaxDelete)
 	}
+	if c.SMBConnections != 3 {
+		t.Errorf("smb connections %d", c.SMBConnections)
+	}
 }
 
 func TestValues(t *testing.T) {
@@ -43,6 +46,7 @@ func TestValues(t *testing.T) {
 		"FERRY_COOKIE_SECURE":   "true",
 		"FERRY_MAX_LISTING":     "500000",
 		"FERRY_MAX_DELETE":      "25",
+		"FERRY_SMB_CONNECTIONS": "1",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -56,8 +60,8 @@ func TestValues(t *testing.T) {
 	if c.MaxUpload != 4<<30 || c.IdleTimeout != 10*time.Minute {
 		t.Errorf("max upload %d idle %v", c.MaxUpload, c.IdleTimeout)
 	}
-	if c.MaxListing != 500000 || c.MaxDelete != 25 {
-		t.Errorf("max listing %d, max delete %d", c.MaxListing, c.MaxDelete)
+	if c.MaxListing != 500000 || c.MaxDelete != 25 || c.SMBConnections != 1 {
+		t.Errorf("max listing %d, max delete %d, smb connections %d", c.MaxListing, c.MaxDelete, c.SMBConnections)
 	}
 	if len(c.TrustedProxies) != 2 || c.TrustedProxies[1].String() != "192.0.2.7/32" {
 		t.Errorf("proxies %v", c.TrustedProxies)
@@ -68,6 +72,7 @@ func TestErrors(t *testing.T) {
 	cases := map[string]map[string]string{
 		"FERRY_SMB_SERVER":      {},
 		"has no host":           {"FERRY_SMB_SERVER": ":445"},
+		"from 1 to 4":           {"FERRY_SMB_SERVER": "nas", "FERRY_SMB_CONNECTIONS": "5"},
 		"no valid port":         {"FERRY_SMB_SERVER": "nas:99999"},
 		"positive duration":     {"FERRY_SMB_SERVER": "nas", "FERRY_IDLE_TIMEOUT": "soon"},
 		"byte count":            {"FERRY_SMB_SERVER": "nas", "FERRY_MAX_UPLOAD": "4GB"},

@@ -29,8 +29,9 @@ import (
 	"github.com/metapatrol/ferry/internal/smb"
 )
 
-// LoginFunc sets up an SMB session; smb.Login, or a stand-in in tests.
-type LoginFunc func(context.Context, smb.LoginOptions, smb.Credentials) (*smb.Session, error)
+// LoginFunc sets up a person's SMB sessions; smb.LoginGroup, or a stand-in
+// in tests.
+type LoginFunc func(context.Context, smb.LoginOptions, smb.Credentials) (*smb.Group, error)
 
 // API serves /api/v1.
 type API struct {
@@ -52,7 +53,7 @@ type API struct {
 	metrics     *metrics.Metrics
 }
 
-// New makes the API. login is smb.Login outside tests; m may be nil.
+// New makes the API. login is smb.LoginGroup outside tests; m may be nil.
 func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.Logger, version string, m *metrics.Metrics) *API {
 	return &API{
 		metrics:     m,
@@ -280,8 +281,14 @@ func (a *API) Login(w http.ResponseWriter, r *http.Request, _ v1.LoginParams) {
 
 	user, domain := splitUser(req.Username)
 	start := time.Now()
-	conn, err := a.login(r.Context(), smb.LoginOptions{Server: a.cfg.SMBServer, Timeout: a.cfg.LoginTimeout, CallTimeout: a.cfg.RequestTimeout},
-		smb.Credentials{User: user, Password: req.Password, Domain: domain})
+	opts := smb.LoginOptions{Server: a.cfg.SMBServer, Timeout: a.cfg.LoginTimeout, CallTimeout: a.cfg.RequestTimeout,
+		Connections: a.cfg.SMBConnections}
+	if a.metrics != nil {
+		opts.Observer = a.metrics
+	}
+	// Every connection is set up here, while the password exists: none can
+	// be added later.
+	conn, err := a.login(r.Context(), opts, smb.Credentials{User: user, Password: req.Password, Domain: domain})
 	// The password is not needed again. Go cannot wipe a string, but nothing
 	// below holds a reference to it.
 	req.Password = ""
@@ -378,19 +385,85 @@ func (a *API) acquire(w http.ResponseWriter, r *http.Request) (*session.Session,
 	return s, true
 }
 
-// fail answers an error from internal/smb. A lost SMB session ends the
-// ferry session: there is no password to reconnect with.
+// fail answers an error from internal/smb. A lost interactive connection
+// ends the ferry session: there is no password to reconnect with. A lost
+// background connection does not: the group carries on with the others
+// (smb.Group), and this one request fails as if the server could not be
+// reached.
 func (a *API) fail(w http.ResponseWriter, r *http.Request, err error) {
+	p := smbProblem(err)
 	if smb.KindOf(err) == smb.KindSessionLost {
-		a.sessions.Delete(sessionID(r))
-		a.clearCookie(w, r)
+		// The pool and the route only: who it was, and what they opened,
+		// stay out of the log.
+		if a.groupLost(r) {
+			a.log.Warn("smb connection lost", "pool", smb.PoolInteractive, "route", r.Pattern, "session", "ended")
+			a.sessions.Delete(sessionID(r))
+			a.clearCookie(w, r)
+		} else {
+			a.log.Warn("smb connection lost", "pool", smb.PoolBackground, "route", r.Pattern, "session", "continues")
+			p = probUnreachable
+		}
 	}
 	a.metrics.SMBError(smb.KindOf(err).String())
-	p := smbProblem(err)
 	if p.status >= 500 {
 		a.log.Warn("request failed", append(errAttrs(err), "route", r.Pattern)...)
 	}
 	p.write(w)
+}
+
+// groupLost reports whether the request's session is over: gone from the
+// table, or its interactive connection lost.
+func (a *API) groupLost(r *http.Request) bool {
+	s, ok := a.sessions.Acquire(sessionID(r))
+	if !ok {
+		return true
+	}
+	defer a.sessions.Release(s)
+	return s.Conn.Lost()
+}
+
+// openDerived opens a file for what ferry derives from it — a thumbnail,
+// its details — on c, a background connection. Should that connection have
+// gone away, it tries once more on another of the group: a small read the
+// person did not start, which is worth not failing for a dropped
+// connection. Content and uploads do not: what a person started fails as
+// it is. done gives the second connection back.
+func (a *API) openDerived(ctx context.Context, r *http.Request, c *smb.Session, share, p string) (_ *smb.File, done func(), err error) {
+	f, err := c.Open(ctx, share, p)
+	if smb.KindOf(err) != smb.KindSessionLost || a.groupLost(r) {
+		return f, func() {}, err
+	}
+	s, ok := a.sessions.Acquire(sessionID(r))
+	if !ok {
+		return nil, func() {}, err
+	}
+	defer a.sessions.Release(s)
+	other, given, ok := connFor(s, smb.PoolBackground)
+	if !ok {
+		return nil, func() {}, err
+	}
+	a.log.Warn("smb connection lost", "pool", smb.PoolBackground, "route", r.Pattern, "session", "continues", "retry", true)
+	f, err = other.Open(ctx, share, p)
+	if err != nil {
+		given()
+		return nil, func() {}, err
+	}
+	return f, given, nil
+}
+
+// connFor is the SMB session of a person's group that serves the pool: the
+// interactive connection, or one of the background ones. done gives a
+// background one back.
+func connFor(s *session.Session, pool string) (_ *smb.Session, done func(), ok bool) {
+	g, ok := s.Conn.(*smb.Group)
+	if !ok {
+		return nil, nil, false
+	}
+	if pool == smb.PoolBackground {
+		c, done := g.Background()
+		return c, done, true
+	}
+	return g.Interactive(), func() {}, true
 }
 
 // ThumbnailMemory is what the thumbnail budget holds now, and the budget.

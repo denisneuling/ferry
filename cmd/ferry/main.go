@@ -87,7 +87,7 @@ func serve(args []string, stderr io.Writer) int {
 		Sessions:        sessions.Len,
 		ThumbnailMemory: func() (int64, int64) { return a.ThumbnailMemory() },
 	})
-	a = api.New(cfg, sessions, smb.Login, log, version, m)
+	a = api.New(cfg, sessions, smb.LoginGroup, log, version, m)
 	srv := server.New(cfg, sessions, a, m, log)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

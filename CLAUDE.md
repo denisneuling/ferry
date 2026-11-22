@@ -57,10 +57,12 @@ is English.
   `internal/smb/call.go`: the request slot under the request's context, the
   SMB call under a detached one with a watchdog. A client that leaves stops
   an operation between steps, never inside one.
-- **One SMB connection per browser session.** Identities never share a
-  connection, a tree connect or a file handle; a dropped connection ends the
-  session instead of reconnecting, because reconnecting would need the
-  password again.
+- **n SMB connections per browser session** (`FERRY_SMB_CONNECTIONS`, 1–4),
+  all set up during login while the password exists, each passing the guest
+  guard; never shared between identities, never re-established. Identities
+  never share a connection, a tree connect or a file handle; a dropped
+  connection is not reconnected, because reconnecting would need the password
+  again.
 - **Fail closed and say so.** SMB statuses map to RFC 9457 problem responses
   (403, 404, 409, 502) in one place, `internal/api`. Mutating requests need
   the session cookie and `X-Ferry-Request: 1`.

@@ -35,6 +35,7 @@ func newTestServers(t *testing.T, smbServer string, log *slog.Logger) (*httptest
 		IdleTimeout: 30 * time.Minute, SessionLifetime: 12 * time.Hour, MaxSessions: 10,
 		LoginTimeout: 5 * time.Second, RequestTimeout: 10 * time.Second, StallTimeout: 10 * time.Second,
 		MaxListing: 1000, MaxDelete: 1000, LoginRatePerAddress: 100, LoginRatePerUser: 100, CookieSecure: "auto",
+		SMBConnections: 3,
 	}
 	tab := session.New(session.Options{IdleTimeout: cfg.IdleTimeout, Lifetime: cfg.SessionLifetime, MaxSessions: cfg.MaxSessions})
 	var a *api.API
@@ -42,7 +43,7 @@ func newTestServers(t *testing.T, smbServer string, log *slog.Logger) (*httptest
 		Sessions:        tab.Len,
 		ThumbnailMemory: func() (int64, int64) { return a.ThumbnailMemory() },
 	})
-	a = api.New(cfg, tab, smb.Login, log, "test", m)
+	a = api.New(cfg, tab, smb.LoginGroup, log, "test", m)
 	s := New(cfg, tab, a, m, log)
 	srv := httptest.NewServer(s.public.Handler)
 	ops := httptest.NewServer(s.ops.Handler)
@@ -147,6 +148,9 @@ func TestPathsNeverLogged(t *testing.T) {
 		`ferry_smb_errors_total{kind="not_found"}`,
 		`ferry_thumbnail_memory_limit_bytes`,
 		`ferry_build_info{commit="abc",version="test"} 1`,
+		`ferry_smb_connections 3`,
+		`ferry_smb_slot_wait_seconds_count{pool="interactive"}`,
+		`ferry_smb_slot_wait_seconds_count{pool="background"}`,
 	} {
 		if !strings.Contains(string(scrape), want) {
 			t.Errorf("the metrics lack %s", want)

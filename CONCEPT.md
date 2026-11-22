@@ -105,12 +105,21 @@ Browser ──HTTP──▶ gateway ──▶ ferry (one Go process)
 
 - **One process.** No workers, queues or sidecars, and no dependency to run
   next to it.
-- **Session table.** It maps a random session ID to one live SMB session: the
-  connection, the authenticated session, the shares mounted so far and the
-  time of last use.
-- **One SMB connection per browser session.** This keeps identities strictly
-  apart and makes logout final. Samba handles a few dozen sessions without
-  effort.
+- **Session table.** It maps a random session ID to one person's live SMB
+  sessions — the connections, the authenticated sessions, the shares mounted
+  so far — and the time of last use.
+- **A few SMB connections per browser session, never shared.** A login sets
+  up `FERRY_SMB_CONNECTIONS` (1 to 4, default 3) SMB sessions, each on its
+  own connection, all while the password exists, each passing the guest
+  guard; one refused, and the login is refused. One connection serves what a
+  person waits on — listing, stat, creating, renaming, deleting — and the
+  others what loads alongside — thumbnails, details, content — because
+  go-smb2 carries one request at a time per connection (docs/spike.md), and
+  a folder should not open behind thirty thumbnails. Connections are never
+  shared between identities and never re-established: a background one lost,
+  the session carries on with the rest; the interactive one lost, the session
+  is over. Logout and the timeouts close them all. Samba handles a few dozen
+  sessions' connections without effort.
 - **Share enumeration** goes through srvsvc NetShareEnum on the user's own
   session. Hidden `$` shares are left out of the list. A deployment can
   choose which shares ferry offers at all (`FERRY_SHARES`); a share outside
@@ -130,8 +139,8 @@ Browser ──HTTP──▶ gateway ──▶ ferry (one Go process)
      session under it. It sets the session cookie: `HttpOnly`,
      `SameSite=Strict`, `Path=/`, and `Secure` when served over HTTPS.
 3. The password goes out of scope. It is never written anywhere and never sent
-   again. If the SMB connection drops, the session is over and the user logs in
-   again.
+   again. If the interactive SMB connection drops, the session is over and the
+   user logs in again; a background one dropping only leaves fewer.
 4. The session ends after an idle timeout (default 30 min), after an absolute
    lifetime (default 12 h), on `POST /api/v1/logout`, or when the process
    stops. Ending a session logs off SMB and closes the connection.
@@ -319,7 +328,7 @@ Filestash for a week before Filestash goes.
 |---|---|
 | Own small Go service, not an existing file manager | none of the ones looked at keeps Samba as the only authority without own users, stored credentials or pool access, and is also pleasant to use |
 | SMB session setup as the login, no OIDC | the accounts already exist in Samba; a second identity system costs resources and drifts |
-| One SMB connection per browser session | keeps identities apart and makes logout real; simpler than pooling |
+| A few SMB connections per browser session, set up at login, never pooled across people | keeps identities apart and makes logout real; one connection for browsing keeps it quick while thumbnails and downloads load on the others |
 | Nothing persisted | no secret to protect at rest, nothing to back up, a restart is harmless |
 | go-smb2 (cloudsoda fork), not libsmbclient | pure Go, distroless image, the same code rclone runs against many servers |
 | Session cookie, not Basic auth or tokens in the browser | the password is sent once; JavaScript never holds it; logout works |

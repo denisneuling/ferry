@@ -40,6 +40,11 @@ type LoginOptions struct {
 	// CallTimeout bounds each SMB call of the session; one the server does
 	// not answer within it ends the session (call.go). Zero means a minute.
 	CallTimeout time.Duration
+	// Connections is how many SMB sessions LoginGroup sets up, each on its
+	// own connection (group.go). Zero or one means one. Login ignores it.
+	Connections int
+	// Observer hears of the connections, for the metrics; nil hears nothing.
+	Observer Observer
 }
 
 const defaultLoginTimeout = 10 * time.Second
@@ -104,7 +109,8 @@ func Login(ctx context.Context, opts LoginOptions, cred Credentials) (_ *Session
 	if callTimeout <= 0 {
 		callTimeout = defaultCallTimeout
 	}
-	return &Session{s: s, conn: tcp, callTimeout: callTimeout, op: make(chan struct{}, 1), mounts: map[string]*smb2.Share{}}, nil
+	return &Session{s: s, conn: tcp, callTimeout: callTimeout, op: make(chan struct{}, 1), mounts: map[string]*smb2.Share{},
+		obs: opts.Observer, pool: PoolInteractive}, nil
 }
 
 // Session is one authenticated SMB session on its own connection. It is safe
@@ -125,7 +131,12 @@ type Session struct {
 	// this costs little; see docs/spike.md for the measurements.
 	// It is a channel rather than a mutex so that waiting for it honours
 	// the request's context.
-	op     chan struct{}
+	op chan struct{}
+	// obs hears how long requests wait for op, under the pool this
+	// session serves in its group.
+	obs  Observer
+	pool string
+
 	mu     sync.Mutex
 	mounts map[string]*smb2.Share
 	lost   bool
@@ -137,6 +148,14 @@ func (s *Session) Lost() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.lost || s.closed
+}
+
+// wentAway reports whether the connection was lost rather than closed by
+// ferry.
+func (s *Session) wentAway() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lost
 }
 
 // Close logs off and closes the connection. It is idempotent.
@@ -200,8 +219,12 @@ func (s *Session) begin(ctx context.Context) error {
 	if err := s.usable(); err != nil {
 		return err
 	}
+	start := time.Now()
 	if err := s.acquire(ctx); err != nil {
 		return err
+	}
+	if s.obs != nil {
+		s.obs.SlotWait(s.pool, time.Since(start))
 	}
 	if err := s.usable(); err != nil {
 		s.release()
