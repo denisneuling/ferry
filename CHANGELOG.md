@@ -5,6 +5,12 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.4.1](https://github.com/metapatrol/ferry/compare/v0.4.0...v0.4.1) (2026-11-22)
+
+### Bug Fixes
+
+* **chart:** roll the pod with the cache on instead of recreating it ([83f0dc6](https://github.com/metapatrol/ferry/commit/83f0dc6793d78205f082c1645c859701ea740fcc))
+
 ## [0.4.0](https://github.com/metapatrol/ferry/compare/v0.3.0...v0.4.0) (2026-11-22)
 
 ### Features

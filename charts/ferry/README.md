@@ -2,7 +2,7 @@
 
 ferry — SMB shares in the browser; log in with your Samba account and see exactly what Samba lets you see, with no users, no database and nothing stored
 
-![Version: 0.4.0](https://img.shields.io/badge/Version-0.4.0-informational?style=flat-square) ![AppVersion: 0.4.0](https://img.shields.io/badge/AppVersion-0.4.0-informational?style=flat-square)
+![Version: 0.4.1](https://img.shields.io/badge/Version-0.4.1-informational?style=flat-square) ![AppVersion: 0.4.1](https://img.shields.io/badge/AppVersion-0.4.1-informational?style=flat-square)
 
 ferry logs people in to an SMB server with their own accounts and shows
 them, in the browser, exactly what the server lets them see. It keeps
@@ -11,7 +11,7 @@ the process's memory. An optional cache of thumbnails and details
 (`cache.enabled`) is the one exception: a volume and a key the chart makes.
 
 ```sh
-helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.4.0 \
+helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.4.1 \
   --set smb.server=nas.example.lan \
   --set ingress.enabled=true --set 'ingress.hosts[0].host=files.example.com' \
   --set 'ingress.hosts[0].paths[0].path=/' \
