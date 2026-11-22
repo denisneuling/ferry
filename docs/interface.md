@@ -16,9 +16,20 @@ the login and says why.
 
 Signing out clears what the browser cached for ferry (`Clear-Site-Data`),
 thumbnails and details included, so that the next person at a shared
-browser cannot page back to them. A session that only times out sends no
-answer to carry that: on a shared computer, sign out. Browsers act on it in
-a secure context only — served over HTTPS, or on localhost.
+browser cannot page back to them. Two cases where it does not:
+
+- **ferry served over plain HTTP.** Browsers honour `Clear-Site-Data` in a
+  secure context only — HTTPS, or localhost. Without HTTPS, thumbnails and
+  details stay in the browser's cache after signing out, for as long as the
+  browser keeps them (up to a year), readable by whoever uses that browser
+  profile next. A file's own content is asked for anew each time
+  (`no-cache`): showing it again needs a session.
+- **A session that times out.** No answer goes to the browser that could
+  carry the header.
+
+On a computer several people share, give each their own browser profile or
+account, or clear the browsing data after use — or serve ferry over HTTPS
+and sign out.
 
 ## Browsing
 
