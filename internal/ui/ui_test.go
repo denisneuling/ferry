@@ -3,6 +3,7 @@ package ui
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -65,5 +66,31 @@ func TestSingleApp(t *testing.T) {
 	}
 	if w := get(t, h, "/", nil); w.Header().Get("Content-Security-Policy") == "" {
 		t.Error("no Content-Security-Policy")
+	}
+}
+
+// TestOwnIcons holds the app to ferry's own icons: the metapatrol mark in
+// .metapatrol/ is the repository's, never the app's.
+func TestOwnIcons(t *testing.T) {
+	svg, err := os.ReadFile("../../ui/public/favicon.svg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(svg), `aria-label="ferry"`) || strings.Contains(string(svg), "metapatrol") {
+		t.Errorf("ui/public/favicon.svg is not ferry's icon")
+	}
+	for _, name := range []string{"favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "site.webmanifest"} {
+		if _, err := os.Stat("../../ui/public/" + name); err != nil {
+			t.Errorf("ui/public lacks %s", name)
+		}
+	}
+	index, err := os.ReadFile("../../ui/src/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`href="favicon.ico"`, `href="favicon.svg"`, `href="apple-touch-icon.png"`, `href="site.webmanifest"`} {
+		if !strings.Contains(string(index), want) {
+			t.Errorf("index.html lacks %s", want)
+		}
 	}
 }
