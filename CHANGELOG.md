@@ -5,6 +5,14 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.4.0](https://github.com/metapatrol/ferry/compare/v0.3.0...v0.4.0) (2026-11-22)
+
+### Features
+
+* a cache of thumbnails and details in a directory ([ad45120](https://github.com/metapatrol/ferry/commit/ad451200f7be3e2faf200a8f955895febc4a3446))
+* keep thumbnails and details in an optional cache on a volume ([cd8f6a4](https://github.com/metapatrol/ferry/commit/cd8f6a4a21d90907262c011bed376d86cc73b5f8))
+* show the cover a recording carries as its thumbnail ([dfc8062](https://github.com/metapatrol/ferry/commit/dfc8062a6abafd9374598b64472bd653af546a45))
+
 ## [0.3.0](https://github.com/metapatrol/ferry/compare/v0.2.0...v0.3.0) (2026-11-22)
 
 ### Features
