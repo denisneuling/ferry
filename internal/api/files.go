@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"strings"
+	"time"
 
 	v1 "github.com/metapatrol/ferry/api/v1"
 	"github.com/metapatrol/ferry/internal/smb"
@@ -57,6 +59,38 @@ func (a *API) ListShares(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// spaceTimeout bounds the wait for an answer about free space: it is a
+// courtesy line under a title, and a busy session should not hold it long.
+const spaceTimeout = 5 * time.Second
+
+func (a *API) GetSpace(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.GetSpaceParams) {
+	conn, ctx, done, ok := a.onShare(w, r, share)
+	if !ok {
+		return
+	}
+	defer done()
+	dir, ok := cleanParam(w, params.Path)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, spaceTimeout)
+	defer cancel()
+	sp, err := conn.Space(ctx, share, dir)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v1.Space{Total: clampInt64(sp.Total), Free: clampInt64(sp.Free)})
+}
+
+// clampInt64 keeps a server's absurd answer from turning negative in JSON.
+func clampInt64(n uint64) int64 {
+	if n > math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return int64(n)
 }
 
 func (a *API) CreateFolder(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.CreateFolderParams) {

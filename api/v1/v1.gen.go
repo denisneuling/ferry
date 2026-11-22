@@ -318,6 +318,15 @@ type ShareList struct {
 	Shares []Share `json:"shares"`
 }
 
+// Space defines model for Space.
+type Space struct {
+	// Free Bytes this user may still write, as the server reports it.
+	Free int64 `json:"free"`
+
+	// Total The volume's size in bytes, as the server reports it.
+	Total int64 `json:"total"`
+}
+
 // EntryPath defines model for EntryPath.
 type EntryPath = string
 
@@ -439,6 +448,12 @@ type MoveEntryParams struct {
 
 // MoveEntryParamsXFerryRequest defines parameters for MoveEntry.
 type MoveEntryParamsXFerryRequest string
+
+// GetSpaceParams defines parameters for GetSpace.
+type GetSpaceParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+}
 
 // GetThumbnailParams defines parameters for GetThumbnail.
 type GetThumbnailParams struct {
@@ -754,6 +769,18 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 	MoveEntry(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetSpace The size and free space of the volume a folder is on.
+	//
+	// What the SMB server reports to this session for the folder
+	// (FileFsFullSizeInformation), and nothing ferry works out itself:
+	// `free` is what the server says this user may still write, which
+	// includes a quota when the server applies one. The answer has a short
+	// timeout of its own; the interface leaves the line out when it fails,
+	// and a folder opens regardless.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/space (the `GetSpace` operationId).
+	GetSpace(ctx context.Context, share ShareName, params *GetSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetThumbnail A thumbnail of an image, made on the fly.
 	//
 	// A JPEG of the image that fits in a `size`×`size` square, upright as
@@ -1022,6 +1049,28 @@ func (c *Client) MoveEntryWithBody(ctx context.Context, share ShareName, params 
 // Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 func (c *Client) MoveEntry(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMoveEntryRequest(c.Server, share, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSpace The size and free space of the volume a folder is on.
+//
+// What the SMB server reports to this session for the folder
+// (FileFsFullSizeInformation), and nothing ferry works out itself:
+// `free` is what the server says this user may still write, which
+// includes a quota when the server applies one. The answer has a short
+// timeout of its own; the interface leaves the line out when it fails,
+// and a folder opens regardless.
+//
+// Corresponds with GET /api/v1/shares/{share}/space (the `GetSpace` operationId).
+func (c *Client) GetSpace(ctx context.Context, share ShareName, params *GetSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSpaceRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1671,6 +1720,67 @@ func NewMoveEntryRequestWithBody(server string, share ShareName, params *MoveEnt
 	return req, nil
 }
 
+// NewGetSpaceRequest constructs an http.Request for the GetSpace method
+func NewGetSpaceRequest(server string, share ShareName, params *GetSpaceParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/space"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetThumbnailRequest constructs an http.Request for the GetThumbnail method
 func NewGetThumbnailRequest(server string, share ShareName, params *GetThumbnailParams) (*http.Request, error) {
 	var err error
@@ -1937,6 +2047,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 	MoveEntryWithResponse(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveEntryResponse, error)
+
+	// GetSpaceWithResponse The size and free space of the volume a folder is on.
+	//
+	// What the SMB server reports to this session for the folder
+	// (FileFsFullSizeInformation), and nothing ferry works out itself:
+	// `free` is what the server says this user may still write, which
+	// includes a quota when the server applies one. The answer has a short
+	// timeout of its own; the interface leaves the line out when it fails,
+	// and a folder opens regardless.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/space (the `GetSpace` operationId).
+	GetSpaceWithResponse(ctx context.Context, share ShareName, params *GetSpaceParams, reqEditors ...RequestEditorFn) (*GetSpaceResponse, error)
 
 	// GetThumbnailWithResponse A thumbnail of an image, made on the fly.
 	//
@@ -2734,6 +2858,82 @@ func (r MoveEntryResponse) ContentType() string {
 	return ""
 }
 
+type GetSpaceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Space
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSpaceResponse) GetJSON200() *Space {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetSpaceResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetSpaceResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetSpaceResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetSpaceResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetSpaceResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSpaceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSpaceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSpaceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSpaceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetThumbnailResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3050,6 +3250,26 @@ func (c *ClientWithResponses) MoveEntryWithResponse(ctx context.Context, share S
 		return nil, err
 	}
 	return ParseMoveEntryResponse(rsp)
+}
+
+// GetSpaceWithResponse The size and free space of the volume a folder is on.
+//
+// What the SMB server reports to this session for the folder
+// (FileFsFullSizeInformation), and nothing ferry works out itself:
+// `free` is what the server says this user may still write, which
+// includes a quota when the server applies one. The answer has a short
+// timeout of its own; the interface leaves the line out when it fails,
+// and a folder opens regardless.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/space (the `GetSpace` operationId).
+func (c *ClientWithResponses) GetSpaceWithResponse(ctx context.Context, share ShareName, params *GetSpaceParams, reqEditors ...RequestEditorFn) (*GetSpaceResponse, error) {
+	rsp, err := c.GetSpace(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSpaceResponse(rsp)
 }
 
 // GetThumbnailWithResponse A thumbnail of an image, made on the fly.
@@ -3709,6 +3929,67 @@ func ParseMoveEntryResponse(rsp *http.Response) (*MoveEntryResponse, error) {
 	return response, nil
 }
 
+// ParseGetSpaceResponse parses an HTTP response from a GetSpaceWithResponse call
+func ParseGetSpaceResponse(rsp *http.Response) (*GetSpaceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSpaceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Space
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetThumbnailResponse parses an HTTP response from a GetThumbnailWithResponse call
 func ParseGetThumbnailResponse(rsp *http.Response) (*GetThumbnailResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -3822,6 +4103,9 @@ type ServerInterface interface {
 	// MoveEntry Rename or move a file or folder within a share.
 	// (POST /api/v1/shares/{share}/move)
 	MoveEntry(w http.ResponseWriter, r *http.Request, share ShareName, params MoveEntryParams)
+	// GetSpace The size and free space of the volume a folder is on.
+	// (GET /api/v1/shares/{share}/space)
+	GetSpace(w http.ResponseWriter, r *http.Request, share ShareName, params GetSpaceParams)
 	// GetThumbnail A thumbnail of an image, made on the fly.
 	// (GET /api/v1/shares/{share}/thumbnail)
 	GetThumbnail(w http.ResponseWriter, r *http.Request, share ShareName, params GetThumbnailParams)
@@ -4346,6 +4630,48 @@ func (siw *ServerInterfaceWrapper) MoveEntry(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetSpace operation middleware
+func (siw *ServerInterfaceWrapper) GetSpace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSpaceParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSpace(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetThumbnail operation middleware
 func (siw *ServerInterfaceWrapper) GetThumbnail(w http.ResponseWriter, r *http.Request) {
 
@@ -4526,6 +4852,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares", wrapper.ListShares)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/space", wrapper.GetSpace)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/shares/{share}/entries", wrapper.DeleteEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/entries", wrapper.ListEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/content", wrapper.GetContent)

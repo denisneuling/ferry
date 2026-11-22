@@ -139,6 +139,33 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/space:
+    parameters:
+      - $ref: "#/components/parameters/ShareName"
+      - $ref: "#/components/parameters/EntryPath"
+    get:
+      operationId: getSpace
+      tags: [files]
+      summary: The size and free space of the volume a folder is on.
+      description: |
+        What the SMB server reports to this session for the folder
+        (FileFsFullSizeInformation), and nothing ferry works out itself:
+        `free` is what the server says this user may still write, which
+        includes a quota when the server applies one. The answer has a short
+        timeout of its own; the interface leaves the line out when it fails,
+        and a folder opens regardless.
+      responses:
+        "200":
+          description: The volume's size and free space.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Space" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/entries:
     parameters:
       - $ref: "#/components/parameters/ShareName"
@@ -575,6 +602,12 @@ components:
         type: { $ref: "#/components/schemas/EntryType" }
         size: { type: integer, format: int64, description: "Bytes; 0 for folders." }
         modified: { type: string, format: date-time }
+    Space:
+      type: object
+      required: [total, free]
+      properties:
+        total: { type: integer, format: int64, description: "The volume's size in bytes, as the server reports it." }
+        free: { type: integer, format: int64, description: "Bytes this user may still write, as the server reports it." }
     EntryList:
       type: object
       required: [path, entries]

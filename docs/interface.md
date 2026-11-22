@@ -22,6 +22,11 @@ the login and says why.
   JPEG, PNG, GIF, WebP and BMP — or as a sortable list.
 - **Search this folder** filters the names of the folder open; it searches
   nothing else.
+- **Free space** shows under a folder's title and on each share's card —
+  "3.2 TB free of 18 TB" with a thin bar — exactly as the SMB server reports
+  it to the person (a quota included, when the server applies one). ferry
+  works nothing out itself; when the server does not answer, the line is
+  not there and the folder opens all the same.
 - **Large folders** open at once: the entries arrive as the server lists
   them, and the first ones show while the rest come in. The page renders a
   few hundred tiles or rows and more as the end comes into view; sorting,

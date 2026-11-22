@@ -112,4 +112,8 @@ func TestSampleFiles(t *testing.T) {
 	if err != nil || len(entries) != 60000 {
 		t.Errorf("Fotoarchiv: %d entries, %v", len(entries), err)
 	}
+	sp, err := alex.Space(ctx, "Family", "")
+	if err != nil || sp.Total == 0 || sp.Free > sp.Total {
+		t.Errorf("Family's space: %+v, %v", sp, err)
+	}
 }

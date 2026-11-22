@@ -21,6 +21,7 @@ import { Prefs } from '../core/prefs';
 import { Transfers } from '../core/transfers';
 import { Icon } from '../ui/icon';
 import { Menu, MenuItem } from '../ui/menu';
+import { Space } from '../ui/space';
 
 /** Entries rendered at once, and added each time the end comes near. */
 const PAGE = 600;
@@ -33,7 +34,7 @@ const PAGE = 600;
 @Component({
   selector: 'f-folder',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Icon, Menu],
+  imports: [RouterLink, Icon, Menu, Space],
   host: {
     '(document:keydown)': 'key($event)',
     '(window:dragenter)': 'dragEnter($event)',

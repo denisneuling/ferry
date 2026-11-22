@@ -4,12 +4,13 @@ import { Browser } from '../core/browser';
 import { shareIcon } from '../core/kinds';
 import { Session } from '../core/session';
 import { Icon } from '../ui/icon';
+import { Space } from '../ui/space';
 
 /** The start: a greeting and the shares, as cards. */
 @Component({
   selector: 'f-home',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, Space],
   template: `<header class="top">
       <div class="heading">
         <h1>{{ greeting() }}</h1>
@@ -31,8 +32,9 @@ import { Icon } from '../ui/icon';
                 <span class="si"><f-icon [name]="icon(s.name)" [size]="22" /></span>
                 <span
                   ><b>{{ s.name }}</b
-                  ><small>{{ s.comment }}</small></span
-                >
+                  ><small>{{ s.comment }}</small
+                  ><small class="share-space"><f-space [share]="s.name" /></small
+                ></span>
               </a>
             }
           </div>

@@ -21,6 +21,9 @@
         @if (browser.loading() && count()) {
           · <ng-container i18n="@@loadingMore">loading more…</ng-container>
         }
+        @if (browser.share(); as share) {
+          · <f-space [share]="share" [path]="browser.path()" />
+        }
         @if (browser.filter()) {
           · <ng-container i18n="@@matching">{{ browser.visible().length }} matching</ng-container>
         }

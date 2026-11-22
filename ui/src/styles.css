@@ -942,6 +942,11 @@ a.brand:hover span {
 .share small {
   color: var(--ink-3);
 }
+/* The free space on a share's card: a line of its own under the comment. */
+.share small.share-space {
+  display: block;
+  margin-top: 8px;
+}
 .empty {
   text-align: center;
   color: var(--ink-3);
@@ -1633,6 +1638,29 @@ dialog.fx-modal::backdrop {
   font-weight: 600;
   color: var(--ink);
 }
+/* A volume's free space, as the server reports it: a line and a thin bar of
+   what is used, quiet next to the folder's count. */
+.space {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.space-bar {
+  display: inline-block;
+  width: 56px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-2);
+  overflow: hidden;
+}
+.space-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
 /* The end of a long folder's rendered window: when it nears the viewport,
    the folder renders the next part. */
 .more {

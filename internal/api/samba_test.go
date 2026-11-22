@@ -414,3 +414,21 @@ func TestAbortedRequestsKeepTheSession(t *testing.T) {
 		}
 	}
 }
+
+// TestSpaceEndpoint: a share's free space as JSON, and Samba's refusal of
+// someone else's share as the usual problem.
+func TestSpaceEndpoint(t *testing.T) {
+	h := sambaHarness(t)
+	c := h.login(t, "alex", alexPassword)
+	res := h.do(t, "GET", "/api/v1/shares/alex/space?path=Photos", nil, nil, c)
+	sp := decode[v1.Space](t, res)
+	if res.StatusCode != 200 || sp.Total <= 0 || sp.Free <= 0 || sp.Free > sp.Total {
+		t.Fatalf("status %d, space %+v", res.StatusCode, sp)
+	}
+	if res := h.do(t, "GET", "/api/v1/shares/sam/space", nil, nil, c); res.StatusCode != 403 || problemCode(t, res) != "access_denied" {
+		t.Fatalf("sam's share: %d", res.StatusCode)
+	}
+	if res := h.do(t, "GET", "/api/v1/shares/alex/space?path=..%2Fsam", nil, nil, c); res.StatusCode != 400 {
+		t.Fatalf("an invalid path: %d", res.StatusCode)
+	}
+}

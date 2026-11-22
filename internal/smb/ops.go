@@ -70,6 +70,42 @@ func (s *Session) Mkdir(ctx context.Context, share, p string) (Entry, error) {
 	return s.stat(m, sp)
 }
 
+// Space is the size and free space of the volume a folder is on, as the
+// server reports them to this session (FileFsFullSizeInformation): Free is
+// what the server says the caller may still use, a quota included when the
+// server applies one. ferry works nothing out itself.
+type Space struct {
+	Total uint64
+	Free  uint64
+}
+
+// Space asks the server for the size and free space of the volume p is on.
+func (s *Session) Space(ctx context.Context, share, p string) (Space, error) {
+	sp, err := CleanPath(p)
+	if err != nil {
+		return Space{}, err
+	}
+	c, err := s.start(ctx, "smb.statfs")
+	if err != nil {
+		return Space{}, err
+	}
+	defer c.end()
+	m, err := s.mount(c.ctx, share)
+	if err != nil {
+		return Space{}, err
+	}
+	dir := sp
+	if dir == "" {
+		dir = "."
+	}
+	fi, err := m.Statfs(dir)
+	if err != nil {
+		return Space{}, s.fail(err)
+	}
+	unit := fi.BlockSize()
+	return Space{Total: fi.TotalBlockCount() * unit, Free: fi.AvailableBlockCount() * unit}, nil
+}
+
 // Remove deletes a file, or a folder: an empty one, or with recursive
 // everything in it, depth first. A recursive delete visits at most max
 // entries (KindLimit beyond, before anything is deleted) and stops at the

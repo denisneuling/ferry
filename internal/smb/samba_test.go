@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -335,4 +336,45 @@ func BenchmarkStream(b *testing.B) {
 		}
 		b.SetBytes(n)
 	}
+}
+
+// TestSpace asks for a share's size and free space: what Samba reports is
+// there and plausible, and — where the test runs on the same machine as the
+// Samba, as in CI — it matches the file system's own figures.
+func TestSpace(t *testing.T) {
+	s, err := login(t, "alex", alexPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	ctx := context.Background()
+	sp, err := s.Space(ctx, "alex", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sp.Total == 0 || sp.Free == 0 || sp.Free > sp.Total {
+		t.Fatalf("space %+v", sp)
+	}
+	if sub, err := s.Space(ctx, "alex", "Photos"); err != nil || sub.Total != sp.Total {
+		t.Fatalf("a folder's volume: %+v, %v", sub, err)
+	}
+	if _, err := s.Space(ctx, "sam", ""); KindOf(err) != KindAccessDenied {
+		t.Fatalf("someone else's share: %v", err)
+	}
+	var fs syscall.Statfs_t
+	if syscall.Statfs("/srv/alex", &fs) == nil {
+		total := fs.Blocks * uint64(fs.Bsize)
+		free := fs.Bavail * uint64(fs.Bsize)
+		if diff(sp.Total, total) > total/100 || diff(sp.Free, free) > total/100 {
+			t.Errorf("Samba says %+v, the file system total %d free %d", sp, total, free)
+		}
+	}
+	t.Logf("alex: %d of %d bytes free", sp.Free, sp.Total)
+}
+
+func diff(a, b uint64) uint64 {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }
