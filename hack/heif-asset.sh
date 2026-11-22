@@ -4,6 +4,11 @@
 #   hack/heif-asset.sh DIR     writes DIR/ferry-heif.wasm and DIR/ferry-heif-LICENSES.md
 #   hack/heif-asset.sh notes   prints the release notes' section about it
 set -eu
+# DIR is resolved before the cd below: it is relative to where this was run.
+case "$1" in
+notes) ;;
+*) out=$(cd "$1" && pwd) ;;
+esac
 cd "$(dirname "$0")/../third_party/heif"
 sha=$(gunzip -c heif.wasm.gz | sha256sum | cut -c1-64)
 if [ "$1" = notes ]; then
@@ -15,7 +20,7 @@ if [ "$1" = notes ]; then
 NOTES
 	exit 0
 fi
-gunzip -c heif.wasm.gz > "$1/ferry-heif.wasm"
+gunzip -c heif.wasm.gz > "$out/ferry-heif.wasm"
 {
 	cat README.md
 	for f in LICENSE.libheif LICENSE.libde265 LICENSE.gen2brain COPYING.LESSER COPYING; do
@@ -23,4 +28,4 @@ gunzip -c heif.wasm.gz > "$1/ferry-heif.wasm"
 		cat "$f"
 		printf '```\n'
 	done
-} > "$1/ferry-heif-LICENSES.md"
+} > "$out/ferry-heif-LICENSES.md"
