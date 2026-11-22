@@ -57,6 +57,8 @@ Esc to close.
 
 ## Details
 
+![The lightbox with a photo and its details: name, size and folder, and from the file its dimensions, time taken, camera, lens, exposure and GPS position.](images/lightbox-en.webp)
+
 `i` or the ⓘ button in the preview shows a file's details: its name, type,
 size, modification time and folder, and below them what the file says
 about itself, read by ferry from its own bytes:

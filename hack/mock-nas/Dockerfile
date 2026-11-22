@@ -39,6 +39,13 @@ RUN chown -R alex:family /srv/alex && chmod -R u+rwX,go-rwx /srv/alex \
  && find /srv/family /srv/scans -type d -exec chmod 2775 {} + \
  && find /srv/family /srv/scans -type f -exec chmod 0664 {} + \
  && chown -R root:root /srv/public && chmod -R a+rX,go-w /srv/public
+# COPY keeps the files' times but gives folders the time of the build; each
+# folder gets the time of the newest thing in it again, depth first, so that
+# a folder's date belongs to the sample as the generator meant it.
+RUN find /srv -mindepth 1 -depth -type d | while IFS= read -r d; do \
+      newest=$(find "$d" -mindepth 1 -maxdepth 1 -printf '%T@ %p\n' | sort -n | tail -n 1 | cut -d' ' -f2-); \
+      [ -n "$newest" ] && touch -r "$newest" "$d"; \
+    done; true
 COPY hack/mock-nas/smb.conf /etc/samba/smb.conf
 COPY hack/mock-nas/entrypoint.sh /entrypoint.sh
 EXPOSE 445

@@ -35,7 +35,7 @@ RUN_LISTEN ?= :8095
 RUN_OPS_LISTEN ?= :8096
 
 .PHONY: build test test-samba lint clean build-all changelog release install-tools ci \
-	ui-install ui-build ui-lint ui-test ui-i18n ui-start helm-lint helm-docs helm-package \
+	ui-install ui-build ui-lint ui-test ui-i18n ui-start screenshots helm-lint helm-docs helm-package \
 	run run-nas generate-api lint-api dev-samba dev-samba-stop dev-nas dev-nas-stop dev-nas-check secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -166,6 +166,12 @@ ui-i18n:
 # of `make run` or `make run-nas`.
 ui-start:
 	cd ui && npm start -- --port 4200
+
+# The screenshots in docs/images, from the mock NAS (`make dev-nas` first):
+# hack/screenshots/shoot.py starts ferry and drives Chromium, with the data,
+# the clock and the viewport fixed. Needs Python with playwright and pillow.
+screenshots: ui-build
+	python3 hack/screenshots/shoot.py
 
 # ── Generated code ─────────────────────────────────────────────────────────
 

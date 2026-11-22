@@ -32,3 +32,6 @@ internal/ui/dist/*
 # there, not in ui/.
 /node_modules/
 /package-lock.json
+
+# Python byte code from hack/ scripts
+__pycache__/

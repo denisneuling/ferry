@@ -29,6 +29,11 @@
   <a href="SECURITY.md">Security</a>
 </p>
 
+<p align="center">
+  <img src="docs/images/folder-en.webp" width="860"
+       alt="ferry in the browser: a folder of holiday photos as thumbnail tiles, the shares in the sidebar, and the free space of the share under the folder's title.">
+</p>
+
 ---
 
 > **Status:** young; 0.1.0 is the first public release. The 0.x releases
@@ -94,6 +99,22 @@ Not in scope: user, group, password or share administration (Samba's job);
 sharing links, guest access and public URLs; sync clients, WebDAV and apps;
 indexed search; editing documents in the browser; backends other than
 SMB2/3; TLS termination (the gateway in front does it).
+
+## Screenshots
+
+| | |
+|---|---|
+| ![The lightbox with a photo and its details: dimensions, time taken, camera, lens, exposure and GPS position, read from the file.](docs/images/lightbox-en.webp) | ![The sign-in page: one card in front of a harbour, asking for the NAS account's username and password.](docs/images/login-en.webp) |
+| The details of a file, read from the file itself | Sign in with the NAS account |
+| ![The same folder in the dark theme.](docs/images/folder-dark-en.webp) | ![The shares as cards, each with its free space.](docs/images/shares-en.webp) |
+| Dark | The shares, with their free space |
+
+On a phone: <a href="docs/images/phone-folder-en.webp">a folder</a> and
+<a href="docs/images/phone-lightbox-en.webp">a photo</a>; in German:
+<a href="docs/images/folder-de.webp">a folder</a> and
+<a href="docs/images/lightbox-de.webp">the details</a>. All of it is the mock
+NAS's fictional data; `make dev-nas screenshots` makes the pictures again
+(hack/screenshots).
 
 ## Installation
 

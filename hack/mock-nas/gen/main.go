@@ -34,7 +34,38 @@ func main() {
 	g.family()
 	g.public()
 	g.scans()
+	settle(*out)
 	log.Printf("wrote %d files, %.1f MB, under %s", g.files, float64(g.bytes)/1e6, *out)
+}
+
+// settle gives every folder the time of the newest thing in it, so that a
+// folder's date is the sample's and not when the generator happened to run:
+// the screenshots (hack/screenshots) depend on it.
+func settle(dir string) time.Time {
+	var newest time.Time
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, e := range entries {
+		p := filepath.Join(dir, e.Name())
+		t := epoch.Add(-700 * 24 * time.Hour)
+		if e.IsDir() {
+			t = settle(p)
+		} else if fi, err := e.Info(); err == nil {
+			t = fi.ModTime()
+		}
+		if t.After(newest) {
+			newest = t
+		}
+	}
+	if newest.IsZero() {
+		newest = epoch.Add(-30 * 24 * time.Hour) // an empty folder
+	}
+	if err := os.Chtimes(dir, newest, newest); err != nil {
+		log.Fatal(err)
+	}
+	return newest
 }
 
 type gen struct {
