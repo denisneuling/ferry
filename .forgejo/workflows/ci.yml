@@ -173,3 +173,18 @@ jobs:
             semantic-release@25 conventional-changelog-conventionalcommits@9
           cp "$GITHUB_WORKSPACE/hack/release/check-notes.mjs" .
           node check-notes.mjs "$GITHUB_WORKSPACE"
+      # The release assets the workflows add beside the binaries, made the way
+      # both make them: from the repository's root, into dist/ (GitHub; it is
+      # not there beforehand for this script) and into . (Forgejo), each
+      # checked with sha256sum. A release is the wrong time to find out.
+      - name: The HEIF release assets build as the release workflows build them
+        run: |
+          set -eu
+          rm -rf dist && mkdir dist
+          hack/heif-asset.sh dist
+          (cd dist && sha256sum ferry-heif.wasm ferry-heif-LICENSES.md > SHA256SUMS && sha256sum -c SHA256SUMS)
+          hack/heif-asset.sh .
+          sha256sum ferry-heif.wasm ferry-heif-LICENSES.md > SHA256SUMS.check && sha256sum -c SHA256SUMS.check
+          cmp ferry-heif.wasm dist/ferry-heif.wasm
+          hack/heif-asset.sh notes | grep -q "$(gunzip -c third_party/heif/heif.wasm.gz | sha256sum | cut -c1-64)"
+          rm -rf dist ferry-heif.wasm ferry-heif-LICENSES.md SHA256SUMS.check
