@@ -379,7 +379,38 @@ func TestThumbnail(t *testing.T) {
 		}
 	}
 
+	// A recording's thumbnail is its cover: an MP3 whose ID3 tag carries the
+	// photo, before 4 MiB of what stands for sound — more than the byte
+	// bound below allows for the file, not for the cover.
+	sound := bytes.Repeat([]byte{0xFF, 0xFB, 0x90, 0x00}, 1<<20)
+	h.do(t, "PUT", "/api/v1/shares/alex/content?path="+q(dir+"/song.mp3"), bytes.NewReader(append(id3WithCover(photo.Bytes()), sound...)), ferryReq, c)
+	h.do(t, "PUT", "/api/v1/shares/alex/content?path="+q(dir+"/bare.mp3"), bytes.NewReader(append(id3WithCover(nil), sound...)), ferryReq, c)
+	h.do(t, "PUT", "/api/v1/shares/alex/content?path="+q(dir+"/unsync.mp3"), bytes.NewReader(append(id3UnsyncCover(photo.Bytes()), sound...)), ferryReq, c)
+	h.api.cfg.ThumbnailMaxBytes = int64(photo.Len() + 1)
+	for _, f := range []string{"song.mp3", "unsync.mp3", "unsync.mp3"} {
+		res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=160&path="+q(dir+"/"+f), nil, nil, c)
+		if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/jpeg" {
+			t.Fatalf("%s's cover: %d", f, res.StatusCode)
+		}
+		if th, err := jpeg.Decode(res.Body); err != nil || th.Bounds().Dx() != 160 {
+			t.Fatalf("%s's thumbnail: %v", f, err)
+		}
+	}
+	// The cover slot is given back: every slot is free again.
+	if n := len(h.api.coverSlots); n != 0 {
+		t.Fatalf("%d cover slots still held", n)
+	}
+	if res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?path="+q(dir+"/bare.mp3"), nil, nil, c); res.StatusCode != 415 || problemCode(t, res) != "not_an_image" {
+		t.Fatalf("a recording without a cover: %d", res.StatusCode)
+	}
+
 	h.api.cfg.ThumbnailMaxBytes = int64(photo.Len() - 1)
+	for _, f := range []string{"photo.jpg", "song.mp3"} {
+		res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?path="+q(dir+"/"+f), nil, nil, c)
+		if res.StatusCode != 413 || problemCode(t, res) != "too_large" {
+			t.Fatalf("%s over the byte bound: %d", f, res.StatusCode)
+		}
+	}
 	res = h.do(t, "GET", "/api/v1/shares/alex/thumbnail?path="+q(dir+"/photo.jpg"), nil, nil, c)
 	if res.StatusCode != 413 || problemCode(t, res) != "too_large" {
 		t.Fatalf("over the byte bound: %d", res.StatusCode)
@@ -393,6 +424,39 @@ func TestThumbnail(t *testing.T) {
 	if res.StatusCode != 413 || problemCode(t, res) != "too_large" {
 		t.Fatalf("over the memory budget: %d", res.StatusCode)
 	}
+}
+
+// id3WithCover is an ID3v2.3 tag with a title and, given one, a picture as
+// the front cover.
+func id3WithCover(pic []byte) []byte {
+	frame := func(id string, body []byte) []byte {
+		return append(append([]byte(id), byte(len(body)>>24), byte(len(body)>>16), byte(len(body)>>8), byte(len(body)), 0, 0), body...)
+	}
+	body := frame("TIT2", []byte("\x00A song"))
+	if pic != nil {
+		body = append(body, frame("APIC", append([]byte("\x00image/jpeg\x00\x03Front\x00"), pic...))...)
+	}
+	n := len(body)
+	return append([]byte{'I', 'D', '3', 3, 0, 0, byte(n >> 21 & 0x7F), byte(n >> 14 & 0x7F), byte(n >> 7 & 0x7F), byte(n & 0x7F)}, body...)
+}
+
+// id3UnsyncCover is an ID3v2.4 tag whose picture frame is written with
+// unsynchronisation: ferry undoes it in memory, through the cover gate.
+func id3UnsyncCover(pic []byte) []byte {
+	data := append([]byte("\x00image/jpeg\x00\x03\x00"), pic...)
+	var u []byte
+	for i, c := range data {
+		u = append(u, c)
+		if c == 0xFF && (i+1 == len(data) || data[i+1]&0xE0 == 0xE0 || data[i+1] == 0) {
+			u = append(u, 0)
+		}
+	}
+	ss := func(n int) []byte {
+		return []byte{byte(n >> 21 & 0x7F), byte(n >> 14 & 0x7F), byte(n >> 7 & 0x7F), byte(n & 0x7F)}
+	}
+	frame := append(append([]byte("APIC"), ss(len(u))...), 0, 0x02)
+	frame = append(frame, u...)
+	return append(append([]byte{'I', 'D', '3', 4, 0, 0}, ss(len(frame))...), frame...)
 }
 
 // A login that fails, sent with the cookie of a running session, leaves that

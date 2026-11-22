@@ -28,6 +28,7 @@ Measured on Linux with Samba 4.21, ferry built with Go 1.27
 | a running download | ~1.5 + 1 × GOMAXPROCS MB: 3.5 MB at 2 CPUs, 6.5 MB at 4 |
 | a running upload | ~2.5 MB |
 | thumbnails in the making, all together | at most `FERRY_THUMBNAIL_MEMORY` (default 320 MiB) |
+| recordings' covers decoded before the budget counts them | at most ~24 MiB × `FERRY_THUMBNAIL_CONCURRENCY`, rarely more than a few hundred KB |
 
 Downloads spread over a session's background connections take a little
 more than on one, since each connection keeps its own buffers: three at
@@ -61,6 +62,17 @@ limit of 50 megapixels, one thumbnail took at its peak:
 
 A 12-megapixel phone photo takes ~30 MB and about a quarter of a second of
 one core.
+
+A recording's thumbnail is made from the cover it carries. ferry finds the
+cover by the tags' headers — at most 4 MiB of them, wherever they are in the
+file — and reads the picture alone, not the recording; from there it is an
+image like any other, bounded by `FERRY_THUMBNAIL_MAX_BYTES` and the budget
+below. A cover stored as base64 in an Ogg comment or in an ID3 tag written
+with unsynchronisation has to be decoded in memory first; such covers above
+8 MiB get no thumbnail. Decoding one takes up to about three times its size
+before the budget can count it — what is read, the comment, the picture —
+so only `FERRY_THUMBNAIL_CONCURRENCY` such covers are decoded at once, each
+holding its place until its thumbnail has its share of the budget.
 
 Before it reads an image, ferry estimates what the thumbnail will cost from
 the image's header and the file's size (`thumb.Estimate`: the file, the

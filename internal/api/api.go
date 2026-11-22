@@ -46,6 +46,12 @@ type API struct {
 	// thumbMemory holds them within FERRY_THUMBNAIL_MEMORY together, and
 	// thumbUsed is what it holds now, for the metrics.
 	thumbs chan struct{}
+	// coverSlots admits as many covers into memory before the memory budget
+	// counts them (meta.FindCover's gate): an Ogg comment's base64, an ID3
+	// tag's unsynchronisation. A request holds its slot until its thumbnail
+	// has taken its share of the budget, so the uncounted memory is bounded
+	// by the slots, about 24 MiB each (operations.md).
+	coverSlots chan struct{}
 	// metaSlots admits metaConcurrency metadata readings at once.
 	metaSlots   chan struct{}
 	thumbMemory *semaphore.Weighted
@@ -67,6 +73,7 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		log:         log,
 		version:     version,
 		thumbs:      make(chan struct{}, max(1, cfg.ThumbnailConcurrency)),
+		coverSlots:  make(chan struct{}, max(1, cfg.ThumbnailConcurrency)),
 		metaSlots:   make(chan struct{}, metaConcurrency),
 		thumbMemory: semaphore.NewWeighted(max(1, cfg.ThumbnailMemory)),
 	}

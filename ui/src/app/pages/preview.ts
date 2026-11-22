@@ -82,7 +82,12 @@ import { FileDetails } from '../ui/file-details';
             <video [src]="url()" controls preload="metadata" playsinline></video>
           }
           @case ('audio') {
-            <audio [src]="url()" controls preload="metadata"></audio>
+            <div class="lb-audio">
+              @if (cover(); as c) {
+                <img class="lb-cover" [src]="c" alt="" (error)="thumbFailed(e)" />
+              }
+              <audio [src]="url()" controls preload="metadata"></audio>
+            </div>
           }
           @case ('pdf') {
             <iframe [src]="frameUrl()" [title]="e.name"></iframe>
@@ -136,7 +141,7 @@ import { FileDetails } from '../ui/file-details';
         @for (f of files(); track f.name; let j = $index) {
           <button type="button" [class.on]="j === index()" (click)="browser.preview.set(j)" [title]="f.name">
             @if (thumb(f); as src) {
-              <img loading="lazy" [src]="src" alt="" />
+              <img loading="lazy" [src]="src" alt="" (error)="thumbFailed(f)" />
             } @else {
               <span class="k"><f-icon [name]="icon(f)" /></span>
             }
@@ -197,6 +202,16 @@ export class Preview {
   );
   /** The URL of the image last shown, loaded or failed. */
   protected readonly shown = signal('');
+  /** Files the server made no thumbnail of — recordings without a cover among them. */
+  private readonly broken = signal<ReadonlySet<string>>(new Set());
+  /** A recording's cover, large, above the player; none when it carries none. */
+  protected readonly cover = computed(() => {
+    const e = this.entry();
+    const share = this.browser.share();
+    if (!e || !share || this.kind() !== 'audio' || !hasThumbnail(e.name) || this.broken().has(e.path))
+      return null;
+    return this.api.thumbnailUrl(share, e.path, 640, e.version);
+  });
   protected readonly text = signal<string | null>(null);
   protected readonly truncated = signal(false);
   private opener: HTMLElement | null = null;
@@ -255,7 +270,13 @@ export class Preview {
 
   protected thumb(e: Entry): string | null {
     const share = this.browser.share();
-    return share && hasThumbnail(e.name) ? this.api.thumbnailUrl(share, e.path, 160, e.version) : null;
+    return share && hasThumbnail(e.name) && !this.broken().has(e.path)
+      ? this.api.thumbnailUrl(share, e.path, 160, e.version)
+      : null;
+  }
+
+  protected thumbFailed(e: Entry): void {
+    this.broken.update((s) => new Set(s).add(e.path));
   }
 
   protected step(d: number): void {

@@ -36,7 +36,8 @@ and sign out.
 - **Shares** come as the server lists them. One the person may not open
   says so when opened; docs/samba.md has the setting that hides such shares.
 - **Folders** show as tiles — folders first, then files with thumbnails for
-  JPEG, PNG, GIF, WebP and BMP — or as a sortable list. The browser keeps a
+  JPEG, PNG, GIF, WebP and BMP, and the cover a recording carries (MP3,
+  FLAC, M4A, Ogg, Opus) — or as a sortable list. The browser keeps a
   thumbnail, and a file's details, until the file changes: their URLs carry
   the version the listing gave (size and time of the last write), so coming
   back to a folder asks the server for its listing and nothing else.
@@ -116,8 +117,9 @@ once the file is complete.
 Images, video, audio and PDF are shown by the browser itself, straight from
 the server, sandboxed: nothing in a file runs in ferry's page. Text files —
 HTML and SVG among them — are shown as text, the first 512 KB. Anything else
-offers a download. HEIC photos and videos get an icon rather than a
-thumbnail.
+offers a download. A recording shows its cover above the player when it
+carries one. HEIC photos and videos get an icon rather than a thumbnail, as
+do recordings without a cover.
 
 While an image is shown, the next and the previous one load ahead, so that
 stepping to them shows them at once; videos and PDFs do not, and nothing

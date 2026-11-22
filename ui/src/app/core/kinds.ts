@@ -40,8 +40,24 @@ export function kindOf(name: string, folder: boolean): Kind {
   return folder ? 'dir' : (byExtension[extension(name)] ?? 'file');
 }
 
-/** Formats the server makes thumbnails of; HEIC, SVG and video get an icon. */
-const thumbnailed = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']);
+/**
+ * Formats the server makes thumbnails of: images, and recordings by the
+ * cover they carry — one without gets an icon, as do HEIC, SVG and video.
+ */
+const thumbnailed = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'bmp',
+  'mp3',
+  'm4a',
+  'flac',
+  'ogg',
+  'oga',
+  'opus',
+]);
 
 export function hasThumbnail(name: string): boolean {
   return thumbnailed.has(extension(name));

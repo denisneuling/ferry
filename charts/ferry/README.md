@@ -89,7 +89,7 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 | smb.serverName | string | `""` | What the login page calls the server; the host of `smb.server` when empty (FERRY_SERVER_NAME). |
 | smb.shares | list | `[]` | The shares this ferry offers, compared without case; empty offers all the server lists (FERRY_SHARES). |
 | thumbnails.concurrency | int | `2` | Thumbnails decoded at once (FERRY_THUMBNAIL_CONCURRENCY). |
-| thumbnails.maxBytes | string | `"64Mi"` | The largest image read for a thumbnail (FERRY_THUMBNAIL_MAX_BYTES). |
+| thumbnails.maxBytes | string | `"64Mi"` | The largest image, or recording's cover, read for a thumbnail (FERRY_THUMBNAIL_MAX_BYTES). |
 | thumbnails.maxPixels | int | `50000000` | The most pixels an image may have to be decoded (FERRY_THUMBNAIL_MAX_PIXELS). |
 | thumbnails.memory | string | `"320Mi"` | The memory all thumbnails in the making may take, by estimate (FERRY_THUMBNAIL_MEMORY). The largest use of memory in ferry: keep it below `resources.limits.memory`, with room for the rest (docs/operations.md). |
 | tolerations | list | `[]` |  |

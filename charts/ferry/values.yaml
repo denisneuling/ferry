@@ -53,7 +53,7 @@ limits:
   stallTimeout: 60s
 
 thumbnails:
-  # -- The largest image read for a thumbnail (FERRY_THUMBNAIL_MAX_BYTES).
+  # -- The largest image, or recording's cover, read for a thumbnail (FERRY_THUMBNAIL_MAX_BYTES).
   maxBytes: 64Mi
   # -- The most pixels an image may have to be decoded (FERRY_THUMBNAIL_MAX_PIXELS).
   maxPixels: 50000000

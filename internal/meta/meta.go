@@ -95,6 +95,20 @@ type budget struct {
 	r    io.ReaderAt
 	size int64
 	left int64
+
+	// FindCover's gate, passed before a picture is copied into memory.
+	gate    func() error
+	gated   bool
+	gateErr error
+}
+
+// toMemory passes the gate, once; false when it refused.
+func (b *budget) toMemory() bool {
+	if b.gate != nil && !b.gated {
+		b.gated = true
+		b.gateErr = b.gate()
+	}
+	return b.gateErr == nil
 }
 
 func (b *budget) ReadAt(p []byte, off int64) (int, error) {

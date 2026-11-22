@@ -16,6 +16,11 @@ describe('kinds', () => {
     expect(hasThumbnail('a.heic')).toBe(false);
     expect(hasThumbnail('a.svg')).toBe(false);
     expect(hasThumbnail('a.mp4')).toBe(false);
+    // Recordings by their cover; the server answers 415 for one without.
+    expect(hasThumbnail('a.mp3')).toBe(true);
+    expect(hasThumbnail('a.FLAC')).toBe(true);
+    expect(hasThumbnail('a.opus')).toBe(true);
+    expect(hasThumbnail('a.wav')).toBe(false);
   });
 
   it('previews HTML and SVG as text, never rendered', () => {

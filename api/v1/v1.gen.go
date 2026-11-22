@@ -1080,11 +1080,14 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/shares/{share}/space (the `GetSpace` operationId).
 	GetSpace(ctx context.Context, share ShareName, params *GetSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetThumbnail A thumbnail of an image, made on the fly.
+	// GetThumbnail A thumbnail of an image or a recording's cover, made on the fly.
 	//
 	// A JPEG of the image that fits in a `size`×`size` square, upright as
 	// its EXIF orientation says, never larger than the original. JPEG,
-	// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+	// PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
+	// tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
+	// the front cover when it says which. Anything else, a recording
+	// without a cover included, is `415`. Made anew
 	// for every request and never stored; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
 	// file is unchanged; with `v`, see `FileVersion`. Images beyond the
@@ -1479,11 +1482,14 @@ func (c *Client) GetSpace(ctx context.Context, share ShareName, params *GetSpace
 	return c.Client.Do(req)
 }
 
-// GetThumbnail A thumbnail of an image, made on the fly.
+// GetThumbnail A thumbnail of an image or a recording's cover, made on the fly.
 //
 // A JPEG of the image that fits in a `size`×`size` square, upright as
 // its EXIF orientation says, never larger than the original. JPEG,
-// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+// PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
+// tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
+// the front cover when it says which. Anything else, a recording
+// without a cover included, is `415`. Made anew
 // for every request and never stored; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
 // file is unchanged; with `v`, see `FileVersion`. Images beyond the
@@ -2709,11 +2715,14 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/shares/{share}/space (the `GetSpace` operationId).
 	GetSpaceWithResponse(ctx context.Context, share ShareName, params *GetSpaceParams, reqEditors ...RequestEditorFn) (*GetSpaceResponse, error)
 
-	// GetThumbnailWithResponse A thumbnail of an image, made on the fly.
+	// GetThumbnailWithResponse A thumbnail of an image or a recording's cover, made on the fly.
 	//
 	// A JPEG of the image that fits in a `size`×`size` square, upright as
 	// its EXIF orientation says, never larger than the original. JPEG,
-	// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+	// PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
+	// tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
+	// the front cover when it says which. Anything else, a recording
+	// without a cover included, is `415`. Made anew
 	// for every request and never stored; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
 	// file is unchanged; with `v`, see `FileVersion`. Images beyond the
@@ -4241,11 +4250,14 @@ func (c *ClientWithResponses) GetSpaceWithResponse(ctx context.Context, share Sh
 	return ParseGetSpaceResponse(rsp)
 }
 
-// GetThumbnailWithResponse A thumbnail of an image, made on the fly.
+// GetThumbnailWithResponse A thumbnail of an image or a recording's cover, made on the fly.
 //
 // A JPEG of the image that fits in a `size`×`size` square, upright as
 // its EXIF orientation says, never larger than the original. JPEG,
-// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
+// PNG, GIF, WebP and BMP are read; of a recording — MP3 with an ID3v2
+// tag, FLAC, MP4 and M4A, Ogg Vorbis and Opus — the cover it carries,
+// the front cover when it says which. Anything else, a recording
+// without a cover included, is `415`. Made anew
 // for every request and never stored; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
 // file is unchanged; with `v`, see `FileVersion`. Images beyond the
@@ -5289,7 +5301,7 @@ type ServerInterface interface {
 	// GetSpace The size and free space of the volume a folder is on.
 	// (GET /api/v1/shares/{share}/space)
 	GetSpace(w http.ResponseWriter, r *http.Request, share ShareName, params GetSpaceParams)
-	// GetThumbnail A thumbnail of an image, made on the fly.
+	// GetThumbnail A thumbnail of an image or a recording's cover, made on the fly.
 	// (GET /api/v1/shares/{share}/thumbnail)
 	GetThumbnail(w http.ResponseWriter, r *http.Request, share ShareName, params GetThumbnailParams)
 }

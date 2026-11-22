@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	v1 "github.com/metapatrol/ferry/api/v1"
+	"github.com/metapatrol/ferry/internal/meta"
 	"github.com/metapatrol/ferry/internal/smb"
 	"github.com/metapatrol/ferry/internal/thumb"
 )
@@ -54,7 +55,52 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	if f.Size > a.cfg.ThumbnailMaxBytes {
+
+	// The picture is the file itself, or the cover a recording carries: then
+	// only the cover is read, found by the tags' headers.
+	src, srcSize := io.Reader(f), f.Size
+	held := false // a cover slot, see API.coverSlots
+	release := func() {
+		if held {
+			held = false
+			<-a.coverSlots
+		}
+	}
+	defer release()
+	peek := make([]byte, min(f.Size, 64))
+	if _, err := f.ReadAt(peek, 0); err != nil && !errors.Is(err, io.EOF) {
+		a.fail(w, r, err)
+		return
+	}
+	if meta.IsAudio(peek) {
+		at := &firstError{r: f}
+		gate := func() error {
+			select {
+			case a.coverSlots <- struct{}{}:
+				held = true
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		c, err := meta.FindCover(at, f.Size, a.cfg.ThumbnailMaxBytes, gate)
+		switch {
+		case at.err != nil:
+			a.fail(w, r, at.err)
+			return
+		case ctx.Err() != nil:
+			probUnreachable.write(w)
+			return
+		case errors.Is(err, meta.ErrCoverTooLarge):
+			a.thumbProblem(w, thumb.ErrTooLarge)
+			return
+		case err != nil:
+			a.thumbProblem(w, thumb.ErrUnsupported)
+			return
+		}
+		src, srcSize = chunked{c.Reader()}, c.Size
+	}
+	if srcSize > a.cfg.ThumbnailMaxBytes {
 		a.metrics.Thumbnail("too_large")
 		probTooLarge.write(w)
 		return
@@ -63,12 +109,12 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	// What the thumbnail will cost is known from the header and the file's
 	// size, before the file is read: the memory budget covers the source
 	// buffer too, so many requests at once cannot hold many large buffers.
-	head := make([]byte, min(f.Size, thumb.HeaderBytes))
-	if _, err := io.ReadFull(f, head); err != nil {
+	head := make([]byte, min(srcSize, thumb.HeaderBytes))
+	if _, err := io.ReadFull(src, head); err != nil {
 		a.fail(w, r, err)
 		return
 	}
-	cost, err := thumb.Estimate(head, f.Size, a.cfg.ThumbnailMaxPixels)
+	cost, err := thumb.Estimate(head, srcSize, a.cfg.ThumbnailMaxPixels)
 	if err == nil && cost > a.cfg.ThumbnailMemory {
 		err = thumb.ErrTooLarge
 	}
@@ -80,17 +126,18 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		probUnreachable.write(w)
 		return
 	}
+	release() // the cover, if one was held in memory, is counted now
 	a.thumbUsed.Add(cost)
 	defer func() {
 		a.thumbUsed.Add(-cost)
 		a.thumbMemory.Release(cost)
 	}()
 
-	// The rest of the image: into a buffer of the file's size, filled by the
-	// file's own 1 MiB reads (io.Copy takes File.WriteTo).
-	buf := bytes.NewBuffer(make([]byte, 0, f.Size))
+	// The rest of the image: into a buffer of its size, filled by the file's
+	// own 1 MiB reads (io.Copy takes File.WriteTo).
+	buf := bytes.NewBuffer(make([]byte, 0, srcSize))
 	buf.Write(head)
-	if _, err := io.Copy(buf, io.LimitReader(f, f.Size-int64(len(head)))); err != nil {
+	if _, err := io.Copy(buf, io.LimitReader(src, srcSize-int64(len(head)))); err != nil {
 		a.fail(w, r, err)
 		return
 	}
@@ -129,4 +176,32 @@ func (a *API) thumbProblem(w http.ResponseWriter, err error) {
 		a.log.Warn("thumbnail failed", errAttrs(err)...)
 		probInternal.write(w)
 	}
+}
+
+// firstError keeps the first error the file gave a parser that, on a
+// malformed file, carries on without one: a connection that failed while
+// looking for a cover is a failure, not a recording without one.
+type firstError struct {
+	r   io.ReaderAt
+	err error
+}
+
+func (e *firstError) ReadAt(p []byte, off int64) (int, error) {
+	n, err := e.r.ReadAt(p, off)
+	if err != nil && !errors.Is(err, io.EOF) && e.err == nil {
+		e.err = err
+	}
+	return n, err
+}
+
+// chunked reads at most smb.StreamChunk at a time: a cover is a part of the
+// file, read with ReadAt, and without it one request would read the whole
+// picture in a single call (docs/spike.md, the 1 MiB reads).
+type chunked struct{ r io.Reader }
+
+func (c chunked) Read(p []byte) (int, error) {
+	if len(p) > smb.StreamChunk {
+		p = p[:smb.StreamChunk]
+	}
+	return c.r.Read(p)
 }
