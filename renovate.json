@@ -65,6 +65,19 @@
         "angular-eslint"
       ],
       "groupName": "angular"
+    },
+    {
+      "description": "The interface's TypeScript follows what Angular supports (@angular/compiler-cli's peer range: 6.0 for Angular 22); a major update comes with the Angular update that allows it",
+      "matchFileNames": [
+        "ui/package.json"
+      ],
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
     }
   ]
 }
