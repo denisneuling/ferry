@@ -64,7 +64,7 @@ thumbnails:
   concurrency: 2
 
 cache:
-  # -- Keep thumbnails and details on a volume, encrypted, across restarts and for everyone who may read the file (FERRY_CACHE_DIR). Off, ferry writes nothing anywhere. Needs a PersistentVolumeClaim; the Deployment then replaces its pod rather than rolling, as the volume is ReadWriteOnce.
+  # -- Keep thumbnails and details on a volume, encrypted, across restarts and for everyone who may read the file (FERRY_CACHE_DIR). Off, ferry writes nothing anywhere. Needs a PersistentVolumeClaim; the Deployment then stops the old pod before it starts the new one (maxSurge 0), as the volume is ReadWriteOnce.
   enabled: false
   # -- The most the entries may take (FERRY_CACHE_MAX_BYTES), the least recently used removed beyond it. Keep it below `cache.persistence.size`.
   maxBytes: 1Gi

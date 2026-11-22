@@ -15,13 +15,17 @@ spec:
   replicas: 1
   {{- if .Values.cache.enabled }}
   # The cache's volume is ReadWriteOnce: the old pod lets go of it before
-  # the new one starts. Sessions die with the old pod either way. The null
-  # removes the rollingUpdate defaults the API server set on a release that
-  # ran without the cache: Helm's merge keeps them otherwise, and the API
-  # refuses them next to Recreate.
+  # the new one starts. With one replica, a rolling update that adds none
+  # and may take one away does exactly that. It stays a RollingUpdate on
+  # purpose: switching a running release to Recreate leaves the API
+  # server's rollingUpdate defaults behind under server-side apply, and the
+  # API refuses them next to Recreate. Sessions die with the old pod either
+  # way.
   strategy:
-    type: Recreate
-    rollingUpdate: null
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   {{- end }}
   selector:
     matchLabels:

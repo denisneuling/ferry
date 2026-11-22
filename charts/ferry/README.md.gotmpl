@@ -32,8 +32,9 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 - **The cache, when on.** A ReadWriteOnce claim mounted at
   `/var/cache/ferry`, a Secret with the key that names and encrypts the
   entries (made once, kept across upgrades by `lookup`; or
-  `cache.existingSecret`), and the `Recreate` strategy, so that the old pod
-  lets go of the volume before the new one starts.
+  `cache.existingSecret`), and a rolling update with `maxSurge: 0` and
+  `maxUnavailable: 1`, so that the old pod lets go of the volume before the
+  new one starts.
 - **Memory.** The defaults — a 512 MiB limit, `GOMEMLIMIT` at 450 MiB, a CPU
   limit — follow [docs/operations.md](https://github.com/metapatrol/ferry/blob/main/docs/operations.md#memory):
   they fit a household with 2 CPUs, a dozen sessions and ten transfers at

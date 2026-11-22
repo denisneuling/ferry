@@ -32,8 +32,9 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 - **The cache, when on.** A ReadWriteOnce claim mounted at
   `/var/cache/ferry`, a Secret with the key that names and encrypts the
   entries (made once, kept across upgrades by `lookup`; or
-  `cache.existingSecret`), and the `Recreate` strategy, so that the old pod
-  lets go of the volume before the new one starts.
+  `cache.existingSecret`), and a rolling update with `maxSurge: 0` and
+  `maxUnavailable: 1`, so that the old pod lets go of the volume before the
+  new one starts.
 - **Memory.** The defaults — a 512 MiB limit, `GOMEMLIMIT` at 450 MiB, a CPU
   limit — follow [docs/operations.md](https://github.com/metapatrol/ferry/blob/main/docs/operations.md#memory):
   they fit a household with 2 CPUs, a dozen sessions and ten transfers at
@@ -51,7 +52,7 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
-| cache.enabled | bool | `false` | Keep thumbnails and details on a volume, encrypted, across restarts and for everyone who may read the file (FERRY_CACHE_DIR). Off, ferry writes nothing anywhere. Needs a PersistentVolumeClaim; the Deployment then replaces its pod rather than rolling, as the volume is ReadWriteOnce. |
+| cache.enabled | bool | `false` | Keep thumbnails and details on a volume, encrypted, across restarts and for everyone who may read the file (FERRY_CACHE_DIR). Off, ferry writes nothing anywhere. Needs a PersistentVolumeClaim; the Deployment then stops the old pod before it starts the new one (maxSurge 0), as the volume is ReadWriteOnce. |
 | cache.existingSecret | string | `""` | A Secret holding the key that names and encrypts the entries, at least 32 bytes, under `key` (FERRY_CACHE_KEY). Empty: the chart makes one and keeps it across upgrades. A new key makes every entry unreadable, which costs only their making again. |
 | cache.maxBytes | string | `"1Gi"` | The most the entries may take (FERRY_CACHE_MAX_BYTES), the least recently used removed beyond it. Keep it below `cache.persistence.size`. |
 | cache.persistence.existingClaim | string | `""` | A claim to use instead of making one. |
