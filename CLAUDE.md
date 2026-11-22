@@ -24,10 +24,14 @@ is English.
   share outside it is a 404, a hidden `$` share asked for by name included).
   It can only narrow what ferry offers, never widen what Samba allows; inside
   the offered shares, Samba decides alone.
-- **Nothing is persisted.** No database, no volume, no file outside an
-  in-memory buffer or the client's stream. Sessions live in the session table
-  and die with the process. Thumbnails are made on the fly and never cached on
-  disk. A restart logs everyone out and loses nothing else.
+- **Nothing is persisted but an optional cache.** Sessions live in memory
+  and die with the process. The one exception is the derived-data cache
+  (`FERRY_CACHE_DIR`, off by default): thumbnails and metadata only, never a
+  file itself, a file name or a credential; entries are named by a keyed
+  hash and encrypted with a key derived from the file's identity; an entry
+  is served only after the requesting session has opened the file for
+  reading on the share, so Samba still decides. Deleting the cache loses
+  nothing.
 - **A wrong password never yields a session.** Not a guest session (`map to
   guest`), not an anonymous one, not a session for another user. The SMB
   session setup must report an authenticated, non-guest, non-anonymous
