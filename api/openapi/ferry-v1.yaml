@@ -429,6 +429,72 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/archive:
+    post:
+      operationId: createArchive
+      tags: [files]
+      summary: Prepare a ZIP of files and folders, for downloading.
+      description: |
+        Lists the entries — files, and folders with everything in them — as
+        the person's session sees them, and keeps the list under a ticket
+        for `GET …/archive/{ticket}`, which a browser can download without
+        headers of its own. What Samba refuses to list is the answer here,
+        before anything is downloaded. All paths must be in the same folder;
+        the archive holds them under their names in it. The ticket is valid
+        once, for a minute, and only for this session.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/FerryRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArchiveRequest" }
+      responses:
+        "201":
+          description: Listed; download it with the ticket.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArchiveTicket" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/archive/{ticket}:
+    get:
+      operationId: getArchive
+      tags: [files]
+      summary: Download a prepared ZIP.
+      description: |
+        The ZIP of what `POST …/archive` listed, written as it is read from
+        the share: stored, not compressed — photos and videos do not shrink
+        — with ZIP64 where it is large, names in UTF-8 and the files' times.
+        Nothing is kept on ferry's side. Should a file fail once the archive
+        has begun, the connection is closed: the browser reports a failed
+        download, never a complete-looking archive with a file missing.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - name: ticket
+          in: path
+          required: true
+          schema: { type: string, maxLength: 64 }
+      responses:
+        "200":
+          description: The archive.
+          headers:
+            Content-Disposition:
+              description: "`attachment`, with the archive's name."
+              schema: { type: string }
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/shares/{share}/move:
     post:
       operationId: moveEntry
@@ -527,7 +593,7 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     TooLarge:
-      description: "A bound of ferry's own was reached (`too_large`): the upload limit, the entries of a folder shown, or the entries of a recursive delete. `limit` says which number it was."
+      description: "A bound of ferry's own was reached (`too_large`): the upload limit, the entries of a folder shown, of a recursive delete or of a ZIP. `limit` says which number it was."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -594,7 +660,7 @@ components:
       description: |
         The deployment's bounds, so that the interface can tell a person
         before they run into one.
-      required: [listing, delete, upload]
+      required: [listing, delete, upload, archive]
       properties:
         listing:
           type: integer
@@ -609,6 +675,12 @@ components:
           type: integer
           format: int64
           description: The largest upload in bytes (`FERRY_MAX_UPLOAD`); 0 for none.
+        archive:
+          type: integer
+          description: |
+            Entries in one ZIP download (`FERRY_MAX_ARCHIVE`), folders and
+            everything in them counted; the interface holds a selection to
+            it.
 
     LoginRequest:
       type: object
@@ -743,6 +815,25 @@ components:
       properties:
         problem: { $ref: "#/components/schemas/Problem" }
 
+    ArchiveRequest:
+      type: object
+      required: [paths]
+      additionalProperties: false
+      properties:
+        paths:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items: { type: string, maxLength: 4096 }
+          description: The entries to archive, all in the same folder.
+    ArchiveTicket:
+      type: object
+      required: [ticket, name, entries, bytes]
+      properties:
+        ticket: { type: string, description: "For `GET …/archive/{ticket}`: once, within a minute, by this session." }
+        name: { type: string, description: "The archive's file name, e.g. `Photos.zip`." }
+        entries: { type: integer, description: "Files and folders in it." }
+        bytes: { type: integer, format: int64, description: "The files' bytes together, before the archive's own." }
     MoveRequest:
       type: object
       required: [from, to]

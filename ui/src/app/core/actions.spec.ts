@@ -1,7 +1,7 @@
 import { LOCALE_ID, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Actions } from './actions';
-import { Api, Entry } from './api';
+import { Api, ApiError, Entry } from './api';
 import { Browser } from './browser';
 import { Session } from './session';
 import { Dialogs } from '../ui/dialog';
@@ -24,7 +24,19 @@ describe('Actions on many entries', () => {
   let asked: { title: string; text?: string }[];
   let answer: boolean;
   let removed: string[];
+  let archived: string[][];
+  let saved: string[];
+  let shown: string[];
+  let refuse: unknown;
   beforeEach(() => {
+    archived = [];
+    saved = [];
+    shown = [];
+    refuse = null;
+    // The links the browser is asked to follow, instead of following them.
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      saved.push(`${this.getAttribute('href')} as ${this.download}`);
+    });
     vi.useFakeTimers();
     errors = [];
     asked = [];
@@ -35,7 +47,9 @@ describe('Actions on many entries', () => {
         { provide: LOCALE_ID, useValue: 'en' },
         {
           provide: Session,
-          useValue: { info: signal({ limits: { listing: 200000, delete: 10000, upload: 0 } }) },
+          useValue: {
+            info: signal({ limits: { listing: 200000, delete: 10000, upload: 0, archive: 10000 } }),
+          },
         },
         {
           provide: Browser,
@@ -51,6 +65,12 @@ describe('Actions on many entries', () => {
           useValue: {
             contentUrl: (_s: string, p: string) => `/c/${p}`,
             remove: async (_s: string, p: string) => void removed.push(p),
+            archive: async (_s: string, paths: string[]) => {
+              if (refuse) throw refuse;
+              archived.push(paths);
+              return { ticket: 'T1', name: 'alex.zip', entries: 61, bytes: 3_200_000 };
+            },
+            archiveUrl: (_s: string, t: string) => `/a/${t}`,
           },
         },
         {
@@ -64,14 +84,17 @@ describe('Actions on many entries', () => {
         },
         {
           provide: Toasts,
-          useValue: { error: (m: string) => errors.push(m), show: () => undefined },
+          useValue: { error: (m: string) => errors.push(m), show: (m: string) => shown.push(m) },
         },
         { provide: FolderPicker, useValue: {} },
       ],
     });
     actions = TestBed.inject(Actions);
   });
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it('refuses to delete a selection beyond FERRY_MAX_DELETE, saying both numbers', async () => {
     expect(await actions.remove(files(10001))).toBe(false);
@@ -88,14 +111,28 @@ describe('Actions on many entries', () => {
     expect(removed.length).toBe(1500);
   });
 
-  it('asks before downloading many files, and refuses too many', async () => {
-    await actions.download(files(20));
-    expect(asked).toEqual([]);
-    await actions.download(files(150));
-    expect(asked[0].title).toBe('Download 150 files?');
-    expect(asked[0].text).toContain('1 min');
-    await actions.download(files(60000));
-    expect(asked.length).toBe(1);
-    expect(errors[0]).toContain('60,000');
+  it('downloads one file as it is', async () => {
+    await actions.download([file(7)]);
+    expect(saved).toEqual(['/c/IMG_7.jpg as IMG_7.jpg']);
+    expect(archived).toEqual([]);
+  });
+
+  it('downloads several entries, or a folder, as one ZIP', async () => {
+    await actions.download(files(3));
+    const folder: Entry = { ...file(0), name: 'Fotos', path: 'Fotos', type: 'folder' };
+    await actions.download([folder]);
+    expect(archived).toEqual([['IMG_0.jpg', 'IMG_1.jpg', 'IMG_2.jpg'], ['Fotos']]);
+    expect(saved).toEqual(['/a/T1 as alex.zip', '/a/T1 as alex.zip']);
+    expect(shown[0]).toBe('Downloading alex.zip — 61 items, 3.2 MB');
+  });
+
+  it('holds a ZIP to FERRY_MAX_ARCHIVE, and says what the server refused', async () => {
+    await actions.download(files(10001));
+    expect(archived).toEqual([]);
+    expect(errors[0]).toContain('10,001');
+    refuse = new ApiError(413, 'too_large', 10000);
+    await actions.download(files(2));
+    expect(errors[1]).toContain('more than 10,000 items');
+    expect(saved).toEqual([]);
   });
 });

@@ -167,6 +167,21 @@ func (e LogoutParamsXFerryRequest) Valid() bool {
 	}
 }
 
+// Defines values for CreateArchiveParamsXFerryRequest.
+const (
+	CreateArchiveParamsXFerryRequestN1 CreateArchiveParamsXFerryRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the CreateArchiveParamsXFerryRequest enum.
+func (e CreateArchiveParamsXFerryRequest) Valid() bool {
+	switch e {
+	case CreateArchiveParamsXFerryRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetContentParamsDisposition.
 const (
 	GetContentParamsDispositionAttachment GetContentParamsDisposition = "attachment"
@@ -264,6 +279,27 @@ func (e GetThumbnailParamsSize) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// ArchiveRequest defines model for ArchiveRequest.
+type ArchiveRequest struct {
+	// Paths The entries to archive, all in the same folder.
+	Paths []string `json:"paths"`
+}
+
+// ArchiveTicket defines model for ArchiveTicket.
+type ArchiveTicket struct {
+	// Bytes The files' bytes together, before the archive's own.
+	Bytes int64 `json:"bytes"`
+
+	// Entries Files and folders in it.
+	Entries int `json:"entries"`
+
+	// Name The archive's file name, e.g. `Photos.zip`.
+	Name string `json:"name"`
+
+	// Ticket For `GET …/archive/{ticket}`: once, within a minute, by this session.
+	Ticket string `json:"ticket"`
 }
 
 // Entry defines model for Entry.
@@ -405,6 +441,11 @@ type Info struct {
 // Limits The deployment's bounds, so that the interface can tell a person
 // before they run into one.
 type Limits struct {
+	// Archive Entries in one ZIP download (`FERRY_MAX_ARCHIVE`), folders and
+	// everything in them counted; the interface holds a selection to
+	// it.
+	Archive int `json:"archive"`
+
 	// Delete Entries one delete removes (`FERRY_MAX_DELETE`): a recursive
 	// delete counts everything in the folder, and the interface holds a
 	// selection to the same number.
@@ -546,6 +587,15 @@ type LogoutParams struct {
 // LogoutParamsXFerryRequest defines parameters for Logout.
 type LogoutParamsXFerryRequest string
 
+// CreateArchiveParams defines parameters for CreateArchive.
+type CreateArchiveParams struct {
+	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
+	XFerryRequest CreateArchiveParamsXFerryRequest `json:"X-Ferry-Request"`
+}
+
+// CreateArchiveParamsXFerryRequest defines parameters for CreateArchive.
+type CreateArchiveParamsXFerryRequest string
+
 // GetContentParams defines parameters for GetContent.
 type GetContentParams struct {
 	Disposition *GetContentParamsDisposition `form:"disposition,omitempty" json:"disposition,omitempty"`
@@ -656,6 +706,9 @@ type GetThumbnailParamsSize int
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// CreateArchiveJSONRequestBody defines body for CreateArchive for application/json ContentType.
+type CreateArchiveJSONRequestBody = ArchiveRequest
 
 // MoveEntryJSONRequestBody defines body for MoveEntry for application/json ContentType.
 type MoveEntryJSONRequestBody = MoveRequest
@@ -876,6 +929,48 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares (the `ListShares` operationId).
 	ListShares(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateArchiveWithBody Prepare a ZIP of files and folders, for downloading.
+	//
+	// Lists the entries — files, and folders with everything in them — as
+	// the person's session sees them, and keeps the list under a ticket
+	// for `GET …/archive/{ticket}`, which a browser can download without
+	// headers of its own. What Samba refuses to list is the answer here,
+	// before anything is downloaded. All paths must be in the same folder;
+	// the archive holds them under their names in it. The ticket is valid
+	// once, for a minute, and only for this session.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
+	CreateArchiveWithBody(ctx context.Context, share ShareName, params *CreateArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateArchive Prepare a ZIP of files and folders, for downloading.
+	//
+	// Lists the entries — files, and folders with everything in them — as
+	// the person's session sees them, and keeps the list under a ticket
+	// for `GET …/archive/{ticket}`, which a browser can download without
+	// headers of its own. What Samba refuses to list is the answer here,
+	// before anything is downloaded. All paths must be in the same folder;
+	// the archive holds them under their names in it. The ticket is valid
+	// once, for a minute, and only for this session.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
+	CreateArchive(ctx context.Context, share ShareName, params *CreateArchiveParams, body CreateArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetArchive Download a prepared ZIP.
+	//
+	// The ZIP of what `POST …/archive` listed, written as it is read from
+	// the share: stored, not compressed — photos and videos do not shrink
+	// — with ZIP64 where it is large, names in UTF-8 and the files' times.
+	// Nothing is kept on ferry's side. Should a file fail once the archive
+	// has begun, the connection is closed: the browser reports a failed
+	// download, never a complete-looking archive with a file missing.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/archive/{ticket} (the `GetArchive` operationId).
+	GetArchive(ctx context.Context, share ShareName, ticket string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetContent Download a file, streamed, with Range.
 	//
@@ -1104,6 +1199,78 @@ func (c *Client) GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*htt
 // Corresponds with GET /api/v1/shares (the `ListShares` operationId).
 func (c *Client) ListShares(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSharesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateArchiveWithBody Prepare a ZIP of files and folders, for downloading.
+//
+// Lists the entries — files, and folders with everything in them — as
+// the person's session sees them, and keeps the list under a ticket
+// for `GET …/archive/{ticket}`, which a browser can download without
+// headers of its own. What Samba refuses to list is the answer here,
+// before anything is downloaded. All paths must be in the same folder;
+// the archive holds them under their names in it. The ticket is valid
+// once, for a minute, and only for this session.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
+func (c *Client) CreateArchiveWithBody(ctx context.Context, share ShareName, params *CreateArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateArchiveRequestWithBody(c.Server, share, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateArchive Prepare a ZIP of files and folders, for downloading.
+//
+// Lists the entries — files, and folders with everything in them — as
+// the person's session sees them, and keeps the list under a ticket
+// for `GET …/archive/{ticket}`, which a browser can download without
+// headers of its own. What Samba refuses to list is the answer here,
+// before anything is downloaded. All paths must be in the same folder;
+// the archive holds them under their names in it. The ticket is valid
+// once, for a minute, and only for this session.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
+func (c *Client) CreateArchive(ctx context.Context, share ShareName, params *CreateArchiveParams, body CreateArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateArchiveRequest(c.Server, share, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetArchive Download a prepared ZIP.
+//
+// The ZIP of what `POST …/archive` listed, written as it is read from
+// the share: stored, not compressed — photos and videos do not shrink
+// — with ZIP64 where it is large, names in UTF-8 and the files' times.
+// Nothing is kept on ferry's side. Should a file fail once the archive
+// has begun, the connection is closed: the browser reports a failed
+// download, never a complete-looking archive with a file missing.
+//
+// Corresponds with GET /api/v1/shares/{share}/archive/{ticket} (the `GetArchive` operationId).
+func (c *Client) GetArchive(ctx context.Context, share ShareName, ticket string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetArchiveRequest(c.Server, share, ticket)
 	if err != nil {
 		return nil, err
 	}
@@ -1492,6 +1659,107 @@ func NewListSharesRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := "/api/v1/shares"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateArchiveRequest calls the generic CreateArchive builder with application/json body
+func NewCreateArchiveRequest(server string, share ShareName, params *CreateArchiveParams, body CreateArchiveJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := runtime.JSONMarshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateArchiveRequestWithBody(server, share, params, "application/json", bodyReader)
+}
+
+// NewCreateArchiveRequestWithBody constructs an http.Request for the CreateArchive method, with any body, and a specified content type
+func NewCreateArchiveRequestWithBody(server string, share ShareName, params *CreateArchiveParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/archive"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Ferry-Request", params.XFerryRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Ferry-Request", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewGetArchiveRequest constructs an http.Request for the GetArchive method
+func NewGetArchiveRequest(server string, share ShareName, ticket string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "ticket", ticket, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/archive/" + pathParam1
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2277,6 +2545,50 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/shares (the `ListShares` operationId).
 	ListSharesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSharesResponse, error)
 
+	// CreateArchiveWithBodyWithResponse Prepare a ZIP of files and folders, for downloading.
+	//
+	// Lists the entries — files, and folders with everything in them — as
+	// the person's session sees them, and keeps the list under a ticket
+	// for `GET …/archive/{ticket}`, which a browser can download without
+	// headers of its own. What Samba refuses to list is the answer here,
+	// before anything is downloaded. All paths must be in the same folder;
+	// the archive holds them under their names in it. The ticket is valid
+	// once, for a minute, and only for this session.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
+	CreateArchiveWithBodyWithResponse(ctx context.Context, share ShareName, params *CreateArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateArchiveResponse, error)
+
+	// CreateArchiveWithResponse Prepare a ZIP of files and folders, for downloading.
+	//
+	// Lists the entries — files, and folders with everything in them — as
+	// the person's session sees them, and keeps the list under a ticket
+	// for `GET …/archive/{ticket}`, which a browser can download without
+	// headers of its own. What Samba refuses to list is the answer here,
+	// before anything is downloaded. All paths must be in the same folder;
+	// the archive holds them under their names in it. The ticket is valid
+	// once, for a minute, and only for this session.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
+	CreateArchiveWithResponse(ctx context.Context, share ShareName, params *CreateArchiveParams, body CreateArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateArchiveResponse, error)
+
+	// GetArchiveWithResponse Download a prepared ZIP.
+	//
+	// The ZIP of what `POST …/archive` listed, written as it is read from
+	// the share: stored, not compressed — photos and videos do not shrink
+	// — with ZIP64 where it is large, names in UTF-8 and the files' times.
+	// Nothing is kept on ferry's side. Should a file fail once the archive
+	// has begun, the connection is closed: the browser reports a failed
+	// download, never a complete-looking archive with a file missing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/archive/{ticket} (the `GetArchive` operationId).
+	GetArchiveWithResponse(ctx context.Context, share ShareName, ticket string, reqEditors ...RequestEditorFn) (*GetArchiveResponse, error)
+
 	// GetContentWithResponse Download a file, streamed, with Range.
 	//
 	// Answers with the file's bytes. One byte range (`Range: bytes=a-b`) is
@@ -2689,6 +3001,151 @@ func (r ListSharesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListSharesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateArchiveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ArchiveTicket
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateArchiveResponse) GetJSON201() *ArchiveTicket {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateArchiveResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateArchiveResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateArchiveResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateArchiveResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateArchiveResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r CreateArchiveResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r CreateArchiveResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateArchiveResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateArchiveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateArchiveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateArchiveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetArchiveResponse200Headers the declared response headers of an HTTP 200 response for GetArchive
+type GetArchiveResponse200Headers struct {
+	ContentDisposition *string
+}
+
+type GetArchiveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetArchiveResponse200Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetArchiveResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetArchiveResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetArchiveResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetArchiveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetArchiveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetArchiveResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -3548,6 +4005,68 @@ func (c *ClientWithResponses) ListSharesWithResponse(ctx context.Context, reqEdi
 	return ParseListSharesResponse(rsp)
 }
 
+// CreateArchiveWithBodyWithResponse Prepare a ZIP of files and folders, for downloading.
+//
+// Lists the entries — files, and folders with everything in them — as
+// the person's session sees them, and keeps the list under a ticket
+// for `GET …/archive/{ticket}`, which a browser can download without
+// headers of its own. What Samba refuses to list is the answer here,
+// before anything is downloaded. All paths must be in the same folder;
+// the archive holds them under their names in it. The ticket is valid
+// once, for a minute, and only for this session.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
+func (c *ClientWithResponses) CreateArchiveWithBodyWithResponse(ctx context.Context, share ShareName, params *CreateArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateArchiveResponse, error) {
+	rsp, err := c.CreateArchiveWithBody(ctx, share, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateArchiveResponse(rsp)
+}
+
+// CreateArchiveWithResponse Prepare a ZIP of files and folders, for downloading.
+//
+// Lists the entries — files, and folders with everything in them — as
+// the person's session sees them, and keeps the list under a ticket
+// for `GET …/archive/{ticket}`, which a browser can download without
+// headers of its own. What Samba refuses to list is the answer here,
+// before anything is downloaded. All paths must be in the same folder;
+// the archive holds them under their names in it. The ticket is valid
+// once, for a minute, and only for this session.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
+func (c *ClientWithResponses) CreateArchiveWithResponse(ctx context.Context, share ShareName, params *CreateArchiveParams, body CreateArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateArchiveResponse, error) {
+	rsp, err := c.CreateArchive(ctx, share, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateArchiveResponse(rsp)
+}
+
+// GetArchiveWithResponse Download a prepared ZIP.
+//
+// The ZIP of what `POST …/archive` listed, written as it is read from
+// the share: stored, not compressed — photos and videos do not shrink
+// — with ZIP64 where it is large, names in UTF-8 and the files' times.
+// Nothing is kept on ferry's side. Should a file fail once the archive
+// has begun, the connection is closed: the browser reports a failed
+// download, never a complete-looking archive with a file missing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/archive/{ticket} (the `GetArchive` operationId).
+func (c *ClientWithResponses) GetArchiveWithResponse(ctx context.Context, share ShareName, ticket string, reqEditors ...RequestEditorFn) (*GetArchiveResponse, error) {
+	rsp, err := c.GetArchive(ctx, share, ticket, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetArchiveResponse(rsp)
+}
+
 // GetContentWithResponse Download a file, streamed, with Range.
 //
 // Answers with the file's bytes. One byte range (`Range: bytes=a-b`) is
@@ -3963,6 +4482,127 @@ func ParseListSharesResponse(rsp *http.Response) (*ListSharesResponse, error) {
 		}
 		response.ApplicationproblemJSON502 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseCreateArchiveResponse parses an HTTP response from a CreateArchiveWithResponse call
+func ParseCreateArchiveResponse(rsp *http.Response) (*CreateArchiveResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateArchiveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ArchiveTicket
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetArchiveResponse parses an HTTP response from a GetArchiveWithResponse call
+func ParseGetArchiveResponse(rsp *http.Response) (*GetArchiveResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetArchiveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetArchiveResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
@@ -4619,6 +5259,12 @@ type ServerInterface interface {
 	// ListShares The shares the server lists for this user.
 	// (GET /api/v1/shares)
 	ListShares(w http.ResponseWriter, r *http.Request)
+	// CreateArchive Prepare a ZIP of files and folders, for downloading.
+	// (POST /api/v1/shares/{share}/archive)
+	CreateArchive(w http.ResponseWriter, r *http.Request, share ShareName, params CreateArchiveParams)
+	// GetArchive Download a prepared ZIP.
+	// (GET /api/v1/shares/{share}/archive/{ticket})
+	GetArchive(w http.ResponseWriter, r *http.Request, share ShareName, ticket string)
 	// GetContent Download a file, streamed, with Range.
 	// (GET /api/v1/shares/{share}/content)
 	GetContent(w http.ResponseWriter, r *http.Request, share ShareName, params GetContentParams)
@@ -4780,6 +5426,95 @@ func (siw *ServerInterfaceWrapper) ListShares(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListShares(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateArchive operation middleware
+func (siw *ServerInterfaceWrapper) CreateArchive(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateArchiveParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Ferry-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Ferry-Request")]; found {
+		var XFerryRequest CreateArchiveParamsXFerryRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Ferry-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Ferry-Request", valueList[0], &XFerryRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Ferry-Request", Err: err})
+			return
+		}
+
+		params.XFerryRequest = XFerryRequest
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateArchive(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetArchive operation middleware
+func (siw *ServerInterfaceWrapper) GetArchive(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "ticket" -------------
+	var ticket string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ticket", r.PathValue("ticket"), &ticket, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ticket", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetArchive(w, r, share, ticket)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5465,6 +6200,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/metadata", wrapper.GetMetadata)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/thumbnail", wrapper.GetThumbnail)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/archive", wrapper.CreateArchive)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/archive/{ticket}", wrapper.GetArchive)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/move", wrapper.MoveEntry)
 
 	return m

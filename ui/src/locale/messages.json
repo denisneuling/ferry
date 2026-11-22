@@ -1,13 +1,9 @@
 {
   "locale": "en",
   "translations": {
-    "download.tooMany": "{$n} files are too many to download one by one; ferry starts at most {$max} at once. Select fewer.",
-    "download.askTitle": "Download {$n} files?",
-    "download.askText": "They are downloaded one by one, which takes about {$minutes} min. Your browser may ask whether this site may download several files.",
-    "download.askOk": "Download",
-    "download.noFolders": "Folders cannot be downloaded as a whole yet; only the files are.",
     "download.one": "Downloading {$name}",
-    "download.many": "{$n} files are downloaded one by one.",
+    "zip.tooMany": "{$n} items are more than ferry puts into one ZIP ({$max}). Select fewer.",
+    "zip.started": "Downloading {$name} — {$n} items, {$size}",
     "mkdir.title": "New folder",
     "mkdir.field": "Name",
     "mkdir.value": "New folder",
@@ -30,6 +26,7 @@
     "delete.many": "{$n} items deleted.",
     "err.tooLarge.list": "This folder has more than {$count} entries — more than this ferry shows.",
     "err.tooLarge.delete": "This folder holds more than {$count} entries — more than ferry deletes at once. Delete what is inside it in parts.",
+    "err.tooLarge.archive": "This holds more than {$count} items — more than ferry puts into one ZIP. Download it in parts.",
     "err.tooLarge.upload": "The file is larger than {$size}, the most this ferry accepts.",
     "err.accessDenied": "The NAS does not allow you to do this here.",
     "err.notFound": "It is no longer there. Someone may have moved or deleted it.",

@@ -56,6 +56,7 @@ type Config struct {
 	ThumbnailConcurrency int
 	MaxListing           int // FERRY_MAX_LISTING: entries in one folder listing
 	MaxDelete            int // FERRY_MAX_DELETE: entries in one recursive delete
+	MaxArchive           int // FERRY_MAX_ARCHIVE: entries in one ZIP download
 	// SMBConnections is how many SMB connections a login sets up
 	// (FERRY_SMB_CONNECTIONS, 1 to 4): one for browsing, the others for
 	// thumbnails, details and content (smb.Group).
@@ -100,6 +101,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		// browser, which holds the folder, rather than ferry.
 		MaxListing:           200000,
 		MaxDelete:            10000,
+		MaxArchive:           10000,
 		SMBConnections:       3,
 		ThumbnailMaxBytes:    64 << 20,
 		ThumbnailMaxPixels:   50_000_000,
@@ -158,6 +160,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		{"FERRY_MAX_SESSIONS", &c.MaxSessions, 1},
 		{"FERRY_MAX_LISTING", &c.MaxListing, 1},
 		{"FERRY_MAX_DELETE", &c.MaxDelete, 1},
+		{"FERRY_MAX_ARCHIVE", &c.MaxArchive, 1},
 		{"FERRY_LOGIN_RATE_ADDRESS", &c.LoginRatePerAddress, 1},
 		{"FERRY_LOGIN_RATE_USER", &c.LoginRatePerUser, 1},
 		{"FERRY_THUMBNAIL_MAX_PIXELS", &c.ThumbnailMaxPixels, 1},

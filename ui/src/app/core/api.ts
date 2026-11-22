@@ -7,6 +7,7 @@ export type Me = components['schemas']['Me'];
 export type Share = components['schemas']['Share'];
 export type Entry = components['schemas']['Entry'];
 export type EntryList = components['schemas']['EntryList'];
+export type ArchiveTicket = components['schemas']['ArchiveTicket'];
 export type Space = components['schemas']['Space'];
 export type FileMetadata = components['schemas']['FileMetadata'];
 export type Problem = components['schemas']['Problem'];
@@ -145,6 +146,19 @@ export class Api {
       'DELETE',
       `${shareBase(share)}/entries?path=${q(path)}${recursive ? '&recursive=true' : ''}`,
     );
+  }
+
+  /**
+   * Lists entries of one folder for a ZIP; the answer's ticket is good for
+   * one download, by this session, within a minute.
+   */
+  archive(share: string, paths: string[]): Promise<ArchiveTicket> {
+    return this.json('POST', `${shareBase(share)}/archive`, { paths });
+  }
+
+  /** The URL a listed ZIP downloads from. */
+  archiveUrl(share: string, ticket: string): string {
+    return `${BASE}${shareBase(share)}/archive/${encodeURIComponent(ticket)}`;
   }
 
   /** The URL a file is downloaded from, or shown inline from. */

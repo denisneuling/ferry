@@ -126,10 +126,21 @@ loads ahead when the browser is set to save data.
 ## Downloading
 
 A file downloads through the browser's own download, with Range, so a large
-download can resume. Several files download one after the other, a little
-apart, since browsers refuse a burst; for more than 20 ferry says how long
-that takes and asks first, and more than 200 it refuses. A folder as one
-download is not there yet.
+download can resume. Several entries, or a folder, download as one ZIP,
+named after the folder they are in (or the one entry): ferry lists what goes
+in first — so that what the server refuses, or a selection beyond the
+deployment's bound (`FERRY_MAX_ARCHIVE`, 10000 entries by default, folders'
+contents counted), is said before anything downloads — and then writes the
+archive as it reads the files, without a file of its own in between. The
+files are stored, not compressed: photos and videos would not shrink, and
+the download starts at once. Names keep their accents and emoji, files their
+times, and archives beyond 4 GB are ZIP64, which every current unpacker
+reads. Should a file fail once the archive has begun — deleted in the
+meantime, or the connection gone — the download is broken off and the
+browser reports it failed: never an archive that looks complete with a file
+missing. A ZIP download cannot resume, and its size is not known before
+it ends — each file's checksum is written after the file — so the browser
+shows how much has come, not how much is left.
 
 Deleting asks first and names how many. A selection larger than the
 deployment's delete bound (`FERRY_MAX_DELETE`) is refused before anything is

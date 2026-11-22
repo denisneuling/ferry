@@ -45,6 +45,8 @@ limits:
   maxListing: 200000
   # -- Entries in one recursive delete, refused whole beyond it (FERRY_MAX_DELETE).
   maxDelete: 10000
+  # -- Entries in one ZIP download, folders' contents counted, refused whole beyond it (FERRY_MAX_ARCHIVE).
+  maxArchive: 10000
   # -- Every API request but transfers, and each single SMB call (FERRY_REQUEST_TIMEOUT).
   requestTimeout: 60s
   # -- A transfer that moves no bytes for this long ends (FERRY_STALL_TIMEOUT).

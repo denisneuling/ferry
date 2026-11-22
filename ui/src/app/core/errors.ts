@@ -2,7 +2,7 @@ import { ApiError } from './api';
 import { formatSize } from './format';
 
 /** What was being done when it failed, where a message depends on it. */
-export type Doing = 'list' | 'delete' | 'upload';
+export type Doing = 'list' | 'delete' | 'upload' | 'archive';
 
 /**
  * What to tell a person when something fails, in everyday words. The codes
@@ -19,6 +19,8 @@ export function describe(err: unknown, doing?: Doing): string {
         return $localize`:@@err.tooLarge.list:This folder has more than ${n}:count: entries — more than this ferry shows.`;
       case 'delete':
         return $localize`:@@err.tooLarge.delete:This folder holds more than ${n}:count: entries — more than ferry deletes at once. Delete what is inside it in parts.`;
+      case 'archive':
+        return $localize`:@@err.tooLarge.archive:This holds more than ${n}:count: items — more than ferry puts into one ZIP. Download it in parts.`;
       case 'upload':
         return $localize`:@@err.tooLarge.upload:The file is larger than ${formatSize(err.limit, locale)}:size:, the most this ferry accepts.`;
     }

@@ -128,6 +128,7 @@ name or a path: routes are patterns, errors are kinds from a fixed list
 | `ferry_logins_total` | counter | `outcome` | login attempts: `ok`, `auth`, `guest`, `unreachable`, `rate_limited`, `too_many_sessions`, `invalid`, `internal` |
 | `ferry_transfer_bytes_total` | counter | `direction` | file bytes `up` (uploads) and `down` (downloads and previews) |
 | `ferry_smb_errors_total` | counter | `kind` | SMB errors answered to a request: `access_denied`, `not_found`, `exists`, `busy`, `not_empty`, `not_dir`, `is_dir`, `invalid_path`, `limit`, `unreachable`, `session_lost`, `canceled`, `internal` |
+| `ferry_archives_total` | counter | `outcome` | ZIP downloads: `ok`, `failed` (broken off when a file failed), `canceled` (the client left); their bytes count in `ferry_transfer_bytes_total{direction="down"}` |
 | `ferry_thumbnails_total` | counter | `outcome` | `made`, `not_modified`, `unsupported`, `too_large`, `failed` |
 | `ferry_thumbnail_memory_bytes` | gauge | | taken from the thumbnail budget now |
 | `ferry_thumbnail_memory_limit_bytes` | gauge | | the budget, `FERRY_THUMBNAIL_MEMORY` |

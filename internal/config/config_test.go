@@ -30,7 +30,7 @@ func TestDefaults(t *testing.T) {
 	if c.MaxListing != 200000 || c.MaxDelete != 10000 {
 		t.Errorf("max listing %d, max delete %d", c.MaxListing, c.MaxDelete)
 	}
-	if c.SMBConnections != 3 {
+	if c.SMBConnections != 3 || c.MaxArchive != 10000 {
 		t.Errorf("smb connections %d", c.SMBConnections)
 	}
 }

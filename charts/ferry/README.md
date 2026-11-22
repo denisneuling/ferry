@@ -59,6 +59,7 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 | ingress.enabled | bool | `false` | An Ingress for the interface. TLS belongs here or in front: without it, passwords and the session cookie cross the network readable. |
 | ingress.hosts | list | `[]` | Hosts, e.g. `[{host: files.example.com, paths: [{path: /, pathType: Prefix}]}]`. |
 | ingress.tls | list | `[]` |  |
+| limits.maxArchive | int | `10000` | Entries in one ZIP download, folders' contents counted, refused whole beyond it (FERRY_MAX_ARCHIVE). |
 | limits.maxDelete | int | `10000` | Entries in one recursive delete, refused whole beyond it (FERRY_MAX_DELETE). |
 | limits.maxListing | int | `200000` | Entries in one folder listing (FERRY_MAX_LISTING). A listing is streamed, so this protects the browser, not ferry's memory. |
 | limits.maxUpload | string | `"0"` | The largest upload, e.g. `4Gi`; `0` for none (FERRY_MAX_UPLOAD). |

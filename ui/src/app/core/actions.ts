@@ -24,60 +24,51 @@ export class Actions {
   private readonly format = inject(Format);
 
   /**
-   * Downloads start one by one, a little apart, because browsers refuse a
-   * burst of them. Beyond `askDownloads` files ferry says how long that takes
-   * and asks; beyond `maxDownloads` it refuses — a folder of that size wants
-   * a ZIP, which is not there yet.
-   */
-  static readonly downloadGap = 400;
-  static readonly askDownloads = 20;
-  static readonly maxDownloads = 200;
-
-  /**
-   * Downloads files through the browser, one after the other: each is a
-   * plain link with the server's attachment header. Folders are left out —
-   * a folder as one download (a ZIP) is not there yet.
+   * Downloads what is chosen: one file as it is, through a plain link with
+   * the server's attachment header; anything more — several entries, or a
+   * folder — as one ZIP, which the server lists first (so that what it
+   * refuses is said here, before anything downloads) and then streams.
    */
   async download(entries: Entry[]): Promise<void> {
     const share = this.browser.share();
-    if (!share) return;
-    const files = entries.filter((e) => e.type === 'file');
-    if (files.length > Actions.maxDownloads) {
+    if (!share || !entries.length) return;
+    if (entries.length === 1 && entries[0].type === 'file') {
+      this.save(this.api.contentUrl(share, entries[0].path), entries[0].name);
+      this.toasts.show($localize`:@@download.one:Downloading ${entries[0].name}:name:`);
+      return;
+    }
+    // FERRY_MAX_ARCHIVE bounds what one ZIP holds, folders' contents
+    // counted by the server; the selection itself is held to it here.
+    const max = this.session.info()?.limits?.archive;
+    if (max && entries.length > max) {
       this.toasts.error(
-        $localize`:@@download.tooMany:${this.format.count(files.length)}:n: files are too many to download one by one; ferry starts at most ${Actions.maxDownloads}:max: at once. Select fewer.`,
+        $localize`:@@zip.tooMany:${this.format.count(entries.length)}:n: items are more than ferry puts into one ZIP (${this.format.count(max)}:max:). Select fewer.`,
       );
       return;
     }
-    if (files.length > Actions.askDownloads) {
-      const minutes = Math.max(1, Math.round((files.length * Actions.downloadGap) / 60000));
-      const ok = await this.dialogs.confirm({
-        title: $localize`:@@download.askTitle:Download ${this.format.count(files.length)}:n: files?`,
-        text: $localize`:@@download.askText:They are downloaded one by one, which takes about ${minutes}:minutes: min. Your browser may ask whether this site may download several files.`,
-        ok: $localize`:@@download.askOk:Download`,
-      });
-      if (!ok) return;
-    }
-    if (files.length < entries.length) {
-      this.toasts.show(
-        $localize`:@@download.noFolders:Folders cannot be downloaded as a whole yet; only the files are.`,
+    try {
+      const t = await this.api.archive(
+        share,
+        entries.map((e) => e.path),
       );
+      this.save(this.api.archiveUrl(share, t.ticket), t.name);
+      this.toasts.show(
+        $localize`:@@zip.started:Downloading ${t.name}:name: — ${this.format.count(t.entries)}:n: items, ${this.format.size(t.bytes)}:size:`,
+      );
+    } catch (e) {
+      this.toasts.error(describe(e, 'archive'));
     }
-    files.forEach((f, i) =>
-      setTimeout(() => {
-        const a = document.createElement('a');
-        a.href = this.api.contentUrl(share, f.path);
-        a.download = f.name;
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }, i * Actions.downloadGap),
-    );
-    if (files.length === 1) {
-      this.toasts.show($localize`:@@download.one:Downloading ${files[0].name}:name:`);
-    } else if (files.length > 1) {
-      this.toasts.show($localize`:@@download.many:${files.length}:n: files are downloaded one by one.`);
-    }
+  }
+
+  /** Lets the browser download a URL, as a click on a link would. */
+  private save(url: string, name: string): void {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   async mkdir(): Promise<void> {

@@ -32,6 +32,7 @@ type Metrics struct {
 	smbConns    prometheus.Gauge
 	smbLost     *prometheus.CounterVec
 	smbWait     *prometheus.HistogramVec
+	archives    *prometheus.CounterVec
 }
 
 // Gauges are read at every scrape from where they are kept.
@@ -87,8 +88,12 @@ func New(version, commit string, g Gauges) *Metrics {
 			// From a free slot to one behind a slow server's call.
 			Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
 		}, []string{"pool"}),
+		archives: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ferry_archives_total",
+			Help: "ZIP downloads by outcome: ok, failed (a file failed once the archive had begun; the download was broken off), canceled (the client left).",
+		}, []string{"outcome"}),
 	}
-	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency, m.smbConns, m.smbLost, m.smbWait)
+	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency, m.smbConns, m.smbLost, m.smbWait, m.archives)
 	build := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:        "ferry_build_info",
 		Help:        "Always 1; the labels say which build runs.",
@@ -182,5 +187,12 @@ func (m *Metrics) ConnectionLost(pool string) {
 func (m *Metrics) SlotWait(pool string, d time.Duration) {
 	if m != nil {
 		m.smbWait.WithLabelValues(pool).Observe(d.Seconds())
+	}
+}
+
+// Archive counts a ZIP download by its outcome.
+func (m *Metrics) Archive(outcome string) {
+	if m != nil {
+		m.archives.WithLabelValues(outcome).Inc()
 	}
 }

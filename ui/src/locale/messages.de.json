@@ -1,13 +1,9 @@
 {
   "locale": "de",
   "translations": {
-    "download.tooMany": "{$n} Dateien sind zu viele, um sie einzeln herunterzuladen; ferry startet höchstens {$max} auf einmal. Wähl weniger aus.",
-    "download.askTitle": "{$n} Dateien herunterladen?",
-    "download.askText": "Sie werden nacheinander heruntergeladen, das dauert etwa {$minutes} Min. Dein Browser fragt eventuell, ob diese Seite mehrere Dateien herunterladen darf.",
-    "download.askOk": "Herunterladen",
-    "download.noFolders": "Ordner lassen sich noch nicht als Ganzes herunterladen; nur die Dateien.",
     "download.one": "Download: {$name}",
-    "download.many": "{$n} Dateien werden einzeln heruntergeladen.",
+    "zip.tooMany": "{$n} Einträge sind mehr, als ferry in ein ZIP packt ({$max}). Wähl weniger aus.",
+    "zip.started": "Download: {$name} – {$n} Einträge, {$size}",
     "mkdir.title": "Neuer Ordner",
     "mkdir.field": "Name",
     "mkdir.value": "Neuer Ordner",
@@ -30,6 +26,7 @@
     "delete.many": "{$n} Elemente gelöscht.",
     "err.tooLarge.list": "Dieser Ordner hat mehr als {$count} Einträge – mehr, als dieses ferry anzeigt.",
     "err.tooLarge.delete": "Dieser Ordner enthält mehr als {$count} Einträge – mehr, als ferry auf einmal löscht. Lösch seinen Inhalt in Teilen.",
+    "err.tooLarge.archive": "Das enthält mehr als {$count} Einträge – mehr, als ferry in ein ZIP packt. Lade es in Teilen herunter.",
     "err.tooLarge.upload": "Die Datei ist größer als {$size} – mehr nimmt dieses ferry nicht an.",
     "err.accessDenied": "Das erlaubt dir der NAS hier nicht.",
     "err.notFound": "Das ist nicht mehr da. Vielleicht hat es jemand verschoben oder gelöscht.",

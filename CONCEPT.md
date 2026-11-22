@@ -162,6 +162,8 @@ Illustrative. The contract is `api/openapi/ferry-v1.yaml`.
 | GET | `/api/v1/shares/{share}/content?path=` | download, streamed, with Range |
 | PUT | `/api/v1/shares/{share}/content?path=` | upload, streamed to a temporary name, renamed on completion |
 | POST | `/api/v1/shares/{share}/folders?path=` | create a folder |
+| POST | `/api/v1/shares/{share}/archive` | list entries of one folder for a ZIP, `{paths}`; answers a ticket, good once, for a minute, for this session |
+| GET | `/api/v1/shares/{share}/archive/{ticket}` | the ZIP, stored, streamed from the share; broken off when a file fails |
 | POST | `/api/v1/shares/{share}/move` | rename or move within a share, `{from, to}` |
 | DELETE | `/api/v1/shares/{share}/entries?path=` | delete a file or an empty folder; recursive only when asked |
 | GET | `/api/v1/shares/{share}/thumbnail?path=&v=` | image thumbnail, made on the fly, never cached on disk; with the entry's version `v`, cached by the browser until the file changes |

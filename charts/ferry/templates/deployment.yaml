@@ -85,6 +85,8 @@ spec:
               value: {{ .Values.limits.maxListing | int | quote }}
             - name: FERRY_MAX_DELETE
               value: {{ .Values.limits.maxDelete | int | quote }}
+            - name: FERRY_MAX_ARCHIVE
+              value: {{ .Values.limits.maxArchive | int | quote }}
             - name: FERRY_REQUEST_TIMEOUT
               value: {{ .Values.limits.requestTimeout | quote }}
             - name: FERRY_STALL_TIMEOUT

@@ -51,6 +51,8 @@ type API struct {
 	thumbMemory *semaphore.Weighted
 	thumbUsed   atomic.Int64
 	metrics     *metrics.Metrics
+	// archives holds the ZIP downloads listed and not yet fetched.
+	archives archiveTickets
 }
 
 // New makes the API. login is smb.LoginGroup outside tests; m may be nil.
@@ -250,6 +252,7 @@ func (a *API) GetInfo(w http.ResponseWriter, r *http.Request) {
 			Listing: a.cfg.MaxListing,
 			Delete:  a.cfg.MaxDelete,
 			Upload:  a.cfg.MaxUpload,
+			Archive: a.cfg.MaxArchive,
 		},
 	})
 }
