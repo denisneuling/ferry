@@ -34,7 +34,7 @@ func newTestServers(t *testing.T, smbServer string, log *slog.Logger) (*httptest
 		ListenAddr: "127.0.0.1:0", OpsListenAddr: "127.0.0.1:0",
 		IdleTimeout: 30 * time.Minute, SessionLifetime: 12 * time.Hour, MaxSessions: 10,
 		LoginTimeout: 5 * time.Second, RequestTimeout: 10 * time.Second, StallTimeout: 10 * time.Second,
-		MaxListing: 1000, LoginRatePerAddress: 100, LoginRatePerUser: 100, CookieSecure: "auto",
+		MaxListing: 1000, MaxDelete: 1000, LoginRatePerAddress: 100, LoginRatePerUser: 100, CookieSecure: "auto",
 	}
 	tab := session.New(session.Options{IdleTimeout: cfg.IdleTimeout, Lifetime: cfg.SessionLifetime, MaxSessions: cfg.MaxSessions})
 	var a *api.API

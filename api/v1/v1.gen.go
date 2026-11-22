@@ -8,6 +8,7 @@ package v1
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -460,20 +461,20 @@ type MoveEntryJSONRequestBody = MoveRequest
 // AsEntry returns the union data inside the EntryStreamLine as a Entry
 func (t EntryStreamLine) AsEntry() (Entry, error) {
 	var body Entry
-	err := json.Unmarshal(t.union, &body)
+	err := runtime.JSONUnmarshal(t.union, &body)
 	return body, err
 }
 
 // FromEntry overwrites any union data inside the EntryStreamLine as the provided Entry
 func (t *EntryStreamLine) FromEntry(v Entry) error {
-	b, err := json.Marshal(v)
+	b, err := runtime.JSONMarshal(v)
 	t.union = b
 	return err
 }
 
 // MergeEntry performs a merge with any union data inside the EntryStreamLine, using the provided Entry
 func (t *EntryStreamLine) MergeEntry(v Entry) error {
-	b, err := json.Marshal(v)
+	b, err := runtime.JSONMarshal(v)
 	if err != nil {
 		return err
 	}
@@ -486,20 +487,20 @@ func (t *EntryStreamLine) MergeEntry(v Entry) error {
 // AsEntryStreamEnd returns the union data inside the EntryStreamLine as a EntryStreamEnd
 func (t EntryStreamLine) AsEntryStreamEnd() (EntryStreamEnd, error) {
 	var body EntryStreamEnd
-	err := json.Unmarshal(t.union, &body)
+	err := runtime.JSONUnmarshal(t.union, &body)
 	return body, err
 }
 
 // FromEntryStreamEnd overwrites any union data inside the EntryStreamLine as the provided EntryStreamEnd
 func (t *EntryStreamLine) FromEntryStreamEnd(v EntryStreamEnd) error {
-	b, err := json.Marshal(v)
+	b, err := runtime.JSONMarshal(v)
 	t.union = b
 	return err
 }
 
 // MergeEntryStreamEnd performs a merge with any union data inside the EntryStreamLine, using the provided EntryStreamEnd
 func (t *EntryStreamLine) MergeEntryStreamEnd(v EntryStreamEnd) error {
-	b, err := json.Marshal(v)
+	b, err := runtime.JSONMarshal(v)
 	if err != nil {
 		return err
 	}
@@ -512,20 +513,20 @@ func (t *EntryStreamLine) MergeEntryStreamEnd(v EntryStreamEnd) error {
 // AsEntryStreamProblem returns the union data inside the EntryStreamLine as a EntryStreamProblem
 func (t EntryStreamLine) AsEntryStreamProblem() (EntryStreamProblem, error) {
 	var body EntryStreamProblem
-	err := json.Unmarshal(t.union, &body)
+	err := runtime.JSONUnmarshal(t.union, &body)
 	return body, err
 }
 
 // FromEntryStreamProblem overwrites any union data inside the EntryStreamLine as the provided EntryStreamProblem
 func (t *EntryStreamLine) FromEntryStreamProblem(v EntryStreamProblem) error {
-	b, err := json.Marshal(v)
+	b, err := runtime.JSONMarshal(v)
 	t.union = b
 	return err
 }
 
 // MergeEntryStreamProblem performs a merge with any union data inside the EntryStreamLine, using the provided EntryStreamProblem
 func (t *EntryStreamLine) MergeEntryStreamProblem(v EntryStreamProblem) error {
-	b, err := json.Marshal(v)
+	b, err := runtime.JSONMarshal(v)
 	if err != nil {
 		return err
 	}
