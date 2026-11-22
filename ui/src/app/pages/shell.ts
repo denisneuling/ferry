@@ -21,7 +21,14 @@ import { TransfersPanel } from './transfers-panel';
   host: { '(document:keydown.escape)': 'drawer.set(false)' },
   template: `<div class="app" [class.drawer]="drawer()">
       <aside class="side" aria-label="Shares" i18n-aria-label="@@shares">
-        <div class="brand"><f-mark [size]="30" /><span>ferry</span></div>
+        <a
+          class="brand"
+          routerLink="/"
+          (click)="drawer.set(false)"
+          aria-label="ferry — all shares"
+          i18n-aria-label="@@brand.home"
+          ><f-mark [size]="30" /><span>ferry</span></a
+        >
         <h3 i18n="@@shares">Shares</h3>
         <nav class="shares-nav">
           @for (s of browser.shares() ?? []; track s.name) {
@@ -75,7 +82,9 @@ import { TransfersPanel } from './transfers-panel';
           >
             <f-icon name="menu" [size]="22" />
           </button>
-          <span class="brand"><f-mark [size]="24" /></span>
+          <a class="brand" routerLink="/" aria-label="ferry — all shares" i18n-aria-label="@@brand.home"
+            ><f-mark [size]="24" /><span>ferry</span></a
+          >
         </div>
         <router-outlet />
       </main>

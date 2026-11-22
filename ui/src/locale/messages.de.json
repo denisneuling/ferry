@@ -62,6 +62,7 @@
     "upload.doneN": "{$n} Dateien hochgeladen.",
     "crumbs": "Wo du bist",
     "shares": "Freigaben",
+    "brand.home": "ferry – alle Freigaben",
     "count": "{VAR_PLURAL, plural, =1 {1 Element} other {{INTERPOLATION} Elemente}}",
     "loadingMore": "weitere werden geladen …",
     "matching": "{$INTERPOLATION} passend",
