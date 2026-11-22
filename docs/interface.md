@@ -69,8 +69,14 @@ thumbnail.
 ## Downloading
 
 A file downloads through the browser's own download, with Range, so a large
-download can resume. Several files download one after the other. A folder as
-one download is not there yet.
+download can resume. Several files download one after the other, a little
+apart, since browsers refuse a burst; for more than 20 ferry says how long
+that takes and asks first, and more than 200 it refuses. A folder as one
+download is not there yet.
+
+Deleting asks first and names how many. A selection larger than the
+deployment's delete bound (`FERRY_MAX_DELETE`) is refused before anything is
+deleted, as a folder with more in it is.
 
 ## Development
 

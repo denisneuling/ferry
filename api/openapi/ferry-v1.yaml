@@ -499,7 +499,7 @@ components:
 
     Info:
       type: object
-      required: [server, idleTimeoutSeconds, sessionLifetimeSeconds, version]
+      required: [server, idleTimeoutSeconds, sessionLifetimeSeconds, version, limits]
       properties:
         server:
           type: string
@@ -507,6 +507,27 @@ components:
         idleTimeoutSeconds: { type: integer }
         sessionLifetimeSeconds: { type: integer }
         version: { type: string }
+        limits: { $ref: "#/components/schemas/Limits" }
+    Limits:
+      type: object
+      description: |
+        The deployment's bounds, so that the interface can tell a person
+        before they run into one.
+      required: [listing, delete, upload]
+      properties:
+        listing:
+          type: integer
+          description: Entries in one folder listing (`FERRY_MAX_LISTING`).
+        delete:
+          type: integer
+          description: |
+            Entries one delete removes (`FERRY_MAX_DELETE`): a recursive
+            delete counts everything in the folder, and the interface holds a
+            selection to the same number.
+        upload:
+          type: integer
+          format: int64
+          description: The largest upload in bytes (`FERRY_MAX_UPLOAD`); 0 for none.
 
     LoginRequest:
       type: object

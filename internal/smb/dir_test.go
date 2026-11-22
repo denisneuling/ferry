@@ -3,7 +3,9 @@ package smb
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 )
@@ -135,4 +137,67 @@ func TestDirClientLeaves(t *testing.T) {
 	if _, err := s.ReadDir(context.Background(), "alex", "", 100); err != nil {
 		t.Fatalf("the session afterwards: %v", err)
 	}
+}
+
+// TestDirWhileTheFolderChanges lists a folder while another session adds,
+// renames and removes files in it, as a scanner or a second person would:
+// the listing ends normally, and no name comes twice. What changed during
+// it may or may not be in it; that is the server's to decide.
+func TestDirWhileTheFolderChanges(t *testing.T) {
+	ctx := context.Background()
+	s, err := login(t, "alex", alexPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	other, err := login(t, "alex", alexPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = other.Close() }()
+
+	dir := fmt.Sprintf("changing-%d", time.Now().UnixNano())
+	if _, err := s.Mkdir(ctx, "alex", dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Remove(ctx, "alex", dir, true, 100000) }()
+	for i := 0; i < 3*DirBatch; i++ {
+		if _, err := s.Upload(ctx, "alex", fmt.Sprintf("%s/before-%04d.txt", dir, i), strings.NewReader("x"), false, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	d, err := s.OpenDir(ctx, "alex", dir, 100000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = d.Close() }()
+	seen := map[string]int{}
+	for round := 0; ; round++ {
+		batch, err := d.Next()
+		for _, e := range batch {
+			seen[e.Name]++
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("the listing broke off while the folder changed: %v", err)
+		}
+		// Between batches, the folder changes under the listing.
+		for i := 0; i < 50; i++ {
+			name := fmt.Sprintf("%s/during-%d-%02d.txt", dir, round, i)
+			if _, err := other.Upload(ctx, "alex", name, strings.NewReader("y"), false, 0); err != nil {
+				t.Fatal(err)
+			}
+		}
+		_, _ = other.Rename(ctx, "alex", fmt.Sprintf("%s/before-%04d.txt", dir, round), fmt.Sprintf("%s/renamed-%04d.txt", dir, round), false)
+		_ = other.Remove(ctx, "alex", fmt.Sprintf("%s/before-%04d.txt", dir, 3*DirBatch-1-round), false, 0)
+	}
+	for name, n := range seen {
+		if n > 1 {
+			t.Errorf("%s came %d times", name, n)
+		}
+	}
+	t.Logf("%d names listed while the folder changed", len(seen))
 }

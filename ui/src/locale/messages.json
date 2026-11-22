@@ -1,6 +1,10 @@
 {
   "locale": "en",
   "translations": {
+    "download.tooMany": "{$n} files are too many to download one by one; ferry starts at most {$max} at once. Select fewer.",
+    "download.askTitle": "Download {$n} files?",
+    "download.askText": "They are downloaded one by one, which takes about {$minutes} min. Your browser may ask whether this site may download several files.",
+    "download.askOk": "Download",
     "download.noFolders": "Folders cannot be downloaded as a whole yet; only the files are.",
     "download.one": "Downloading {$name}",
     "download.many": "{$n} files are downloaded one by one.",
@@ -15,6 +19,7 @@
     "move.someFailed": "{$n} items could not be moved.",
     "move.one": "Moved.",
     "move.many": "{$n} items moved.",
+    "delete.tooMany": "{$n} items are more than ferry deletes at once ({$max}). Select fewer.",
     "delete.title1": "Delete “{$name}”?",
     "delete.titleN": "Delete {$n} items?",
     "delete.textFolders": "Folders are deleted with everything in them. Deleting is final; it can only be brought back from a snapshot, if the NAS keeps them.",

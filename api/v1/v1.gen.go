@@ -229,10 +229,29 @@ type EntryType string
 type Info struct {
 	IdleTimeoutSeconds int `json:"idleTimeoutSeconds"`
 
+	// Limits The deployment's bounds, so that the interface can tell a person
+	// before they run into one.
+	Limits Limits `json:"limits"`
+
 	// Server The SMB server's display name, for "with your account on …".
 	Server                 string `json:"server"`
 	SessionLifetimeSeconds int    `json:"sessionLifetimeSeconds"`
 	Version                string `json:"version"`
+}
+
+// Limits The deployment's bounds, so that the interface can tell a person
+// before they run into one.
+type Limits struct {
+	// Delete Entries one delete removes (`FERRY_MAX_DELETE`): a recursive
+	// delete counts everything in the folder, and the interface holds a
+	// selection to the same number.
+	Delete int `json:"delete"`
+
+	// Listing Entries in one folder listing (`FERRY_MAX_LISTING`).
+	Listing int `json:"listing"`
+
+	// Upload The largest upload in bytes (`FERRY_MAX_UPLOAD`); 0 for none.
+	Upload int64 `json:"upload"`
 }
 
 // LoginRequest defines model for LoginRequest.

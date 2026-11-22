@@ -123,6 +123,9 @@ func TestInfo(t *testing.T) {
 	if info.Server != "nas.example.lan" || info.IdleTimeoutSeconds != 1800 || info.Version != "test" {
 		t.Fatalf("info %+v", info)
 	}
+	if info.Limits.Listing != 1000 || info.Limits.Delete != 1000 || info.Limits.Upload != 0 {
+		t.Fatalf("limits %+v", info.Limits)
+	}
 	for k, want := range map[string]string{
 		"X-Content-Type-Options":  "nosniff",
 		"Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",

@@ -2,6 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { Api, Entry, join } from './api';
 import { Browser } from './browser';
 import { describe } from './errors';
+import { Format } from './format';
+import { Session } from './session';
 import { Dialogs, checkName } from '../ui/dialog';
 import { Toasts } from '../ui/toast';
 import { FolderPicker } from '../ui/folder-picker';
@@ -18,16 +20,43 @@ export class Actions {
   private readonly dialogs = inject(Dialogs);
   private readonly toasts = inject(Toasts);
   private readonly picker = inject(FolderPicker);
+  private readonly session = inject(Session);
+  private readonly format = inject(Format);
+
+  /**
+   * Downloads start one by one, a little apart, because browsers refuse a
+   * burst of them. Beyond `askDownloads` files ferry says how long that takes
+   * and asks; beyond `maxDownloads` it refuses — a folder of that size wants
+   * a ZIP, which is not there yet.
+   */
+  static readonly downloadGap = 400;
+  static readonly askDownloads = 20;
+  static readonly maxDownloads = 200;
 
   /**
    * Downloads files through the browser, one after the other: each is a
    * plain link with the server's attachment header. Folders are left out —
    * a folder as one download (a ZIP) is not there yet.
    */
-  download(entries: Entry[]): void {
+  async download(entries: Entry[]): Promise<void> {
     const share = this.browser.share();
     if (!share) return;
     const files = entries.filter((e) => e.type === 'file');
+    if (files.length > Actions.maxDownloads) {
+      this.toasts.error(
+        $localize`:@@download.tooMany:${this.format.count(files.length)}:n: files are too many to download one by one; ferry starts at most ${Actions.maxDownloads}:max: at once. Select fewer.`,
+      );
+      return;
+    }
+    if (files.length > Actions.askDownloads) {
+      const minutes = Math.max(1, Math.round((files.length * Actions.downloadGap) / 60000));
+      const ok = await this.dialogs.confirm({
+        title: $localize`:@@download.askTitle:Download ${this.format.count(files.length)}:n: files?`,
+        text: $localize`:@@download.askText:They are downloaded one by one, which takes about ${minutes}:minutes: min. Your browser may ask whether this site may download several files.`,
+        ok: $localize`:@@download.askOk:Download`,
+      });
+      if (!ok) return;
+    }
     if (files.length < entries.length) {
       this.toasts.show(
         $localize`:@@download.noFolders:Folders cannot be downloaded as a whole yet; only the files are.`,
@@ -42,7 +71,7 @@ export class Actions {
         document.body.appendChild(a);
         a.click();
         a.remove();
-      }, i * 400),
+      }, i * Actions.downloadGap),
     );
     if (files.length === 1) {
       this.toasts.show($localize`:@@download.one:Downloading ${files[0].name}:name:`);
@@ -133,12 +162,22 @@ export class Actions {
   async remove(entries: Entry[]): Promise<boolean> {
     const share = this.browser.share();
     if (share === null || !entries.length) return false;
+    // FERRY_MAX_DELETE bounds what one delete removes: the server counts a
+    // folder's contents, and the interface holds the selection to the same
+    // number, so that the bound means one thing whichever way it is reached.
+    const max = this.session.info()?.limits?.delete;
+    if (max && entries.length > max) {
+      this.toasts.error(
+        $localize`:@@delete.tooMany:${this.format.count(entries.length)}:n: items are more than ferry deletes at once (${this.format.count(max)}:max:). Select fewer.`,
+      );
+      return false;
+    }
     const folders = entries.some((e) => e.type === 'folder');
     const ok = await this.dialogs.confirm({
       title:
         entries.length === 1
           ? $localize`:@@delete.title1:Delete “${entries[0].name}:name:”?`
-          : $localize`:@@delete.titleN:Delete ${entries.length}:n: items?`,
+          : $localize`:@@delete.titleN:Delete ${this.format.count(entries.length)}:n: items?`,
       text: folders
         ? $localize`:@@delete.textFolders:Folders are deleted with everything in them. Deleting is final; it can only be brought back from a snapshot, if the NAS keeps them.`
         : $localize`:@@delete.text:Deleting is final. It can only be brought back from a snapshot, if the NAS keeps them.`,

@@ -23,6 +23,11 @@ export class Format {
   // new one per call, which a sort of fifty thousand names feels.
   private readonly collator = new Intl.Collator(this.locale, { numeric: true, sensitivity: 'base' });
 
+  /** A count, with the language's grouping: 60.000 in German. */
+  count(n: number): string {
+    return n.toLocaleString(this.locale);
+  }
+
   /** Bytes in decimal units, as file managers show them: 3.2 MB. */
   size(n: number | null | undefined): string {
     return n == null ? '—' : formatSize(n, this.locale);

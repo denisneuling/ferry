@@ -108,6 +108,14 @@ describe('Browser loading a folder', () => {
     expect(b.loading()).toBe(false);
   });
 
+  it('takes a name once, should a server list it twice', async () => {
+    batches = [page(['a', 'b']), page(['b', 'c'])];
+    const done = b.open('alex', 'Changing');
+    release();
+    await done;
+    expect(b.entries()?.map((e) => e.name)).toEqual(['a', 'b', 'c']);
+  });
+
   it('replaces a folder already shown only when its new listing is complete', async () => {
     batches = [page(['a']), page(['b'])];
     const first = b.open('alex', 'Many');

@@ -242,6 +242,11 @@ func (a *API) GetInfo(w http.ResponseWriter, r *http.Request) {
 		IdleTimeoutSeconds:     int(a.cfg.IdleTimeout / time.Second),
 		SessionLifetimeSeconds: int(a.cfg.SessionLifetime / time.Second),
 		Version:                a.version,
+		Limits: v1.Limits{
+			Listing: a.cfg.MaxListing,
+			Delete:  a.cfg.MaxDelete,
+			Upload:  a.cfg.MaxUpload,
+		},
 	})
 }
 

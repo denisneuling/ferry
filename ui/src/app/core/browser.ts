@@ -103,6 +103,9 @@ export class Browser {
     // sorts the whole folder again.
     const progressive = this.entries() === null;
     const got: Entry[] = [];
+    // A server may list a name twice when the folder changes under the
+    // listing; the interface keys entries by name, so the first one counts.
+    const names = new Set<string>();
     let shownAt = -Infinity;
     this.loading.set(true);
     try {
@@ -111,7 +114,11 @@ export class Browser {
         path,
         (batch) => {
           if (n !== this.loads) return;
-          for (const e of batch) got.push(e);
+          for (const e of batch) {
+            if (names.has(e.name)) continue;
+            names.add(e.name);
+            got.push(e);
+          }
           const now = performance.now();
           if (progressive && now - shownAt > 400) {
             this.entries.set(got.slice());
@@ -126,7 +133,6 @@ export class Browser {
       this.entries.set(got);
       this.error.set(null);
       this.errorCode.set(null);
-      const names = new Set(got.map((e) => e.name));
       this.selected.update((s) => new Set([...s].filter((x) => names.has(x))));
     } catch (e) {
       if (n !== this.loads) {
