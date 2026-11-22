@@ -46,7 +46,7 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	tag = tag[:len(tag)-1] + "-" + strconv.Itoa(size) + `"`
 	h := w.Header()
 	h.Set("ETag", tag)
-	h.Set("Cache-Control", "private, no-cache")
+	cacheDerived(h, params.V, f.Size, f.ModTime)
 	if inm := r.Header.Get("If-None-Match"); inm != "" && etagMatches(inm, tag) {
 		a.metrics.Thumbnail("not_modified")
 		w.WriteHeader(http.StatusNotModified)

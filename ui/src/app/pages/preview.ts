@@ -158,7 +158,7 @@ import { FileDetails } from '../ui/file-details';
             <dd>{{ where() }}</dd>
           </dl>
           @if (browser.share(); as share) {
-            <f-file-details [share]="share" [path]="e.path" />
+            <f-file-details [share]="share" [path]="e.path" [version]="e.version" />
           }
         </aside>
       }
@@ -237,7 +237,7 @@ export class Preview {
 
   protected thumb(e: Entry): string | null {
     const share = this.browser.share();
-    return share && hasThumbnail(e.name) ? this.api.thumbnailUrl(share, e.path, 160) : null;
+    return share && hasThumbnail(e.name) ? this.api.thumbnailUrl(share, e.path, 160, e.version) : null;
   }
 
   protected step(d: number): void {

@@ -51,7 +51,7 @@ func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.Share
 	tag = tag[:len(tag)-1] + `-meta"`
 	h := w.Header()
 	h.Set("ETag", tag)
-	h.Set("Cache-Control", "private, no-cache")
+	cacheDerived(h, params.V, f.Size, f.ModTime)
 	if inm := r.Header.Get("If-None-Match"); inm != "" && etagMatches(inm, tag) {
 		w.WriteHeader(http.StatusNotModified)
 		return

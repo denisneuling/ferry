@@ -14,12 +14,21 @@ server; the form forgets it right after. When the server ends a session —
 the idle timeout, the lifetime, a lost connection — the interface returns to
 the login and says why.
 
+Signing out clears what the browser cached for ferry (`Clear-Site-Data`),
+thumbnails and details included, so that the next person at a shared
+browser cannot page back to them. A session that only times out sends no
+answer to carry that: on a shared computer, sign out. Browsers act on it in
+a secure context only — served over HTTPS, or on localhost.
+
 ## Browsing
 
 - **Shares** come as the server lists them. One the person may not open
   says so when opened; docs/samba.md has the setting that hides such shares.
 - **Folders** show as tiles — folders first, then files with thumbnails for
-  JPEG, PNG, GIF, WebP and BMP — or as a sortable list.
+  JPEG, PNG, GIF, WebP and BMP — or as a sortable list. The browser keeps a
+  thumbnail, and a file's details, until the file changes: their URLs carry
+  the version the listing gave (size and time of the last write), so coming
+  back to a folder asks the server for its listing and nothing else.
 - **Search this folder** filters the names of the folder open; it searches
   nothing else.
 - **Free space** shows under a folder's title and on each share's card —

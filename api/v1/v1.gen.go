@@ -277,6 +277,11 @@ type Entry struct {
 	// Size Bytes; 0 for folders.
 	Size int64     `json:"size"`
 	Type EntryType `json:"type"`
+
+	// Version Changes whenever the file's size or modification time does. Opaque:
+	// pass it as `v` to the thumbnail and the details, so that the
+	// browser keeps them until the file changes.
+	Version string `json:"version"`
 }
 
 // EntryList defines model for EntryList.
@@ -490,6 +495,9 @@ type EntryPath = string
 // FerryRequest defines model for FerryRequest.
 type FerryRequest string
 
+// FileVersion defines model for FileVersion.
+type FileVersion = string
+
 // ShareName defines model for ShareName.
 type ShareName = string
 
@@ -601,6 +609,14 @@ type CreateFolderParamsXFerryRequest string
 type GetMetadataParams struct {
 	// Path Slash-separated, relative to the share's root; empty for the root.
 	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// V The `version` of the entry as its listing gave it. When it is the
+	// file's version still, the answer is cached as
+	// `private, max-age=31536000, immutable`: a changed file has another
+	// version, and so another URL. When it is not — the file changed since
+	// the listing — the answer is the current file's, revalidated as
+	// without `v`. Never an error.
+	V *FileVersion `form:"v,omitempty" json:"v,omitempty"`
 }
 
 // MoveEntryParams defines parameters for MoveEntry.
@@ -622,6 +638,14 @@ type GetSpaceParams struct {
 type GetThumbnailParams struct {
 	// Path Slash-separated, relative to the share's root; empty for the root.
 	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// V The `version` of the entry as its listing gave it. When it is the
+	// file's version still, the answer is cached as
+	// `private, max-age=31536000, immutable`: a changed file has another
+	// version, and so another URL. When it is not — the file changed since
+	// the listing — the answer is the current file's, revalidated as
+	// without `v`. Never an error.
+	V *FileVersion `form:"v,omitempty" json:"v,omitempty"`
 
 	// Size The edge of the square the thumbnail fits in, in pixels.
 	Size *GetThumbnailParamsSize `form:"size,omitempty" json:"size,omitempty"`
@@ -832,6 +856,8 @@ type ClientInterface interface {
 	// Logout End the session and its SMB session.
 	//
 	// Idempotent; without a session it does nothing and still answers 204.
+	// The answer carries `Clear-Site-Data: "cache"`, so that thumbnails and
+	// details the browser keeps for a year go with the session.
 	//
 	// Corresponds with POST /api/v1/logout (the `Logout` operationId).
 	Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -928,7 +954,7 @@ type ClientInterface interface {
 	// and nothing is stored or logged. A format ferry does not read, or a
 	// file it cannot make sense of, is `kind: other` with whatever was
 	// found, not an error. Every value comes out of the file: show it as
-	// text. `ETag` follows the file.
+	// text. `ETag` follows the file; with `v`, see `FileVersion`.
 	//
 	// Corresponds with GET /api/v1/shares/{share}/metadata (the `GetMetadata` operationId).
 	GetMetadata(ctx context.Context, share ShareName, params *GetMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -966,8 +992,8 @@ type ClientInterface interface {
 	// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
 	// for every request and never stored; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
-	// file is unchanged. Images beyond the deployment's bounds — bytes or
-	// pixels — are `413`.
+	// file is unchanged; with `v`, see `FileVersion`. Images beyond the
+	// deployment's bounds — bytes or pixels — are `413`.
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1037,6 +1063,8 @@ func (c *Client) Login(ctx context.Context, params *LoginParams, body LoginJSONR
 // Logout End the session and its SMB session.
 //
 // Idempotent; without a session it does nothing and still answers 204.
+// The answer carries `Clear-Site-Data: "cache"`, so that thumbnails and
+// details the browser keeps for a year go with the session.
 //
 // Corresponds with POST /api/v1/logout (the `Logout` operationId).
 func (c *Client) Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1213,7 +1241,7 @@ func (c *Client) CreateFolder(ctx context.Context, share ShareName, params *Crea
 // and nothing is stored or logged. A format ferry does not read, or a
 // file it cannot make sense of, is `kind: other` with whatever was
 // found, not an error. Every value comes out of the file: show it as
-// text. `ETag` follows the file.
+// text. `ETag` follows the file; with `v`, see `FileVersion`.
 //
 // Corresponds with GET /api/v1/shares/{share}/metadata (the `GetMetadata` operationId).
 func (c *Client) GetMetadata(ctx context.Context, share ShareName, params *GetMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1291,8 +1319,8 @@ func (c *Client) GetSpace(ctx context.Context, share ShareName, params *GetSpace
 // PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
 // for every request and never stored; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
-// file is unchanged. Images beyond the deployment's bounds — bytes or
-// pixels — are `413`.
+// file is unchanged; with `v`, see `FileVersion`. Images beyond the
+// deployment's bounds — bytes or pixels — are `413`.
 //
 // Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1910,6 +1938,18 @@ func NewGetMetadataRequest(server string, share ShareName, params *GetMetadataPa
 
 		}
 
+		if params.V != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "v", *params.V, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -2092,6 +2132,18 @@ func NewGetThumbnailRequest(server string, share ShareName, params *GetThumbnail
 
 		}
 
+		if params.V != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "v", *params.V, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Size != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "size", *params.Size, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
@@ -2198,6 +2250,8 @@ type ClientWithResponsesInterface interface {
 	// LogoutWithResponse End the session and its SMB session.
 	//
 	// Idempotent; without a session it does nothing and still answers 204.
+	// The answer carries `Clear-Site-Data: "cache"`, so that thumbnails and
+	// details the browser keeps for a year go with the session.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2308,7 +2362,7 @@ type ClientWithResponsesInterface interface {
 	// and nothing is stored or logged. A format ferry does not read, or a
 	// file it cannot make sense of, is `kind: other` with whatever was
 	// found, not an error. Every value comes out of the file: show it as
-	// text. `ETag` follows the file.
+	// text. `ETag` follows the file; with `v`, see `FileVersion`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2350,8 +2404,8 @@ type ClientWithResponsesInterface interface {
 	// PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
 	// for every request and never stored; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
-	// file is unchanged. Images beyond the deployment's bounds — bytes or
-	// pixels — are `413`.
+	// file is unchanged; with `v`, see `FileVersion`. Images beyond the
+	// deployment's bounds — bytes or pixels — are `413`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2490,11 +2544,18 @@ func (r LoginResponse) ContentType() string {
 	return ""
 }
 
+// LogoutResponse204Headers the declared response headers of an HTTP 204 response for Logout
+type LogoutResponse204Headers struct {
+	ClearSiteData *string
+}
+
 type LogoutResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
 	ApplicationproblemJSON400 *BadRequest
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *LogoutResponse204Headers
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
@@ -3442,6 +3503,8 @@ func (c *ClientWithResponses) LoginWithResponse(ctx context.Context, params *Log
 // LogoutWithResponse End the session and its SMB session.
 //
 // Idempotent; without a session it does nothing and still answers 204.
+// The answer carries `Clear-Site-Data: "cache"`, so that thumbnails and
+// details the browser keeps for a year go with the session.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3600,7 +3663,7 @@ func (c *ClientWithResponses) CreateFolderWithResponse(ctx context.Context, shar
 // and nothing is stored or logged. A format ferry does not read, or a
 // file it cannot make sense of, is `kind: other` with whatever was
 // found, not an error. Every value comes out of the file: show it as
-// text. `ETag` follows the file.
+// text. `ETag` follows the file; with `v`, see `FileVersion`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3666,8 +3729,8 @@ func (c *ClientWithResponses) GetSpaceWithResponse(ctx context.Context, share Sh
 // PNG, GIF, WebP and BMP are read; anything else is `415`. Made anew
 // for every request and never stored; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
-// file is unchanged. Images beyond the deployment's bounds — bytes or
-// pixels — are `413`.
+// file is unchanged; with `v`, see `FileVersion`. Images beyond the
+// deployment's bounds — bytes or pixels — are `413`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3814,6 +3877,19 @@ func ParseLogoutResponse(rsp *http.Response) (*LogoutResponse, error) {
 		}
 		response.ApplicationproblemJSON400 = &dest
 
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		var headers LogoutResponse204Headers
+		if values := rsp.Header.Values("Clear-Site-Data"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Clear-Site-Data", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ClearSiteData = &value
+		}
+		response.Headers204 = &headers
 	}
 
 	return response, nil
@@ -5068,6 +5144,19 @@ func (siw *ServerInterfaceWrapper) GetMetadata(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// ------------- Optional query parameter "v" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "v", r.URL.Query(), &params.V, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "v"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "v", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMetadata(w, r, share, params)
 	}))
@@ -5202,6 +5291,19 @@ func (siw *ServerInterfaceWrapper) GetThumbnail(w http.ResponseWriter, r *http.R
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "v" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "v", r.URL.Query(), &params.V, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "v"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "v", Err: err})
 		}
 		return
 	}

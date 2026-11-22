@@ -251,6 +251,10 @@ func TestLogoutWithoutSession(t *testing.T) {
 	if res.StatusCode != 204 {
 		t.Fatalf("status %d", res.StatusCode)
 	}
+	// Thumbnails and details are cached for a year; they leave with it.
+	if got := res.Header.Get("Clear-Site-Data"); got != `"cache"` {
+		t.Errorf("Clear-Site-Data %q", got)
+	}
 	found := false
 	for _, c := range res.Cookies() {
 		if c.Name == cookieName && c.MaxAge < 0 {

@@ -85,8 +85,28 @@ func disposition(kind, name string) string {
 	return fmt.Sprintf(`%s; filename="%s"; filename*=UTF-8''%s`, kind, fallback, url.PathEscape(name))
 }
 
-func etag(size int64, mod time.Time) string {
-	return fmt.Sprintf(`"%x-%x"`, size, mod.UnixNano())
+// version is what an entry's listing says of the file's state, and what an
+// ETag is made of: it changes whenever the size or the time of the last
+// write does.
+func version(size int64, mod time.Time) string {
+	return fmt.Sprintf("%x-%x", size, mod.UnixNano())
+}
+
+func etag(size int64, mod time.Time) string { return `"` + version(size, mod) + `"` }
+
+// cacheDerived sets how long the browser keeps what ferry derives from a
+// file — a thumbnail, its details. Asked for with the version the listing
+// gave, and the file still at that version, it is kept for a year without
+// asking again: a changed file has another version and so another URL, and
+// the file's bytes never change under one. Otherwise, the file changed or
+// no version was given, it is revalidated every time, as before. Private
+// either way: it comes from someone's share.
+func cacheDerived(h http.Header, v *v1.FileVersion, size int64, mod time.Time) {
+	if v != nil && *v == version(size, mod) {
+		h.Set("Cache-Control", "private, max-age=31536000, immutable")
+		return
+	}
+	h.Set("Cache-Control", "private, no-cache")
 }
 
 func (a *API) GetContent(w http.ResponseWriter, r *http.Request, share v1.ShareName, params v1.GetContentParams) {

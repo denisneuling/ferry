@@ -142,7 +142,7 @@ export class Folder {
   protected thumb(e: Entry): string | null {
     const share = this.browser.share();
     if (!share || e.type !== 'file' || !hasThumbnail(e.name) || this.broken().has(e.path)) return null;
-    return this.api.thumbnailUrl(share, e.path, 320);
+    return this.api.thumbnailUrl(share, e.path, 320, e.version);
   }
 
   protected thumbFailed(e: Entry): void {

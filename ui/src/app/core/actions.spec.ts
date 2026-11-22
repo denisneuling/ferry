@@ -14,6 +14,7 @@ const file = (i: number): Entry => ({
   type: 'file',
   size: 1,
   modified: '2026-01-01T00:00:00Z',
+  version: '1-0',
 });
 const files = (n: number) => Array.from({ length: n }, (_, i) => file(i));
 

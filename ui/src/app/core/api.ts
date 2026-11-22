@@ -124,9 +124,12 @@ export class Api {
     return this.json('GET', `${shareBase(share)}/space?path=${q(path)}`);
   }
 
-  /** What a file says about itself, read by the server from its bytes. */
-  metadata(share: string, path: string): Promise<FileMetadata> {
-    return this.json('GET', `${shareBase(share)}/metadata?path=${q(path)}`);
+  /**
+   * What a file says about itself, read by the server from its bytes. With
+   * the entry's version the browser keeps the answer until the file changes.
+   */
+  metadata(share: string, path: string, version?: string): Promise<FileMetadata> {
+    return this.json('GET', `${shareBase(share)}/metadata?path=${q(path)}${v(version)}`);
   }
 
   mkdir(share: string, path: string): Promise<Entry> {
@@ -149,8 +152,13 @@ export class Api {
     return `${BASE}${shareBase(share)}/content?path=${q(path)}${inline ? '&disposition=inline' : ''}`;
   }
 
-  thumbnailUrl(share: string, path: string, size: 160 | 320 | 640 = 320): string {
-    return `${BASE}${shareBase(share)}/thumbnail?size=${size}&path=${q(path)}`;
+  /**
+   * A thumbnail's URL. With the entry's version the browser keeps the
+   * thumbnail until the file changes, and coming back to a folder costs no
+   * request at all.
+   */
+  thumbnailUrl(share: string, path: string, size: 160 | 320 | 640 = 320, version?: string): string {
+    return `${BASE}${shareBase(share)}/thumbnail?size=${size}&path=${q(path)}${v(version)}`;
   }
 
   /** The start of a text file, at most max bytes, as text. */
@@ -267,6 +275,11 @@ function shareBase(share: string): string {
 
 function q(path: string): string {
   return encodeURIComponent(path);
+}
+
+/** The `v` parameter for an entry's version, or nothing without one. */
+function v(version: string | undefined): string {
+  return version ? `&v=${encodeURIComponent(version)}` : '';
 }
 
 /** Joins a folder and a name into an API path. */

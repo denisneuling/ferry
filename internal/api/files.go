@@ -186,5 +186,5 @@ func entry(dir string, e smb.Entry) v1.Entry {
 	if e.Dir {
 		t = v1.EntryTypeFolder
 	}
-	return v1.Entry{Name: e.Name, Path: p, Type: t, Size: e.Size, Modified: e.ModTime.UTC()}
+	return v1.Entry{Name: e.Name, Path: p, Type: t, Size: e.Size, Modified: e.ModTime.UTC(), Version: version(e.Size, e.ModTime)}
 }

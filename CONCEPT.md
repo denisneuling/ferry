@@ -155,7 +155,7 @@ Illustrative. The contract is `api/openapi/ferry-v1.yaml`.
 | POST | `/api/v1/shares/{share}/folders?path=` | create a folder |
 | POST | `/api/v1/shares/{share}/move` | rename or move within a share, `{from, to}` |
 | DELETE | `/api/v1/shares/{share}/entries?path=` | delete a file or an empty folder; recursive only when asked |
-| GET | `/api/v1/shares/{share}/thumbnail?path=` | image thumbnail, made on the fly, never cached on disk |
+| GET | `/api/v1/shares/{share}/thumbnail?path=&v=` | image thumbnail, made on the fly, never cached on disk; with the entry's version `v`, cached by the browser until the file changes |
 
 - **Paths** are cleaned and resolved within the share. `..`, absolute paths and
   NUL bytes are refused before anything reaches SMB.

@@ -39,6 +39,8 @@ interface Row {
 export class FileDetails {
   readonly share = input.required<string>();
   readonly path = input.required<string>();
+  /** The entry's version from its listing: the answer is cached while it holds. */
+  readonly version = input<string>();
   private readonly api = inject(Api);
   private readonly locale = inject(LOCALE_ID);
   private readonly meta = signal<FileMetadata | null>(null);
@@ -48,9 +50,10 @@ export class FileDetails {
     effect(() => {
       const share = this.share();
       const path = this.path();
+      const version = this.version();
       const n = ++this.asked;
       this.meta.set(null);
-      this.api.metadata(share, path).then(
+      this.api.metadata(share, path, version).then(
         (m) => n === this.asked && this.meta.set(m),
         () => undefined,
       );

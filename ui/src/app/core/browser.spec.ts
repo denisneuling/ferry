@@ -14,6 +14,7 @@ const entry = (
   type,
   size,
   modified,
+  version: `${size}-0`,
 });
 
 describe('Browser', () => {

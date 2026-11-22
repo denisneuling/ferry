@@ -340,6 +340,11 @@ func (a *API) Logout(w http.ResponseWriter, r *http.Request, _ v1.LogoutParams) 
 		a.sessions.Delete(id)
 	}
 	a.clearCookie(w, r)
+	// Thumbnails and details are cached for a year (cacheDerived); they
+	// leave with the session, so that the next person at a shared browser
+	// cannot page back to them. Browsers act on it only in a secure context
+	// (HTTPS, or localhost).
+	w.Header().Set("Clear-Site-Data", `"cache"`)
 	w.WriteHeader(http.StatusNoContent)
 }
 

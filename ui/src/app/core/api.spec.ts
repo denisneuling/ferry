@@ -8,6 +8,7 @@ const entry = (name: string): Entry => ({
   type: 'file',
   size: 1,
   modified: '2026-01-01T00:00:00Z',
+  version: '1-0',
 });
 
 /** A response whose body arrives in the given pieces. */
@@ -88,5 +89,41 @@ describe('Api.entriesStream', () => {
     const err = await api.entriesStream('alex', 'Many', () => undefined).catch((e) => e);
     expect(err.status).toBe(413);
     expect(err.limit).toBe(100);
+  });
+});
+
+describe('Api, versioned URLs', () => {
+  let api: Api;
+  let asked: string[];
+  beforeEach(() => {
+    asked = [];
+    TestBed.configureTestingModule({
+      providers: [{ provide: Session, useValue: { ended: () => undefined } }],
+    });
+    api = TestBed.inject(Api);
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      asked.push(String(input));
+      return new Response('{"kind":"other"}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("puts the entry's version into the thumbnail's URL, so the browser keeps it", () => {
+    expect(api.thumbnailUrl('alex', 'Photos/a b.jpg', 320, '1f-18a')).toBe(
+      '/api/v1/shares/alex/thumbnail?size=320&path=Photos%2Fa%20b.jpg&v=1f-18a',
+    );
+    expect(api.thumbnailUrl('alex', 'a.jpg', 160)).toBe('/api/v1/shares/alex/thumbnail?size=160&path=a.jpg');
+  });
+
+  it('asks for the details with the version when there is one', async () => {
+    await api.metadata('alex', 'a.jpg', '1f-18a');
+    await api.metadata('alex', 'a.jpg');
+    expect(asked).toEqual([
+      '/api/v1/shares/alex/metadata?path=a.jpg&v=1f-18a',
+      '/api/v1/shares/alex/metadata?path=a.jpg',
+    ]);
   });
 });
