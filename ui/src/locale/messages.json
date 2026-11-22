@@ -164,6 +164,7 @@
     "picker.titleN": "Move {$INTERPOLATION} items to …",
     "picker.empty": "No folders in here.",
     "picker.here": "Move here",
-    "space.free": "{$INTERPOLATION} free of {$INTERPOLATION_1}"
+    "space.free": "{$INTERPOLATION} free of {$INTERPOLATION_1}",
+    "space.used": "{$percent} % used"
   }
 }

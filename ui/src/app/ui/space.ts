@@ -13,7 +13,9 @@ import { Format } from '../core/format';
   host: { style: 'display: contents' },
   template: `@if (space(); as s) {
     <span class="space">
-      <span class="space-bar" aria-hidden="true"><i [style.width.%]="used(s)"></i></span>
+      <span class="space-bar" role="img" [attr.aria-label]="usedLabel(s)"
+        ><i [style.width.%]="used(s)"></i
+      ></span>
       <ng-container i18n="@@space.free"
         >{{ format.size(s.free) }} free of {{ format.size(s.total) }}</ng-container
       >
@@ -42,5 +44,10 @@ export class Space {
 
   protected used(s: SpaceInfo): number {
     return Math.min(100, Math.max(0, ((s.total - s.free) / s.total) * 100));
+  }
+
+  /** What the bar shows, for a screen reader: the bar is the used part. */
+  protected usedLabel(s: SpaceInfo): string {
+    return $localize`:@@space.used:${Math.round(this.used(s))}:percent: % used`;
   }
 }

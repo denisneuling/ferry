@@ -164,6 +164,7 @@
     "picker.titleN": "{$INTERPOLATION} Elemente verschieben nach …",
     "picker.empty": "Hier sind keine Ordner.",
     "picker.here": "Hierher verschieben",
-    "space.free": "{$INTERPOLATION} frei von {$INTERPOLATION_1}"
+    "space.free": "{$INTERPOLATION} frei von {$INTERPOLATION_1}",
+    "space.used": "{$percent} % belegt"
   }
 }

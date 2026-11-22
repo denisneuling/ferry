@@ -47,6 +47,7 @@ describe('Space', () => {
     const el = f.nativeElement as HTMLElement;
     expect(el.textContent).toContain('3.2 TB free of 18 TB');
     expect((el.querySelector('.space-bar i') as HTMLElement).style.width).toMatch(/^82\.2/);
+    expect(el.querySelector('.space-bar')?.getAttribute('aria-label')).toBe('82 % used');
   });
 
   it('shows nothing when the server does not answer', async () => {
