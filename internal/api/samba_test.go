@@ -91,8 +91,9 @@ func TestEndToEnd(t *testing.T) {
 	if e := decode[v1.Entry](t, res); e.Path != dir || e.Type != v1.EntryTypeFolder {
 		t.Fatalf("folder %+v", e)
 	}
+	// The test logs out at its end, so the cleanup signs in afresh.
 	t.Cleanup(func() {
-		h.do(t, "DELETE", "/api/v1/shares/alex/entries?recursive=true&path="+q(dir), nil, ferryReq, c)
+		h.do(t, "DELETE", "/api/v1/shares/alex/entries?recursive=true&path="+q(dir), nil, ferryReq, h.login(t, "alex", alexPassword))
 	})
 
 	// Upload, then download whole and in a range.
