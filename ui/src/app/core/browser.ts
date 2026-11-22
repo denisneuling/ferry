@@ -1,9 +1,20 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Api, ApiError, Entry, Share } from './api';
 import { Format } from './format';
 import { describe } from './errors';
+import { Session } from './session';
 
 export type SortKey = 'name' | 'modified' | 'size';
+
+/**
+ * The folders kept in memory for going back to them without waiting: the
+ * last ones opened, so many entries in all, and none larger than a folder
+ * worth keeping — a folder of a hundred thousand entries would push out
+ * everything else, and lists in a second anyway.
+ */
+export const MEMORY_FOLDERS = 20;
+export const MEMORY_ENTRIES = 100_000;
+export const MEMORY_LARGEST = 20_000;
 
 /**
  * What the person is looking at: the shares, the folder open, its entries,
@@ -37,6 +48,21 @@ export class Browser {
 
   private loads = 0;
   private abort: AbortController | null = null;
+  /**
+   * The folders last listed, the most recent last: a folder opened again
+   * shows at once from here while its listing is read anew. Only in this
+   * tab's memory — never in the browser's storage — and gone with the
+   * session, whoever logs in next.
+   */
+  private readonly memory = new Map<string, Entry[]>();
+  private remembered = 0;
+
+  constructor() {
+    const session = inject(Session);
+    effect(() => {
+      if (!session.me()) this.forget();
+    });
+  }
 
   /** The folder's entries, filtered and sorted: folders first, then files. */
   readonly visible = computed(() => {
@@ -77,7 +103,9 @@ export class Browser {
     if (!same) {
       this.share.set(share);
       this.path.set(path);
-      this.entries.set(null);
+      // A folder seen a moment ago shows as it was, and its new listing
+      // replaces it when complete (stale while revalidating).
+      this.entries.set(this.recall(share, path));
       this.filter.set('');
       this.clear();
       this.preview.set(null);
@@ -131,6 +159,7 @@ export class Browser {
         return; // A newer load is on its way.
       }
       this.entries.set(got);
+      this.remember(share, path, got);
       this.error.set(null);
       this.errorCode.set(null);
       this.selected.update((s) => new Set([...s].filter((x) => names.has(x))));
@@ -139,6 +168,7 @@ export class Browser {
         return;
       }
       this.entries.set(null);
+      this.drop(key(share, path));
       this.error.set(describe(e, 'list'));
       this.errorCode.set(e instanceof ApiError ? e.code : 'internal');
     } finally {
@@ -163,6 +193,39 @@ export class Browser {
   reset(): void {
     this.leave();
     this.shares.set(null);
+    this.forget();
+  }
+
+  private recall(share: string, path: string): Entry[] | null {
+    const k = key(share, path);
+    const got = this.memory.get(k);
+    if (!got) return null;
+    this.memory.delete(k); // to the end: the most recent
+    this.memory.set(k, got);
+    return got;
+  }
+
+  private remember(share: string, path: string, entries: Entry[]): void {
+    const k = key(share, path);
+    this.drop(k);
+    if (entries.length > MEMORY_LARGEST) return;
+    this.memory.set(k, entries);
+    this.remembered += entries.length;
+    // The oldest go first, until both bounds hold.
+    for (const old of this.memory.keys()) {
+      if (this.memory.size <= MEMORY_FOLDERS && this.remembered <= MEMORY_ENTRIES) break;
+      this.drop(old);
+    }
+  }
+
+  private drop(k: string): void {
+    this.remembered -= this.memory.get(k)?.length ?? 0;
+    this.memory.delete(k);
+  }
+
+  private forget(): void {
+    this.memory.clear();
+    this.remembered = 0;
   }
 
   setSort(key: SortKey): void {
@@ -203,4 +266,8 @@ export class Browser {
     this.selected.set(new Set());
     this.anchor = null;
   }
+}
+
+function key(share: string, path: string): string {
+  return `${share}\u0000${path}`;
 }

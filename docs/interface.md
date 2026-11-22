@@ -40,6 +40,11 @@ and sign out.
   thumbnail, and a file's details, until the file changes: their URLs carry
   the version the listing gave (size and time of the last write), so coming
   back to a folder asks the server for its listing and nothing else.
+- **Going back** to a folder seen a moment ago shows it at once, as it
+  was, while ferry lists it anew; the new listing replaces it when
+  complete. The interface keeps the last 20 folders (100000 entries in all,
+  none above 20000) in the tab's memory only, never in the browser's
+  storage, and forgets them when the session ends.
 - **Search this folder** filters the names of the folder open; it searches
   nothing else.
 - **Free space** shows under a folder's title and on each share's card —

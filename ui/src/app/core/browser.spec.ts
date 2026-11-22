@@ -1,7 +1,8 @@
 import { LOCALE_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Api, Entry } from './api';
-import { Browser } from './browser';
+import { Browser, MEMORY_FOLDERS, MEMORY_LARGEST } from './browser';
+import { Session } from './session';
 
 const entry = (
   name: string,
@@ -129,5 +130,108 @@ describe('Browser loading a folder', () => {
     release();
     await again;
     expect(b.entries()?.map((e) => e.name)).toEqual(['x', 'y']);
+  });
+});
+
+describe('Browser going back', () => {
+  /** What each folder lists now; a folder named 'hold' waits for release(). */
+  let listings: Record<string, Entry[] | Error>;
+  let held: (() => void) | null;
+  let b: Browser;
+  let session: Session;
+  beforeEach(() => {
+    listings = {};
+    held = null;
+    const api = {
+      entriesStream: (_s: string, path: string, on: (b: Entry[]) => void) => {
+        const answer = () => {
+          const l = listings[path] ?? [];
+          if (l instanceof Error) throw l;
+          on(l);
+          return l.length;
+        };
+        if (path !== 'hold') return Promise.resolve().then(answer);
+        return new Promise<number>((resolve, reject) => {
+          held = () => {
+            try {
+              resolve(answer());
+            } catch (e) {
+              reject(e);
+            }
+          };
+        });
+      },
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: LOCALE_ID, useValue: 'en' },
+        { provide: Api, useValue: api },
+      ],
+    });
+    session = TestBed.inject(Session);
+    session.started({ user: 'alex' } as never);
+    b = TestBed.inject(Browser);
+    TestBed.tick();
+  });
+
+  const names = () => b.entries()?.map((e) => e.name) ?? null;
+  const files = (...n: string[]) => n.map((x) => entry(x, 'file'));
+
+  it('shows a folder seen before at once, and its new listing when complete', async () => {
+    listings['hold'] = files('old');
+    const first = b.open('alex', 'hold');
+    held!();
+    await first;
+    await b.open('alex', 'elsewhere');
+
+    listings['hold'] = files('old', 'new');
+    const back = b.open('alex', 'hold');
+    expect(names()).toEqual(['old']);
+    expect(b.loading()).toBe(true);
+    held!();
+    await back;
+    expect(names()).toEqual(['old', 'new']);
+    expect(b.loading()).toBe(false);
+  });
+
+  it(`keeps the last ${MEMORY_FOLDERS} folders`, async () => {
+    for (let i = 0; i <= MEMORY_FOLDERS; i++) {
+      listings[`f${i}`] = files(`in-${i}`);
+      await b.open('alex', `f${i}`);
+    }
+    // The first went out; the second is still there.
+    void b.open('alex', 'f0');
+    expect(names()).toBeNull();
+    void b.open('alex', 'f1');
+    expect(names()).toEqual(['in-1']);
+  });
+
+  it('does not keep a folder too large to be worth it', async () => {
+    listings['big'] = Array.from({ length: MEMORY_LARGEST + 1 }, (_, i) => entry(`f${i}`, 'file'));
+    await b.open('alex', 'big');
+    await b.open('alex', 'elsewhere');
+    void b.open('alex', 'big');
+    expect(names()).toBeNull();
+  });
+
+  it('forgets a folder whose listing failed', async () => {
+    listings['gone'] = files('a');
+    await b.open('alex', 'gone');
+    listings['gone'] = new Error('not found');
+    await b.reload();
+    await b.open('alex', 'elsewhere');
+    void b.open('alex', 'gone');
+    expect(names()).toBeNull();
+  });
+
+  it('forgets everything when the session ends, whoever logs in next', async () => {
+    listings['Photos'] = files('IMG_1.jpg');
+    await b.open('alex', 'Photos');
+    await b.open('alex', 'elsewhere');
+    session.ended('expired');
+    TestBed.tick();
+    session.started({ user: 'sam' } as never);
+    void b.open('alex', 'Photos');
+    expect(names()).toBeNull();
   });
 });
