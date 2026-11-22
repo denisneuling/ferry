@@ -5,6 +5,13 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.5.0](https://github.com/metapatrol/ferry/compare/v0.4.1...v0.5.0) (2026-11-22)
+
+### Features
+
+* show a PDF's first page as its thumbnail ([9a115b4](https://github.com/metapatrol/ferry/commit/9a115b426df23655927a34874b3cfc343ee69fb3))
+* show HEIC photos as thumbnails and in the preview ([41f2436](https://github.com/metapatrol/ferry/commit/41f243627e66f8e75cf19202cd77e14732d59768))
+
 ## [0.4.1](https://github.com/metapatrol/ferry/compare/v0.4.0...v0.4.1) (2026-11-22)
 
 ### Bug Fixes
