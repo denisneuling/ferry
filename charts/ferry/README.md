@@ -2,7 +2,7 @@
 
 ferry — SMB shares in the browser; log in with your Samba account and see exactly what Samba lets you see, with no users, no database and nothing stored
 
-![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square) ![AppVersion: 0.2.0](https://img.shields.io/badge/AppVersion-0.2.0-informational?style=flat-square)
+![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![AppVersion: 0.3.0](https://img.shields.io/badge/AppVersion-0.3.0-informational?style=flat-square)
 
 ferry logs people in to an SMB server with their own accounts and shows
 them, in the browser, exactly what the server lets them see. It keeps
@@ -10,7 +10,7 @@ nothing: no users, no database, no volumes, no secrets — sessions live in
 the process's memory.
 
 ```sh
-helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.2.0 \
+helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.3.0 \
   --set smb.server=nas.example.lan \
   --set ingress.enabled=true --set 'ingress.hosts[0].host=files.example.com' \
   --set 'ingress.hosts[0].paths[0].path=/' \

@@ -5,6 +5,16 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.3.0](https://github.com/metapatrol/ferry/compare/v0.2.0...v0.3.0) (2026-11-22)
+
+### Features
+
+* a few SMB connections per login, one kept for browsing ([1cc0d38](https://github.com/metapatrol/ferry/commit/1cc0d386f6358485e605e90120697211b93e358b))
+* download several entries or folders as one ZIP ([20daf8b](https://github.com/metapatrol/ferry/commit/20daf8b4843ee45026dbaf8e78a1d073f870e63d))
+* keep thumbnails and details in the browser until the file changes ([31adac1](https://github.com/metapatrol/ferry/commit/31adac133a9af8d1ac7a6c7eefa4d076cf54652c))
+* **ui:** load the next and the previous image ahead in the preview ([c112075](https://github.com/metapatrol/ferry/commit/c11207577e27ea2383780b2e2b6fcebccf8cecd0))
+* **ui:** show a folder seen a moment ago at once when going back ([903a79d](https://github.com/metapatrol/ferry/commit/903a79df641387715a6b89093b64fc7e732dce89))
+
 ## [0.2.0](https://github.com/metapatrol/ferry/compare/v0.1.0...v0.2.0) (2026-11-22)
 
 ### Features
