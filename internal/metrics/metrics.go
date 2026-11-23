@@ -39,6 +39,8 @@ type Metrics struct {
 	previews    *prometheus.CounterVec
 	previewWait *prometheus.HistogramVec
 	previewRun  *prometheus.HistogramVec
+	searches    *prometheus.CounterVec
+	searchRun   prometheus.Histogram
 }
 
 // Gauges are read at every scrape from where they are kept.
@@ -126,9 +128,18 @@ func New(version, commit string, g Gauges) *Metrics {
 			// CPU and FERRY_PREVIEW_TIMEOUT cuts it off.
 			Buckets: []float64{.05, .1, .25, .5, 1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 45, 60},
 		}, []string{"format"}),
+		searches: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ferry_searches_total",
+			Help: "Searches below a folder by outcome: ok, truncated (stopped at a bound: hits, folders, depth, time), canceled (the client left), failed.",
+		}, []string{"outcome"}),
+		searchRun: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "ferry_search_duration_seconds",
+			Help:    "How long a search below a folder ran, to its end or its bound.",
+			Buckets: []float64{.05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 45, 60},
+		}),
 	}
 	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency, m.smbConns, m.smbLost, m.smbWait, m.archives,
-		m.cacheReqs, m.cacheBytes, m.cacheEvict, m.previews, m.previewWait, m.previewRun)
+		m.cacheReqs, m.cacheBytes, m.cacheEvict, m.previews, m.previewWait, m.previewRun, m.searches, m.searchRun)
 	build := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:        "ferry_build_info",
 		Help:        "Always 1; the labels say which build runs.",
@@ -235,6 +246,14 @@ func (m *Metrics) ConnectionLost(pool string) {
 func (m *Metrics) SlotWait(pool string, d time.Duration) {
 	if m != nil {
 		m.smbWait.WithLabelValues(pool).Observe(d.Seconds())
+	}
+}
+
+// Search counts a search below a folder by its outcome, and how long it ran.
+func (m *Metrics) Search(outcome string, d time.Duration) {
+	if m != nil {
+		m.searches.WithLabelValues(outcome).Inc()
+		m.searchRun.Observe(d.Seconds())
 	}
 }
 

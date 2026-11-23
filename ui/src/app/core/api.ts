@@ -14,6 +14,7 @@ export type FileMetadata = components['schemas']['FileMetadata'];
 export type Problem = components['schemas']['Problem'];
 export type Version = components['schemas']['Version'];
 export type VersionList = components['schemas']['VersionList'];
+export type SearchEnd = components['schemas']['SearchEnd']['end'];
 
 /** An answer of the API that is not a success: its status and stable code. */
 export class ApiError extends Error {
@@ -135,6 +136,57 @@ export class Api {
         batch.push(v);
       }
       if (batch.length) onEntries(batch);
+    }
+  }
+
+  /**
+   * Looks for names containing q below a folder: onHits gets the hits as
+   * the server finds them, and the promise ends with how the search went.
+   * A problem in the stream's last line, or a stream cut off before it, is
+   * an ApiError, as for a listing.
+   */
+  async search(
+    share: string,
+    path: string,
+    q: string,
+    onHits: (hits: Entry[]) => void,
+    signal?: AbortSignal,
+  ): Promise<SearchEnd> {
+    const res = await this.fetch(
+      'GET',
+      `${BASE}${shareBase(share)}/search?path=${encodeURIComponent(path)}&q=${encodeURIComponent(q)}${this.at()}`,
+      undefined,
+      { Accept: 'application/x-ndjson' },
+      signal,
+    );
+    if (!res.body) throw new ApiError(0, 'network');
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let rest = '';
+    for (;;) {
+      let chunk: ReadableStreamReadResult<string>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        throw new ApiError(0, 'network');
+      }
+      if (chunk.done) throw new ApiError(0, 'network');
+      const lines = (rest + chunk.value).split('\n');
+      rest = lines.pop() ?? '';
+      const hits: Entry[] = [];
+      for (const line of lines) {
+        if (!line) continue;
+        const v = JSON.parse(line) as { hit?: Entry; end?: SearchEnd; problem?: Problem };
+        if (v.hit) hits.push(v.hit);
+        else if (v.end) {
+          if (hits.length) onHits(hits);
+          void reader.cancel();
+          return v.end;
+        } else if (v.problem) {
+          void reader.cancel();
+          throw this.problemOf(v.problem.status, v.problem);
+        }
+      }
+      if (hits.length) onHits(hits);
     }
   }
 

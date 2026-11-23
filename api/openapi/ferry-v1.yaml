@@ -466,6 +466,52 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/search:
+    get:
+      operationId: search
+      tags: [files]
+      summary: Find names below a folder.
+      description: |
+        Looks for entries whose name contains `q` in the folder `path` and
+        every folder below it, as they are now or, with `at`, as that
+        snapshot holds them. Case is ignored, and names are compared after
+        Unicode normalisation (NFC), so a name written decomposed matches.
+        There is no index: the folders are listed one by one, breadth
+        first, with the person's session, and nothing is kept. A folder the
+        server refuses below `path` is skipped and counted; `path` refused
+        is the error.
+
+        The answer is `application/x-ndjson`, written as hits are found:
+        one `{"hit": Entry}` per hit, then a last line, `{"end": …}` with
+        what was looked through, or `{"problem": Problem}` when it failed
+        part-way. A stream without either last line was cut off. Errors
+        before the first line are ordinary problem responses.
+
+        It stops after 1000 hits, 20000 folders, 32 levels below `path` or
+        60 seconds, saying which in `end.reason` with `truncated: true`. A
+        client that goes away stops it before the next folder.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/At"
+        - name: q
+          in: query
+          required: true
+          description: What names must contain.
+          schema: { type: string, minLength: 1, maxLength: 256 }
+      responses:
+        "200":
+          description: The hits as they are found, and how the search ended.
+          content:
+            application/x-ndjson:
+              schema: { $ref: "#/components/schemas/SearchStreamLine" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/folders:
     post:
       operationId: createFolder
@@ -905,6 +951,33 @@ components:
         - $ref: "#/components/schemas/Entry"
         - $ref: "#/components/schemas/EntryStreamEnd"
         - $ref: "#/components/schemas/EntryStreamProblem"
+    SearchStreamLine:
+      description: One line of a search's answer.
+      oneOf:
+        - $ref: "#/components/schemas/SearchHit"
+        - $ref: "#/components/schemas/SearchEnd"
+        - $ref: "#/components/schemas/EntryStreamProblem"
+    SearchHit:
+      type: object
+      required: [hit]
+      properties:
+        hit: { $ref: "#/components/schemas/Entry" }
+    SearchEnd:
+      type: object
+      required: [end]
+      properties:
+        end:
+          type: object
+          required: [hits, folders, skipped, truncated]
+          properties:
+            hits: { type: integer, description: "The hits given." }
+            folders: { type: integer, description: "The folders looked through." }
+            skipped: { type: integer, description: "Folders the server refused, or too large to look through." }
+            truncated: { type: boolean, description: "It stopped at a bound before looking through everything." }
+            reason:
+              type: string
+              enum: [hits, folders, depth, time]
+              description: The bound it stopped at, when truncated.
     EntryStreamEnd:
       type: object
       required: [end]

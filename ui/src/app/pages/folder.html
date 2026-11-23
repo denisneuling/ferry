@@ -24,7 +24,7 @@
         @if (browser.share(); as share) {
           · <f-space [share]="share" [path]="browser.path()" />
         }
-        @if (browser.filter()) {
+        @if (browser.filter() && !finder.query()) {
           · <ng-container i18n="@@matching">{{ browser.visible().length }} matching</ng-container>
         }
       }
@@ -43,6 +43,18 @@
         i18n-placeholder="@@search.ph"
       />
     </label>
+    <button
+      type="button"
+      class="btn deep"
+      [class.on]="finder.deep()"
+      [attr.aria-pressed]="finder.deep()"
+      (click)="finder.deep.set(!finder.deep())"
+      title="Also search the folders below"
+      i18n-title="@@search.deepTitle"
+      i18n="@@search.deep"
+    >
+      Subfolders
+    </button>
     <div class="seg" role="group" aria-label="View" i18n-aria-label="@@view">
       <button
         type="button"
@@ -135,7 +147,53 @@
 }
 
 <section class="content" [class.selecting]="selecting()">
-  @if (browser.error(); as err) {
+  @if (finder.query(); as sq) {
+    <div class="hits">
+      <p class="hits-status" role="status">
+        @if (finder.running()) {
+          <ng-container i18n="@@search.running">Searching the folders below…</ng-container>
+          ·
+        }
+        <ng-container i18n="@@search.count">{finder.hits().length, plural,
+          =1 {1 found}
+          other {{{ finder.hits().length }} found}
+        }</ng-container>
+        @if (finder.end(); as end) {
+          ·
+          <ng-container i18n="@@search.folders">{{ end.folders }} folders looked through</ng-container>
+          @if (end.skipped) {
+            ·
+            <ng-container i18n="@@search.skipped">{{ end.skipped }} not readable</ng-container>
+          }
+          @if (end.truncated) {
+            ·
+            <b i18n="@@search.truncated">stopped early, there may be more</b>
+          }
+        }
+      </p>
+      @if (finder.error(); as err) {
+        <p class="hits-error" role="alert">{{ err }}</p>
+      }
+      <ul class="hits-list">
+        @for (e of finder.hits(); track e.path) {
+          <li>
+            <button type="button" (click)="revealHit(e)">
+              <f-icon [name]="icon(e)" [size]="18" />
+              <b>{{ e.name }}</b>
+              <small>{{ hitFolder(e) }}</small>
+            </button>
+          </li>
+        }
+      </ul>
+      @if (!finder.running() && finder.end() && !finder.hits().length) {
+        <div class="empty">
+          <f-icon name="search" [size]="56" [stroke]="1.2" />
+          <b i18n="@@empty.none">Nothing found</b>
+          <ng-container i18n="@@search.noneText">No name here or below contains “{{ sq.q }}”.</ng-container>
+        </div>
+      }
+    </div>
+  } @else if (browser.error(); as err) {
     <div class="error-pane">
       <f-icon [name]="browser.errorCode() === 'access_denied' ? 'lock' : 'info'" [size]="48" [stroke]="1.3" />
       @if (browser.errorCode() === 'access_denied') {

@@ -208,6 +208,14 @@
     "versions.open": "Öffnen",
     "versions.download": "Herunterladen",
     "versions.truncated": " Nur die neuesten Snapshots wurden durchgesehen; es kann ältere Versionen geben. ",
-    "versions.close": "Schließen"
+    "versions.close": "Schließen",
+    "search.deepTitle": "Auch in den Ordnern darunter suchen",
+    "search.deep": " Unterordner ",
+    "search.running": "Die Ordner darunter werden durchsucht …",
+    "search.count": "{VAR_PLURAL, plural, =1 {1 gefunden} other {{INTERPOLATION} gefunden}}",
+    "search.folders": "{$INTERPOLATION} Ordner durchsucht",
+    "search.skipped": "{$INTERPOLATION} nicht lesbar",
+    "search.truncated": "vorzeitig beendet, es kann mehr geben",
+    "search.noneText": "Kein Name hier oder darunter enthält „{$INTERPOLATION}“."
   }
 }

@@ -80,6 +80,19 @@ chown sam:family /srv/family/sam-only.png /srv/family/sam-only.txt && chmod 0600
 chown -R root:root /srv/scans && chmod 0755 /srv/scans
 chown -R nobody /srv/public && chmod 0777 /srv/public
 
+# A tree to search below (internal/smb's search tests): hits at several
+# depths and cases, a name written decomposed as macOS writes it, and a
+# folder alex may not open, which a search skips and counts.
+S=/srv/alex/Search
+rm -rf "$S" && mkdir -p "$S/a/b/c" "$S/Privat" "$S/leer"
+echo 1 > "$S/Rechnung 2025.pdf"
+echo 2 > "$S/a/rechnung strom.txt"
+echo 3 > "$S/a/b/c/RECHNUNG.md"
+printf 4 > "$S/a/b/$(printf 'Gru\314\210n Rechnung.txt')"
+echo 5 > "$S/a/b/notiz.txt"
+echo 6 > "$S/Privat/rechnung geheim.txt"
+chown -R alex:family "$S" && chown -R sam:family "$S/Privat" && chmod 0700 "$S/Privat"
+
 mkdir -p /var/lib/ferry-test-samba/bad-password /run/ferry-test-samba/bad-password
 smbd -D -s "$CONF/smb-bad-password.conf"
 case "$MODE" in

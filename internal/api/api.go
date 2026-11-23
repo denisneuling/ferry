@@ -59,7 +59,9 @@ type API struct {
 	metaSlots   chan struct{}
 	thumbMemory *semaphore.Weighted
 	// failures are files that made no thumbnail a moment ago (failures.go).
-	failures  *failures
+	failures *failures
+	// searches holds the one search each session may have running.
+	searches  *searches
 	thumbUsed atomic.Int64
 	metrics   *metrics.Metrics
 	// archives holds the ZIP downloads listed and not yet fetched.
@@ -119,6 +121,7 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		metaSlots:   make(chan struct{}, metaConcurrency),
 		thumbMemory: semaphore.NewWeighted(max(1, cfg.ThumbnailMemory)),
 		failures:    newFailures(),
+		searches:    newSearches(),
 	}
 	o := preview.Options{
 		PDF: cfg.PreviewPDF, CodeDir: cfg.WASMDir, Budget: a.budget, BudgetSize: cfg.ThumbnailMemory,

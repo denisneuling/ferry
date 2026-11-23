@@ -1894,3 +1894,54 @@ a {
     flex-wrap: wrap;
   }
 }
+
+/* A search below the folder: the switch beside the field, and the hits. */
+.btn.deep.on {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.hits-status {
+  color: var(--ink-2);
+  margin: 0 0 12px;
+}
+.hits-error {
+  color: var(--danger);
+}
+.hits-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hits-list button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hits-list button:hover,
+.hits-list button:focus-visible {
+  background: var(--sunk);
+}
+.hits-list b {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hits-list small {
+  margin-left: auto;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}

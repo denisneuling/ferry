@@ -47,8 +47,18 @@ and sign out.
   complete. The interface keeps the last 20 folders (100000 entries in all,
   none above 20000) in the tab's memory only, never in the browser's
   storage, and forgets them when the session ends.
-- **Search this folder** filters the names of the folder open; it searches
-  nothing else.
+- **Search this folder** filters the names of the folder open. With
+  **Subfolders** switched on, what is typed (two characters or more) is
+  looked for below the folder as well: the server lists the folders one by
+  one, with the person's own session, and the hits appear as they are found,
+  each with the folder it is in; a click opens that folder with the hit
+  selected. Case does not matter, nor how an umlaut was written. Folders the
+  NAS does not let the person open are skipped and counted. It stops at 1000
+  hits, 20000 folders, 32 levels or a minute, and says so; nothing is
+  indexed or kept. In a folder shown as it was, the search looks through
+  that snapshot. One search runs per session: typing on ends the one
+  before. It uses one of the background connections, a folder at a time,
+  so thumbnails and downloads still load in between.
 - **Free space** shows under a folder's title and on each share's card —
   "3.2 TB free of 18 TB" with a thin bar — exactly as the SMB server reports
   it to the person (a quota included, when the server applies one). ferry

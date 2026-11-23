@@ -18,6 +18,7 @@ import { Browser, SortKey } from '../core/browser';
 import { Format } from '../core/format';
 import { hasThumbnail, kindIcon, kindOf } from '../core/kinds';
 import { Prefs } from '../core/prefs';
+import { Search } from '../core/search';
 import { Snapshot, isToken, tokenTime } from '../core/snapshot';
 import { Transfers } from '../core/transfers';
 import { Icon } from '../ui/icon';
@@ -54,6 +55,8 @@ export class Folder {
   private readonly api = inject(Api);
   private readonly transfers = inject(Transfers);
   private readonly versions = inject(Versions);
+  /** The search below this folder, while the field asks for one. */
+  protected readonly finder = inject(Search);
   /** Set while the folder is shown as a snapshot holds it: then nothing changes. */
   protected readonly snapshot = inject(Snapshot);
   protected readonly pastWhen = computed(() => {
@@ -113,6 +116,20 @@ export class Folder {
         });
       }
     });
+    // With "include subfolders", what is typed is searched for below the
+    // folder, a moment after the typing stops; anything else ends it.
+    effect((cleanup) => {
+      const q = this.browser.filter().trim();
+      const share = this.browser.share();
+      const path = this.browser.path();
+      this.snapshot.at(); // a snapshot browsed is searched as it is
+      if (!this.finder.deep() || q.length < 2 || !share) {
+        untracked(() => this.finder.stop());
+        return;
+      }
+      const t = setTimeout(() => void this.finder.run(share, path, q), 400);
+      cleanup(() => clearTimeout(t));
+    });
     // The window widens when its end comes near the viewport.
     effect((cleanup) => {
       const el = this.sentinel()?.nativeElement;
@@ -135,6 +152,23 @@ export class Folder {
     const at = this.snapshot.at();
     if (at) q['at'] = at;
     return q;
+  }
+
+  /** A search's hit, shown in its folder and selected there. */
+  protected revealHit(e: Entry): void {
+    const i = e.path.lastIndexOf('/');
+    this.browser.reveal.set(e.name);
+    this.setFilter('');
+    this.go(i < 0 ? '' : e.path.slice(0, i));
+  }
+
+  /** Where a hit is, below the folder searched. */
+  protected hitFolder(e: Entry): string {
+    const base = this.browser.path();
+    const i = e.path.lastIndexOf('/');
+    const dir = i < 0 ? '' : e.path.slice(0, i);
+    const rel = base && dir.startsWith(base) ? dir.slice(base.length).replace(/^\//, '') : dir;
+    return rel || '.';
   }
 
   /** Back to the folder as it is now. */

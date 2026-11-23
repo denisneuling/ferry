@@ -47,6 +47,8 @@ export class Browser {
   private anchor: string | null = null;
   /** The index into files() of the file previewed, or null. */
   readonly preview = signal<number | null>(null);
+  /** A name to select once the folder opening has listed it: a search's hit. */
+  readonly reveal = signal<string | null>(null);
 
   private loads = 0;
   private abort: AbortController | null = null;
@@ -169,6 +171,11 @@ export class Browser {
       this.error.set(null);
       this.errorCode.set(null);
       this.selected.update((s) => new Set([...s].filter((x) => names.has(x))));
+      const r = this.reveal();
+      if (r !== null) {
+        this.reveal.set(null);
+        if (names.has(r)) this.only(r);
+      }
     } catch (e) {
       if (n !== this.loads) {
         return;

@@ -290,6 +290,8 @@ name or a path: routes are patterns, errors are kinds from a fixed list
 | `ferry_logins_total` | counter | `outcome` | login attempts: `ok`, `auth`, `guest`, `unreachable`, `rate_limited`, `too_many_sessions`, `invalid`, `internal` |
 | `ferry_transfer_bytes_total` | counter | `direction` | file bytes `up` (uploads) and `down` (downloads and previews) |
 | `ferry_smb_errors_total` | counter | `kind` | SMB errors answered to a request: `access_denied`, `not_found`, `exists`, `busy`, `not_empty`, `not_dir`, `is_dir`, `invalid_path`, `limit`, `unreachable`, `session_lost`, `canceled`, `internal` |
+| `ferry_searches_total` | counter | `outcome` | Searches below a folder: `ok`, `truncated` (stopped at a bound: hits, folders, depth, a minute), `canceled` (the client left), `failed` |
+| `ferry_search_duration_seconds` | histogram | — | How long a search below a folder ran |
 | `ferry_archives_total` | counter | `outcome` | ZIP downloads: `ok`, `failed` (broken off when a file failed), `canceled` (the client left); their bytes count in `ferry_transfer_bytes_total{direction="down"}` |
 | `ferry_thumbnails_total` | counter | `outcome` | `made`, `cached` (from the cache), `not_modified`, `unsupported`, `too_large`, `remembered` (a file that made no thumbnail a moment ago, answered as then), `timeout` (a PDF page or HEIC photo past `FERRY_PREVIEW_TIMEOUT`, answered `503`), `failed` |
 | `ferry_preview_jobs_total` | counter | `format`, `outcome` | PDF pages (`pdf`) and HEIC photos (`heic`) made in WebAssembly: `made`, `unsupported`, `blank`, `too_large`, `timeout`, `unavailable` (off, or no budget), `cancelled` (the request ended first), `failed` (reading the file failed) |

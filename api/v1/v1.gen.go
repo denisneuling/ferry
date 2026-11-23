@@ -140,6 +140,30 @@ func (e InfoPreviews) Valid() bool {
 	}
 }
 
+// Defines values for SearchEndEndReason.
+const (
+	SearchEndEndReasonDepth   SearchEndEndReason = "depth"
+	SearchEndEndReasonFolders SearchEndEndReason = "folders"
+	SearchEndEndReasonHits    SearchEndEndReason = "hits"
+	SearchEndEndReasonTime    SearchEndEndReason = "time"
+)
+
+// Valid indicates whether the value is a known member of the SearchEndEndReason enum.
+func (e SearchEndEndReason) Valid() bool {
+	switch e {
+	case SearchEndEndReasonDepth:
+		return true
+	case SearchEndEndReasonFolders:
+		return true
+	case SearchEndEndReasonHits:
+		return true
+	case SearchEndEndReasonTime:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FerryRequest.
 const (
 	FerryRequestN1 FerryRequest = "1"
@@ -534,6 +558,39 @@ type Problem struct {
 	Type string `json:"type"`
 }
 
+// SearchEnd defines model for SearchEnd.
+type SearchEnd struct {
+	End struct {
+		// Folders The folders looked through.
+		Folders int `json:"folders"`
+
+		// Hits The hits given.
+		Hits int `json:"hits"`
+
+		// Reason The bound it stopped at, when truncated.
+		Reason *SearchEndEndReason `json:"reason,omitempty"`
+
+		// Skipped Folders the server refused, or too large to look through.
+		Skipped int `json:"skipped"`
+
+		// Truncated It stopped at a bound before looking through everything.
+		Truncated bool `json:"truncated"`
+	} `json:"end"`
+}
+
+// SearchEndEndReason The bound it stopped at, when truncated.
+type SearchEndEndReason string
+
+// SearchHit defines model for SearchHit.
+type SearchHit struct {
+	Hit Entry `json:"hit"`
+}
+
+// SearchStreamLine One line of a search's answer.
+type SearchStreamLine struct {
+	union json.RawMessage
+}
+
 // Share defines model for Share.
 type Share struct {
 	// Comment The server's comment for the share; not translated.
@@ -755,6 +812,24 @@ type MoveEntryParams struct {
 // MoveEntryParamsXFerryRequest defines parameters for MoveEntry.
 type MoveEntryParamsXFerryRequest string
 
+// SearchParams defines parameters for Search.
+type SearchParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+
+	// Q What names must contain.
+	Q string `form:"q" json:"q"`
+}
+
 // GetSpaceParams defines parameters for GetSpace.
 type GetSpaceParams struct {
 	// Path Slash-separated, relative to the share's root; empty for the root.
@@ -889,6 +964,94 @@ func (t EntryStreamLine) MarshalJSON() ([]byte, error) {
 }
 
 func (t *EntryStreamLine) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSearchHit returns the union data inside the SearchStreamLine as a SearchHit
+func (t SearchStreamLine) AsSearchHit() (SearchHit, error) {
+	var body SearchHit
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSearchHit overwrites any union data inside the SearchStreamLine as the provided SearchHit
+func (t *SearchStreamLine) FromSearchHit(v SearchHit) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSearchHit performs a merge with any union data inside the SearchStreamLine, using the provided SearchHit
+func (t *SearchStreamLine) MergeSearchHit(v SearchHit) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSearchEnd returns the union data inside the SearchStreamLine as a SearchEnd
+func (t SearchStreamLine) AsSearchEnd() (SearchEnd, error) {
+	var body SearchEnd
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSearchEnd overwrites any union data inside the SearchStreamLine as the provided SearchEnd
+func (t *SearchStreamLine) FromSearchEnd(v SearchEnd) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSearchEnd performs a merge with any union data inside the SearchStreamLine, using the provided SearchEnd
+func (t *SearchStreamLine) MergeSearchEnd(v SearchEnd) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEntryStreamProblem returns the union data inside the SearchStreamLine as a EntryStreamProblem
+func (t SearchStreamLine) AsEntryStreamProblem() (EntryStreamProblem, error) {
+	var body EntryStreamProblem
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEntryStreamProblem overwrites any union data inside the SearchStreamLine as the provided EntryStreamProblem
+func (t *SearchStreamLine) FromEntryStreamProblem(v EntryStreamProblem) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEntryStreamProblem performs a merge with any union data inside the SearchStreamLine, using the provided EntryStreamProblem
+func (t *SearchStreamLine) MergeEntryStreamProblem(v EntryStreamProblem) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SearchStreamLine) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SearchStreamLine) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -1165,6 +1328,30 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 	MoveEntry(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Search Find names below a folder.
+	//
+	// Looks for entries whose name contains `q` in the folder `path` and
+	// every folder below it, as they are now or, with `at`, as that
+	// snapshot holds them. Case is ignored, and names are compared after
+	// Unicode normalisation (NFC), so a name written decomposed matches.
+	// There is no index: the folders are listed one by one, breadth
+	// first, with the person's session, and nothing is kept. A folder the
+	// server refuses below `path` is skipped and counted; `path` refused
+	// is the error.
+	//
+	// The answer is `application/x-ndjson`, written as hits are found:
+	// one `{"hit": Entry}` per hit, then a last line, `{"end": …}` with
+	// what was looked through, or `{"problem": Problem}` when it failed
+	// part-way. A stream without either last line was cut off. Errors
+	// before the first line are ordinary problem responses.
+	//
+	// It stops after 1000 hits, 20000 folders, 32 levels below `path` or
+	// 60 seconds, saying which in `end.reason` with `truncated: true`. A
+	// client that goes away stops it before the next folder.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/search (the `Search` operationId).
+	Search(ctx context.Context, share ShareName, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSpace The size and free space of the volume a folder is on.
 	//
@@ -1579,6 +1766,40 @@ func (c *Client) MoveEntryWithBody(ctx context.Context, share ShareName, params 
 // Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 func (c *Client) MoveEntry(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMoveEntryRequest(c.Server, share, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// Search Find names below a folder.
+//
+// Looks for entries whose name contains `q` in the folder `path` and
+// every folder below it, as they are now or, with `at`, as that
+// snapshot holds them. Case is ignored, and names are compared after
+// Unicode normalisation (NFC), so a name written decomposed matches.
+// There is no index: the folders are listed one by one, breadth
+// first, with the person's session, and nothing is kept. A folder the
+// server refuses below `path` is skipped and counted; `path` refused
+// is the error.
+//
+// The answer is `application/x-ndjson`, written as hits are found:
+// one `{"hit": Entry}` per hit, then a last line, `{"end": …}` with
+// what was looked through, or `{"problem": Problem}` when it failed
+// part-way. A stream without either last line was cut off. Errors
+// before the first line are ordinary problem responses.
+//
+// It stops after 1000 hits, 20000 folders, 32 levels below `path` or
+// 60 seconds, saying which in `end.reason` with `truncated: true`. A
+// client that goes away stops it before the next folder.
+//
+// Corresponds with GET /api/v1/shares/{share}/search (the `Search` operationId).
+func (c *Client) Search(ctx context.Context, share ShareName, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2498,6 +2719,87 @@ func NewMoveEntryRequestWithBody(server string, share ShareName, params *MoveEnt
 	return req, nil
 }
 
+// NewSearchRequest constructs an http.Request for the Search method
+func NewSearchRequest(server string, share ShareName, params *SearchParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/search"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetSpaceRequest constructs an http.Request for the GetSpace method
 func NewGetSpaceRequest(server string, share ShareName, params *GetSpaceParams) (*http.Request, error) {
 	var err error
@@ -2979,6 +3281,32 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/shares/{share}/move (the `MoveEntry` operationId).
 	MoveEntryWithResponse(ctx context.Context, share ShareName, params *MoveEntryParams, body MoveEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveEntryResponse, error)
+
+	// SearchWithResponse Find names below a folder.
+	//
+	// Looks for entries whose name contains `q` in the folder `path` and
+	// every folder below it, as they are now or, with `at`, as that
+	// snapshot holds them. Case is ignored, and names are compared after
+	// Unicode normalisation (NFC), so a name written decomposed matches.
+	// There is no index: the folders are listed one by one, breadth
+	// first, with the person's session, and nothing is kept. A folder the
+	// server refuses below `path` is skipped and counted; `path` refused
+	// is the error.
+	//
+	// The answer is `application/x-ndjson`, written as hits are found:
+	// one `{"hit": Entry}` per hit, then a last line, `{"end": …}` with
+	// what was looked through, or `{"problem": Problem}` when it failed
+	// part-way. A stream without either last line was cut off. Errors
+	// before the first line are ordinary problem responses.
+	//
+	// It stops after 1000 hits, 20000 folders, 32 levels below `path` or
+	// 60 seconds, saying which in `end.reason` with `truncated: true`. A
+	// client that goes away stops it before the next folder.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/search (the `Search` operationId).
+	SearchWithResponse(ctx context.Context, share ShareName, params *SearchParams, reqEditors ...RequestEditorFn) (*SearchResponse, error)
 
 	// GetSpaceWithResponse The size and free space of the volume a folder is on.
 	//
@@ -4055,6 +4383,82 @@ func (r MoveEntryResponse) ContentType() string {
 	return ""
 }
 
+type SearchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SearchResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SearchResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SearchResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SearchResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r SearchResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r SearchResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r SearchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SearchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SearchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SearchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetSpaceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4623,6 +5027,38 @@ func (c *ClientWithResponses) MoveEntryWithResponse(ctx context.Context, share S
 		return nil, err
 	}
 	return ParseMoveEntryResponse(rsp)
+}
+
+// SearchWithResponse Find names below a folder.
+//
+// Looks for entries whose name contains `q` in the folder `path` and
+// every folder below it, as they are now or, with `at`, as that
+// snapshot holds them. Case is ignored, and names are compared after
+// Unicode normalisation (NFC), so a name written decomposed matches.
+// There is no index: the folders are listed one by one, breadth
+// first, with the person's session, and nothing is kept. A folder the
+// server refuses below `path` is skipped and counted; `path` refused
+// is the error.
+//
+// The answer is `application/x-ndjson`, written as hits are found:
+// one `{"hit": Entry}` per hit, then a last line, `{"end": …}` with
+// what was looked through, or `{"problem": Problem}` when it failed
+// part-way. A stream without either last line was cut off. Errors
+// before the first line are ordinary problem responses.
+//
+// It stops after 1000 hits, 20000 folders, 32 levels below `path` or
+// 60 seconds, saying which in `end.reason` with `truncated: true`. A
+// client that goes away stops it before the next folder.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/search (the `Search` operationId).
+func (c *ClientWithResponses) SearchWithResponse(ctx context.Context, share ShareName, params *SearchParams, reqEditors ...RequestEditorFn) (*SearchResponse, error) {
+	rsp, err := c.Search(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSearchResponse(rsp)
 }
 
 // GetSpaceWithResponse The size and free space of the volume a folder is on.
@@ -5543,6 +5979,67 @@ func ParseMoveEntryResponse(rsp *http.Response) (*MoveEntryResponse, error) {
 	return response, nil
 }
 
+// ParseSearchResponse parses an HTTP response from a SearchWithResponse call
+func ParseSearchResponse(rsp *http.Response) (*SearchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SearchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetSpaceResponse parses an HTTP response from a GetSpaceWithResponse call
 func ParseGetSpaceResponse(rsp *http.Response) (*GetSpaceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5794,6 +6291,9 @@ type ServerInterface interface {
 	// MoveEntry Rename or move a file or folder within a share.
 	// (POST /api/v1/shares/{share}/move)
 	MoveEntry(w http.ResponseWriter, r *http.Request, share ShareName, params MoveEntryParams)
+	// Search Find names below a folder.
+	// (GET /api/v1/shares/{share}/search)
+	Search(w http.ResponseWriter, r *http.Request, share ShareName, params SearchParams)
 	// GetSpace The size and free space of the volume a folder is on.
 	// (GET /api/v1/shares/{share}/space)
 	GetSpace(w http.ResponseWriter, r *http.Request, share ShareName, params GetSpaceParams)
@@ -6507,6 +7007,74 @@ func (siw *ServerInterfaceWrapper) MoveEntry(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// Search operation middleware
+func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Search(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSpace operation middleware
 func (siw *ServerInterfaceWrapper) GetSpace(w http.ResponseWriter, r *http.Request) {
 
@@ -6805,6 +7373,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/metadata", wrapper.GetMetadata)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/thumbnail", wrapper.GetThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/versions", wrapper.ListVersions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/search", wrapper.Search)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/archive", wrapper.CreateArchive)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/archive/{ticket}", wrapper.GetArchive)
