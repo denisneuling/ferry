@@ -339,12 +339,21 @@ export class Api {
 
   /** The start of a text file, at most max bytes, as text. */
   async text(share: string, path: string, max = 512 * 1024): Promise<{ text: string; truncated: boolean }> {
+    const r = await this.head(share, path, max);
+    return { text: new TextDecoder().decode(r.bytes), truncated: r.truncated };
+  }
+
+  /**
+   * The first max bytes of a file, at the snapshot looked at, and whether
+   * there was more.
+   */
+  async head(share: string, path: string, max: number): Promise<{ bytes: Uint8Array; truncated: boolean }> {
     const res = await this.fetch('GET', this.contentUrl(share, path, true), undefined, {
       Range: `bytes=0-${max - 1}`,
     });
     const buf = await res.arrayBuffer();
     const total = Number(res.headers.get('Content-Range')?.split('/')[1] ?? buf.byteLength);
-    return { text: new TextDecoder().decode(buf), truncated: total > buf.byteLength };
+    return { bytes: new Uint8Array(buf), truncated: total > buf.byteLength };
   }
 
   /**

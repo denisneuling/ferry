@@ -23,6 +23,7 @@ import { Snapshot } from '../core/snapshot';
 import { Versions } from '../ui/versions';
 import { TextEditor } from '../ui/text-editor';
 import { MAX_EDIT_BYTES } from '../core/text-file';
+import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../core/subtitles';
 
 /**
  * The preview: a file of the folder over everything, with the files of the
@@ -113,7 +114,11 @@ import { MAX_EDIT_BYTES } from '../core/text-file';
             </div>
           }
           @case ('video') {
-            <video [src]="url()" controls preload="metadata" playsinline></video>
+            <video [src]="url()" controls preload="metadata" playsinline>
+              @for (t of tracks(); track t.src) {
+                <track kind="subtitles" [src]="t.src" [attr.srclang]="t.lang || null" [label]="t.label" />
+              }
+            </video>
           }
           @case ('audio') {
             <div class="lb-audio">
@@ -362,6 +367,8 @@ export class Preview {
   protected readonly zipError = signal<string | null>(null);
   protected readonly zipFiles = computed(() => (this.zipEntries() ?? []).filter((z) => z.type === 'file'));
   protected readonly truncated = signal(false);
+  /** The video's subtitles, as WebVTT behind blob URLs that go when it does. */
+  protected readonly tracks = signal<{ src: string; lang: string; label: string }[]>([]);
   private opener: HTMLElement | null = null;
 
   constructor() {
@@ -400,6 +407,47 @@ export class Preview {
           (err) => this.entry() === e && this.text.set(describe(err)),
         );
       }
+    });
+    // Subtitle files next to a video become its tracks. They are read at the
+    // snapshot the video is (Api.head), and only the browser's cue renderer
+    // ever sees their text.
+    effect((onCleanup) => {
+      const e = this.entry();
+      const share = this.browser.share();
+      const urls: string[] = [];
+      onCleanup(() => {
+        urls.forEach((u) => URL.revokeObjectURL(u));
+        this.tracks.set([]);
+      });
+      if (!e || !share || this.kind() !== 'video') return;
+      // All of the folder's files, not only those a filter shows.
+      const sizes = new Map(
+        (this.browser.entries() ?? []).filter((f) => f.type === 'file').map((f) => [f.name, f.size]),
+      );
+      const subs = subtitlesFor(e.name, [...sizes.keys()]).filter(
+        (s) => (sizes.get(s.name) ?? 0) <= MAX_SUBTITLE_BYTES,
+      );
+      const dir = e.path.slice(0, e.path.length - e.name.length);
+      let live = true;
+      onCleanup(() => (live = false));
+      void Promise.all(
+        subs.map((s) =>
+          this.api.head(share, dir + s.name, MAX_SUBTITLE_BYTES).then(
+            (r) => (r.truncated ? null : { s, text: toWebVTT(decodeSubtitle(r.bytes), s.name) }),
+            () => null,
+          ),
+        ),
+      ).then((read) => {
+        if (!live) return;
+        const tracks = read
+          .filter((r) => r !== null)
+          .map((r) => {
+            const src = URL.createObjectURL(new Blob([r.text], { type: 'text/vtt' }));
+            urls.push(src);
+            return { src, lang: r.s.lang, label: r.s.label };
+          });
+        this.tracks.set(tracks);
+      });
     });
     // The next and the previous image load ahead — after the one shown, so
     // that they do not hold it up; the preview closed, they are let go.

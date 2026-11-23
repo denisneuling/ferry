@@ -178,6 +178,13 @@ seldom; the rest get an icon, as do recordings without a cover. Frames
 are not taken from videos: that needs a video decoder, which ferry does
 not carry.
 
+A video plays with the subtitles that lie next to it: `Film.srt` or
+`Film.vtt`, and `Film.de.srt`, `Film.en.forced.vtt` and the like, the
+language taken from the name; the player's menu chooses among them. SubRip
+files are turned into WebVTT in the browser, read as UTF-8 or else as
+Windows-1252; a subtitle file over 2 MB is left out. Their text goes only
+to the browser's own subtitle display, never into the page.
+
 While an image is shown, the next and the previous one load ahead, so that
 stepping to them shows them at once; videos and PDFs do not, and nothing
 loads ahead when the browser is set to save data.
