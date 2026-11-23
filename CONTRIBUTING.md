@@ -6,11 +6,9 @@ an answer, a fix or a merge.
 
 ## How this repository works
 
-ferry is developed in a private Forgejo instance and push-mirrored here.
-Issues and pull requests opened on GitHub are carried into Forgejo by
-a bridge, where the maintainers work, and everything
-they say comes back here. From your side it is an ordinary GitHub project; a
-bot account posts the maintainers' replies, naming who wrote them.
+ferry is developed in a private Forgejo instance and push-mirrored here, so
+GitHub shows what was pushed there. Issues and pull requests opened on GitHub
+are read here, when there is time; nothing carries them over automatically.
 
 ## Issues
 
@@ -41,8 +39,6 @@ if you ever see one in its output, that is a security problem: see
 
 ### What happens after you open one
 
-1. Your branch is imported into the maintainers' Forgejo. CI runs there once a
-   maintainer has read your changes and approved the run.
-2. Review comments appear on your pull request, posted by the bot and
-   attributed to the maintainer.
-3. When it is merged, the bot says so; your authorship is kept.
+If a change is taken, it is applied in the Forgejo repository, with your
+authorship kept, and arrives here with the next push; the pull request is then
+closed with a note. GitHub's own CI does not run on pull requests.

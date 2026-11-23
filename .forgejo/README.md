@@ -148,8 +148,8 @@ requests then go out as the bot, and cross-repository calls quietly fail.
 
 ## The GitHub mirror
 
-The repository is push-mirrored to GitHub. Issues and pull requests opened
-there are carried in by a bridge (`CONTRIBUTING.md`). GitHub
+The repository is push-mirrored to GitHub; issues and pull requests opened
+there are read there, not carried over (`CONTRIBUTING.md`). GitHub
 builds the public artifacts from what arrives there, with
 `.github/workflows/publish.yml` (Forgejo ignores `.github/`). It decides
 nothing — a release tag semantic-release made here is built there:
