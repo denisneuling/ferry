@@ -67,6 +67,11 @@ const thumbnailed = new Set([
   ...rawPhotos,
   'tif',
   'tiff',
+  // Videos by the cover an MP4 or QuickTime file carries (as music does);
+  // most cameras write none, and those keep their icon.
+  'mp4',
+  'm4v',
+  'mov',
   // Documents and books, by the picture they carry: OpenDocument almost
   // always, Office now and then, EPUB its cover. Without one, an icon.
   'odt',
