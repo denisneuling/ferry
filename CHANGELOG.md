@@ -5,6 +5,18 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.10.0](https://github.com/denisneuling/ferry/compare/v0.9.1...v0.10.0) (2026-11-23)
+
+### Features
+
+* edit text files in the preview ([6466207](https://github.com/denisneuling/ferry/commit/6466207f5e9f9cbcb9ed3669130aa5bd9c51fff0))
+* look into ZIP archives, and open or download one file from them ([ad0bc73](https://github.com/denisneuling/ferry/commit/ad0bc73f65a3ab962ca9d93d36995d9ec6fbca3c))
+* thumbnails and previews of raw photos and TIFF images ([3cee024](https://github.com/denisneuling/ferry/commit/3cee024738b8e9a610a4d08f0e56f9152aba4b5b))
+* thumbnails of documents and books, and the text of Word and OpenDocument files ([5fdc3af](https://github.com/denisneuling/ferry/commit/5fdc3afeb2b04c18a79a97aad45e50427deed03c))
+* **ui:** CSV and TSV files as a table in the preview ([2ec8214](https://github.com/denisneuling/ferry/commit/2ec8214ccff52d05cb1147f0d448e4ed3321da03))
+* **ui:** play a folder's recordings as a playlist ([c8f7ba0](https://github.com/denisneuling/ferry/commit/c8f7ba01014efd3c8a8434f7833489492178f130))
+* **ui:** thumbnails of MP4 and QuickTime videos from the cover they carry ([e02bc00](https://github.com/denisneuling/ferry/commit/e02bc009fb1124c828ae4a4790baa0c046e54532))
+
 ## [0.9.1](https://github.com/denisneuling/ferry/compare/v0.9.0...v0.9.1) (2026-11-23)
 
 ### Bug Fixes
