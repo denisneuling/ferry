@@ -41,6 +41,7 @@ type Metrics struct {
 	previewRun  *prometheus.HistogramVec
 	searches    *prometheus.CounterVec
 	searchRun   prometheus.Histogram
+	copies      *prometheus.CounterVec
 }
 
 // Gauges are read at every scrape from where they are kept.
@@ -132,6 +133,10 @@ func New(version, commit string, g Gauges) *Metrics {
 			Name: "ferry_searches_total",
 			Help: "Searches below a folder by outcome: ok, truncated (stopped at a bound: hits, folders, depth, time), canceled (the client left), failed.",
 		}, []string{"outcome"}),
+		copies: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ferry_copies_total",
+			Help: "Copies within a share, versions restored as copies included, by outcome: ok, failed (what was copied so far stays), canceled (the client left).",
+		}, []string{"outcome"}),
 		searchRun: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name:    "ferry_search_duration_seconds",
 			Help:    "How long a search below a folder ran, to its end or its bound.",
@@ -139,7 +144,7 @@ func New(version, commit string, g Gauges) *Metrics {
 		}),
 	}
 	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency, m.smbConns, m.smbLost, m.smbWait, m.archives,
-		m.cacheReqs, m.cacheBytes, m.cacheEvict, m.previews, m.previewWait, m.previewRun, m.searches, m.searchRun)
+		m.cacheReqs, m.cacheBytes, m.cacheEvict, m.previews, m.previewWait, m.previewRun, m.searches, m.searchRun, m.copies)
 	build := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:        "ferry_build_info",
 		Help:        "Always 1; the labels say which build runs.",
@@ -254,6 +259,13 @@ func (m *Metrics) Search(outcome string, d time.Duration) {
 	if m != nil {
 		m.searches.WithLabelValues(outcome).Inc()
 		m.searchRun.Observe(d.Seconds())
+	}
+}
+
+// Copy counts a copy within a share by its outcome.
+func (m *Metrics) Copy(outcome string) {
+	if m != nil {
+		m.copies.WithLabelValues(outcome).Inc()
 	}
 }
 

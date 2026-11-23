@@ -322,6 +322,7 @@ export class Folder {
         run: () => this.actions.rename(e),
       });
     items.push({ icon: 'move', label: $localize`:@@act.move:Move`, run: () => this.actions.move(sel) });
+    items.push({ icon: 'copy', label: $localize`:@@act.copy:Copy to…`, run: () => this.actions.copy(sel) });
     items.push({ separator: true });
     items.push({
       icon: 'trash',

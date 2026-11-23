@@ -216,6 +216,17 @@
     "search.folders": "{$INTERPOLATION} Ordner durchsucht",
     "search.skipped": "{$INTERPOLATION} nicht lesbar",
     "search.truncated": "vorzeitig beendet, es kann mehr geben",
-    "search.noneText": "Kein Name hier oder darunter enthält „{$INTERPOLATION}“."
+    "search.noneText": "Kein Name hier oder darunter enthält „{$INTERPOLATION}“.",
+    "copy.suffix": "Kopie",
+    "restore.suffix": "Version {$when}",
+    "copy.started": "{$name} wird kopiert …",
+    "copy.done": "Kopiert: {$name}",
+    "copy.partly": "{$name} abgebrochen nach {$done} von {$total} Einträgen: {$why}",
+    "act.copy": "Kopieren nach …",
+    "picker.copy1": "Kopieren nach …",
+    "picker.copyN": "{$INTERPOLATION} Einträge kopieren nach …",
+    "picker.copyHere": "Hierher kopieren",
+    "versions.restoreTitle": "Als Kopie daneben wiederherstellen",
+    "versions.restore": "Als Kopie wiederherstellen"
   }
 }

@@ -19,19 +19,27 @@ interface Pick {
   /** Folders that cannot be the target: the ones being moved, and what is inside them. */
   excluded: string[];
   count: number;
+  /** Copying rather than moving: only what the dialog says differs. */
+  copy: boolean;
   resolve: (path: string | null) => void;
 }
 
-/** Asks for a folder of a share to move entries to. */
+/** Asks for a folder of a share to move or copy entries to. */
 @Injectable({ providedIn: 'root' })
 export class FolderPicker {
   readonly current = signal<Pick | null>(null);
   readonly start = signal('');
 
-  pick(share: string, start: string, excluded: string[], count: number): Promise<string | null> {
+  pick(
+    share: string,
+    start: string,
+    excluded: string[],
+    count: number,
+    copy = false,
+  ): Promise<string | null> {
     this.current()?.resolve(null);
     this.start.set(start);
-    return new Promise((resolve) => this.current.set({ share, excluded, count, resolve }));
+    return new Promise((resolve) => this.current.set({ share, excluded, count, copy, resolve }));
   }
 
   close(path: string | null): void {
@@ -48,7 +56,11 @@ export class FolderPicker {
   template: `@if (picker.current(); as p) {
     <dialog #dlg class="fx-modal" aria-modal="true" (cancel)="$event.preventDefault(); picker.close(null)">
       <h2 class="fx-modal-title">
-        @if (p.count === 1) {
+        @if (p.copy && p.count === 1) {
+          <ng-container i18n="@@picker.copy1">Copy to …</ng-container>
+        } @else if (p.copy) {
+          <ng-container i18n="@@picker.copyN">Copy {{ p.count }} items to …</ng-container>
+        } @else if (p.count === 1) {
           <ng-container i18n="@@picker.title1">Move to …</ng-container>
         } @else {
           <ng-container i18n="@@picker.titleN">Move {{ p.count }} items to …</ng-container>
@@ -87,7 +99,11 @@ export class FolderPicker {
           [disabled]="blocked(path())"
           (click)="picker.close(path())"
         >
-          <ng-container i18n="@@picker.here">Move here</ng-container>
+          @if (p.copy) {
+            <ng-container i18n="@@picker.copyHere">Copy here</ng-container>
+          } @else {
+            <ng-container i18n="@@picker.here">Move here</ng-container>
+          }
         </button>
       </div>
     </dialog>

@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { Actions } from '../core/actions';
 import { Api, Version } from '../core/api';
 import { describe } from '../core/errors';
 import { Format } from '../core/format';
@@ -68,6 +69,15 @@ export class Versions {
             <li>
               <span class="when">{{ when(v) }}</span>
               <span class="what">{{ of.folder ? '' : format.size(v.size) }}</span>
+              <button
+                type="button"
+                class="fx-btn"
+                (click)="restore(of, v)"
+                title="Restore as a copy beside it"
+                i18n-title="@@versions.restoreTitle"
+              >
+                <f-icon name="copy" [size]="16" /><span i18n="@@versions.restore">Restore as copy</span>
+              </button>
               @if (of.folder) {
                 <button type="button" class="fx-btn" (click)="browse(of, v)">
                   <f-icon name="folder" [size]="16" /><span i18n="@@versions.browse">Open as it was</span>
@@ -100,6 +110,7 @@ export class VersionsHost {
   protected readonly format = inject(Format);
   private readonly api = inject(Api);
   private readonly router = inject(Router);
+  private readonly actions = inject(Actions);
   protected readonly list = signal<Version[] | null>(null);
   protected readonly truncated = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -139,6 +150,25 @@ export class VersionsHost {
 
   protected url(of: VersionsOf, v: Version, inline: boolean): string {
     return this.api.contentUrl(of.share, of.path, inline, v.at);
+  }
+
+  /** The version copied beside the original, named after its time. */
+  protected restore(of: VersionsOf, v: Version): void {
+    this.versions.close();
+    const t = tokenTime(v.at);
+    const when = t
+      ? t
+          .toLocaleString(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          .replace(/[/:]/g, '.')
+          .replace(',', '')
+      : v.at;
+    void this.actions.restore(of.share, of.path, v.at, when);
   }
 
   /** A folder as the snapshot holds it, read-only, in the folder view. */

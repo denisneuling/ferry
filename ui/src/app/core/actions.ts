@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Api, Entry, join } from './api';
+import { Api, Entry, join, parent } from './api';
 import { Browser } from './browser';
 import { describe } from './errors';
 import { Format } from './format';
@@ -146,6 +146,92 @@ export class Actions {
       this.toasts.show(
         moved === 1 ? $localize`:@@move.one:Moved.` : $localize`:@@move.many:${moved}:n: items moved.`,
       );
+    }
+  }
+
+  /**
+   * Copies entries into a folder the person picks; the server copies, and
+   * says how far it got. A copy that fails part-way keeps what it copied.
+   */
+  async copy(entries: Entry[]): Promise<void> {
+    const share = this.browser.share();
+    if (share === null || !entries.length) return;
+    const dest = await this.picker.pick(
+      share,
+      this.browser.path(),
+      entries.filter((e) => e.type === 'folder').map((e) => e.path),
+      entries.length,
+      true,
+    );
+    if (dest === null) return;
+    for (const e of entries) {
+      const to = await this.freeName(
+        share,
+        dest,
+        e.name,
+        dest === this.browser.path() ? $localize`:@@copy.suffix:copy` : null,
+      );
+      await this.copyOne(share, e.path, to, null, e.name);
+    }
+    await this.browser.reload();
+  }
+
+  /**
+   * A previous version restored as a copy beside the original, named after
+   * the snapshot's time as the person's clock shows it: "letter (version
+   * 23.11.2026 16.00).txt".
+   */
+  async restore(share: string, path: string, at: string, when: string): Promise<void> {
+    const dir = parent(path);
+    const name = path.slice(path.lastIndexOf('/') + 1);
+    const to = await this.freeName(share, dir, name, $localize`:@@restore.suffix:version ${when}:when:`);
+    if (await this.copyOne(share, path, to, at, name)) {
+      if (share === this.browser.share() && dir === this.browser.path()) await this.browser.reload();
+    }
+  }
+
+  /** Copies one entry and says how it went; true when it was copied whole. */
+  private async copyOne(
+    share: string,
+    from: string,
+    to: string,
+    at: string | null,
+    name: string,
+  ): Promise<boolean> {
+    this.toasts.show($localize`:@@copy.started:Copying ${name}:name:…`);
+    try {
+      const r = await this.api.copy(share, from, to, { at }, () => undefined);
+      if (r.entry) {
+        this.toasts.show($localize`:@@copy.done:Copied: ${r.entry.name}:name:`);
+        return true;
+      }
+      const p = r.progress;
+      this.toasts.error(
+        $localize`:@@copy.partly:${name}:name: stopped after ${this.format.count(p.files)}:done: of ${this.format.count(p.totalFiles)}:total: items: ${describe(r.error)}:why:`,
+      );
+    } catch (err) {
+      this.toasts.error(`${name}: ${describe(err)}`);
+    }
+    return false;
+  }
+
+  /**
+   * A name in dir for a copy of name: with suffix, "name (suffix).ext",
+   * and "(suffix 2)" and on while one is taken; without, name itself.
+   */
+  private async freeName(share: string, dir: string, name: string, suffix: string | null): Promise<string> {
+    if (suffix === null) return join(dir, name);
+    const dot = name.lastIndexOf('.');
+    const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
+    let taken = new Set<string>();
+    try {
+      taken = new Set((await this.api.entries(share, dir)).entries.map((e) => e.name));
+    } catch {
+      // The server says so when the copy is refused.
+    }
+    for (let i = 1; ; i++) {
+      const candidate = `${stem} (${suffix}${i > 1 ? ` ${i}` : ''})${ext}`;
+      if (!taken.has(candidate)) return join(dir, candidate);
     }
   }
 

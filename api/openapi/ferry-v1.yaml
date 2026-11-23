@@ -600,6 +600,55 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/shares/{share}/copy:
+    post:
+      operationId: copyEntry
+      tags: [files]
+      summary: Copy a file or a folder within a share, or restore a version as a copy.
+      description: |
+        Copies `from` to `to` — a folder with everything in it — as it is
+        now or, with `at`, as that snapshot holds it: a previous version
+        restored as a copy. The bytes go through ferry a chunk at a time,
+        under the person's session, and each file is written to a
+        temporary name and renamed once complete, so none is ever left
+        half-copied under its real name.
+
+        What would be copied is listed first: more than the deployment's
+        entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+        none by default) is `413`; a folder copied into itself is `400`
+        (`copy_into_itself`); a target that exists is `409`, unless it is a
+        file and `overwrite` is set. These come as ordinary problem
+        responses, before anything is copied.
+
+        Then the answer is `application/x-ndjson`: a `{"progress": …}`
+        line about every second, so that a long copy is never a silent
+        request, and a last line, `{"end": …}` with the new entry, or
+        `{"problem": …}` with how far it got. A copy that fails or is
+        abandoned part-way leaves the files copied so far in place; nothing
+        is deleted to undo it. A client that goes away stops it between two
+        chunks.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/FerryRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CopyRequest" }
+      responses:
+        "200":
+          description: The copy's progress, and how it ended.
+          content:
+            application/x-ndjson:
+              schema: { $ref: "#/components/schemas/CopyStreamLine" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/move:
     post:
       operationId: moveEntry
@@ -686,7 +735,7 @@ components:
 
   responses:
     BadRequest:
-      description: The request is not valid (`invalid_request`, `invalid_path`, `missing_ferry_request`, `version_read_only`).
+      description: The request is not valid (`invalid_request`, `invalid_path`, `missing_ferry_request`, `version_read_only`, `copy_into_itself`).
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -752,7 +801,7 @@ components:
           type: string
           description: |
             Stable, machine-readable: `invalid_request`, `invalid_path`,
-            `missing_ferry_request`, `version_read_only`, `unauthenticated`, `login_failed`,
+            `missing_ferry_request`, `version_read_only`, `copy_into_itself`, `unauthenticated`, `login_failed`,
             `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
             `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
             `range_not_satisfiable`, `server_unreachable`, `session_lost`,
@@ -1012,6 +1061,59 @@ components:
         name: { type: string, description: "The archive's file name, e.g. `Photos.zip`." }
         entries: { type: integer, description: "Files and folders in it." }
         bytes: { type: integer, format: int64, description: "The files' bytes together, before the archive's own." }
+    CopyRequest:
+      type: object
+      required: [from, to]
+      additionalProperties: false
+      properties:
+        from: { type: string, maxLength: 4096, description: "The entry's path." }
+        to: { type: string, maxLength: 4096, description: "The copy's path, in the same share." }
+        overwrite:
+          type: boolean
+          default: false
+          description: Replace a file of the target name; a folder is never replaced.
+        at:
+          type: string
+          maxLength: 24
+          description: |
+            Copy `from` as the snapshot of this time holds it (`At`): a
+            previous version restored as a copy. Only the source is read at
+            the snapshot; the copy is written into the share as it is now.
+    CopyProgress:
+      type: object
+      required: [files, bytes, totalFiles, totalBytes]
+      properties:
+        files: { type: integer, description: "Entries made so far: files and folders." }
+        bytes: { type: integer, format: int64, description: "Bytes copied so far." }
+        totalFiles: { type: integer, description: "Entries the copy makes in all." }
+        totalBytes: { type: integer, format: int64, description: "Bytes the copy copies in all." }
+    CopyProgressLine:
+      type: object
+      required: [progress]
+      properties:
+        progress: { $ref: "#/components/schemas/CopyProgress" }
+    CopyStreamLine:
+      description: One line of a copy's answer.
+      oneOf:
+        - $ref: "#/components/schemas/CopyProgressLine"
+        - $ref: "#/components/schemas/CopyEnd"
+        - $ref: "#/components/schemas/CopyProblem"
+    CopyEnd:
+      type: object
+      required: [end]
+      properties:
+        end:
+          type: object
+          required: [entry, progress]
+          properties:
+            entry: { $ref: "#/components/schemas/Entry" }
+            progress: { $ref: "#/components/schemas/CopyProgress" }
+    CopyProblem:
+      type: object
+      required: [problem, progress]
+      properties:
+        problem: { $ref: "#/components/schemas/Problem" }
+        progress: { $ref: "#/components/schemas/CopyProgress" }
     MoveRequest:
       type: object
       required: [from, to]

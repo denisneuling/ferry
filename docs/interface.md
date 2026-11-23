@@ -76,7 +76,11 @@ and sign out.
 Click an entry to open it; with Shift, Ctrl or ⌘ — or once a selection is
 running — a click selects. On touch, a long press starts a selection. The
 dark bar above the folder acts on the selection: download, rename (one
-entry), move, delete. A right click opens the same as a menu.
+entry), move, delete. A right click opens the same as a menu, with **Copy
+to…** and **Previous versions** besides. A copy is made by the server's
+session through ferry, file by file, and shows how far it got; one that
+stops part-way keeps what it copied and says how much. Copied into the
+same folder, the copy is named "… (copy)".
 
 | key | does |
 |---|---|
@@ -121,7 +125,9 @@ Where the server keeps snapshots ([samba.md](samba.md), *Previous
 versions*), **Previous versions** in a file's or folder's menu, the clock
 beside a folder's title and the button in a file's details list them,
 newest first, with the time and the size — not who changed anything. A
-file's version opens in a new tab or downloads; a folder's opens **as it
+file's version opens in a new tab or downloads; **Restore as copy** puts
+it beside the original, named after its time — "letter (version 21.11.2026
+04.00).txt" — and never replaces anything; a folder's opens **as it
 was**: the folder view with a banner saying when, where a file deleted
 since can be found, opened and downloaded. Nothing can be changed there —
 no upload, rename, move or delete — and **Back to now** leaves it. A

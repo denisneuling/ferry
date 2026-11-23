@@ -257,6 +257,21 @@ func (e PutContentParamsXFerryRequest) Valid() bool {
 	}
 }
 
+// Defines values for CopyEntryParamsXFerryRequest.
+const (
+	CopyEntryParamsXFerryRequestN1 CopyEntryParamsXFerryRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the CopyEntryParamsXFerryRequest enum.
+func (e CopyEntryParamsXFerryRequest) Valid() bool {
+	switch e {
+	case CopyEntryParamsXFerryRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteEntryParamsXFerryRequest.
 const (
 	DeleteEntryParamsXFerryRequestN1 DeleteEntryParamsXFerryRequest = "1"
@@ -342,6 +357,63 @@ type ArchiveTicket struct {
 
 	// Ticket For `GET …/archive/{ticket}`: once, within a minute, by this session.
 	Ticket string `json:"ticket"`
+}
+
+// CopyEnd defines model for CopyEnd.
+type CopyEnd struct {
+	End struct {
+		Entry    Entry        `json:"entry"`
+		Progress CopyProgress `json:"progress"`
+	} `json:"end"`
+}
+
+// CopyProblem defines model for CopyProblem.
+type CopyProblem struct {
+	// Problem RFC 9457 problem details.
+	Problem  Problem      `json:"problem"`
+	Progress CopyProgress `json:"progress"`
+}
+
+// CopyProgress defines model for CopyProgress.
+type CopyProgress struct {
+	// Bytes Bytes copied so far.
+	Bytes int64 `json:"bytes"`
+
+	// Files Entries made so far: files and folders.
+	Files int `json:"files"`
+
+	// TotalBytes Bytes the copy copies in all.
+	TotalBytes int64 `json:"totalBytes"`
+
+	// TotalFiles Entries the copy makes in all.
+	TotalFiles int `json:"totalFiles"`
+}
+
+// CopyProgressLine defines model for CopyProgressLine.
+type CopyProgressLine struct {
+	Progress CopyProgress `json:"progress"`
+}
+
+// CopyRequest defines model for CopyRequest.
+type CopyRequest struct {
+	// At Copy `from` as the snapshot of this time holds it (`At`): a
+	// previous version restored as a copy. Only the source is read at
+	// the snapshot; the copy is written into the share as it is now.
+	At *string `json:"at,omitempty"`
+
+	// From The entry's path.
+	From string `json:"from"`
+
+	// Overwrite Replace a file of the target name; a folder is never replaced.
+	Overwrite *bool `json:"overwrite,omitempty"`
+
+	// To The copy's path, in the same share.
+	To string `json:"to"`
+}
+
+// CopyStreamLine One line of a copy's answer.
+type CopyStreamLine struct {
+	union json.RawMessage
 }
 
 // Entry defines model for Entry.
@@ -539,7 +611,7 @@ type MoveRequest struct {
 // Problem RFC 9457 problem details.
 type Problem struct {
 	// Code Stable, machine-readable: `invalid_request`, `invalid_path`,
-	// `missing_ferry_request`, `version_read_only`, `unauthenticated`, `login_failed`,
+	// `missing_ferry_request`, `version_read_only`, `copy_into_itself`, `unauthenticated`, `login_failed`,
 	// `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
 	// `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
 	// `range_not_satisfiable`, `server_unreachable`, `session_lost`,
@@ -738,6 +810,15 @@ type PutContentParams struct {
 // PutContentParamsXFerryRequest defines parameters for PutContent.
 type PutContentParamsXFerryRequest string
 
+// CopyEntryParams defines parameters for CopyEntry.
+type CopyEntryParams struct {
+	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
+	XFerryRequest CopyEntryParamsXFerryRequest `json:"X-Ferry-Request"`
+}
+
+// CopyEntryParamsXFerryRequest defines parameters for CopyEntry.
+type CopyEntryParamsXFerryRequest string
+
 // DeleteEntryParams defines parameters for DeleteEntry.
 type DeleteEntryParams struct {
 	// Recursive Delete a folder with everything in it.
@@ -877,8 +958,99 @@ type LoginJSONRequestBody = LoginRequest
 // CreateArchiveJSONRequestBody defines body for CreateArchive for application/json ContentType.
 type CreateArchiveJSONRequestBody = ArchiveRequest
 
+// CopyEntryJSONRequestBody defines body for CopyEntry for application/json ContentType.
+type CopyEntryJSONRequestBody = CopyRequest
+
 // MoveEntryJSONRequestBody defines body for MoveEntry for application/json ContentType.
 type MoveEntryJSONRequestBody = MoveRequest
+
+// AsCopyProgressLine returns the union data inside the CopyStreamLine as a CopyProgressLine
+func (t CopyStreamLine) AsCopyProgressLine() (CopyProgressLine, error) {
+	var body CopyProgressLine
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCopyProgressLine overwrites any union data inside the CopyStreamLine as the provided CopyProgressLine
+func (t *CopyStreamLine) FromCopyProgressLine(v CopyProgressLine) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCopyProgressLine performs a merge with any union data inside the CopyStreamLine, using the provided CopyProgressLine
+func (t *CopyStreamLine) MergeCopyProgressLine(v CopyProgressLine) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCopyEnd returns the union data inside the CopyStreamLine as a CopyEnd
+func (t CopyStreamLine) AsCopyEnd() (CopyEnd, error) {
+	var body CopyEnd
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCopyEnd overwrites any union data inside the CopyStreamLine as the provided CopyEnd
+func (t *CopyStreamLine) FromCopyEnd(v CopyEnd) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCopyEnd performs a merge with any union data inside the CopyStreamLine, using the provided CopyEnd
+func (t *CopyStreamLine) MergeCopyEnd(v CopyEnd) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCopyProblem returns the union data inside the CopyStreamLine as a CopyProblem
+func (t CopyStreamLine) AsCopyProblem() (CopyProblem, error) {
+	var body CopyProblem
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCopyProblem overwrites any union data inside the CopyStreamLine as the provided CopyProblem
+func (t *CopyStreamLine) FromCopyProblem(v CopyProblem) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCopyProblem performs a merge with any union data inside the CopyStreamLine, using the provided CopyProblem
+func (t *CopyStreamLine) MergeCopyProblem(v CopyProblem) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CopyStreamLine) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CopyStreamLine) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // AsEntry returns the union data inside the EntryStreamLine as a Entry
 func (t EntryStreamLine) AsEntry() (Entry, error) {
@@ -1258,6 +1430,64 @@ type ClientInterface interface {
 	// Corresponds with PUT /api/v1/shares/{share}/content (the `PutContent` operationId).
 	PutContentWithBody(ctx context.Context, share ShareName, params *PutContentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CopyEntryWithBody Copy a file or a folder within a share, or restore a version as a copy.
+	//
+	// Copies `from` to `to` — a folder with everything in it — as it is
+	// now or, with `at`, as that snapshot holds it: a previous version
+	// restored as a copy. The bytes go through ferry a chunk at a time,
+	// under the person's session, and each file is written to a
+	// temporary name and renamed once complete, so none is ever left
+	// half-copied under its real name.
+	//
+	// What would be copied is listed first: more than the deployment's
+	// entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+	// none by default) is `413`; a folder copied into itself is `400`
+	// (`copy_into_itself`); a target that exists is `409`, unless it is a
+	// file and `overwrite` is set. These come as ordinary problem
+	// responses, before anything is copied.
+	//
+	// Then the answer is `application/x-ndjson`: a `{"progress": …}`
+	// line about every second, so that a long copy is never a silent
+	// request, and a last line, `{"end": …}` with the new entry, or
+	// `{"problem": …}` with how far it got. A copy that fails or is
+	// abandoned part-way leaves the files copied so far in place; nothing
+	// is deleted to undo it. A client that goes away stops it between two
+	// chunks.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/copy (the `CopyEntry` operationId).
+	CopyEntryWithBody(ctx context.Context, share ShareName, params *CopyEntryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CopyEntry Copy a file or a folder within a share, or restore a version as a copy.
+	//
+	// Copies `from` to `to` — a folder with everything in it — as it is
+	// now or, with `at`, as that snapshot holds it: a previous version
+	// restored as a copy. The bytes go through ferry a chunk at a time,
+	// under the person's session, and each file is written to a
+	// temporary name and renamed once complete, so none is ever left
+	// half-copied under its real name.
+	//
+	// What would be copied is listed first: more than the deployment's
+	// entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+	// none by default) is `413`; a folder copied into itself is `400`
+	// (`copy_into_itself`); a target that exists is `409`, unless it is a
+	// file and `overwrite` is set. These come as ordinary problem
+	// responses, before anything is copied.
+	//
+	// Then the answer is `application/x-ndjson`: a `{"progress": …}`
+	// line about every second, so that a long copy is never a silent
+	// request, and a last line, `{"end": …}` with the new entry, or
+	// `{"problem": …}` with how far it got. A copy that fails or is
+	// abandoned part-way leaves the files copied so far in place; nothing
+	// is deleted to undo it. A client that goes away stops it between two
+	// chunks.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/copy (the `CopyEntry` operationId).
+	CopyEntry(ctx context.Context, share ShareName, params *CopyEntryParams, body CopyEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteEntry Delete a file or a folder.
 	//
 	// A folder is deleted only when it is empty, unless `recursive` is
@@ -1635,6 +1865,84 @@ func (c *Client) GetContent(ctx context.Context, share ShareName, params *GetCon
 // Corresponds with PUT /api/v1/shares/{share}/content (the `PutContent` operationId).
 func (c *Client) PutContentWithBody(ctx context.Context, share ShareName, params *PutContentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutContentRequestWithBody(c.Server, share, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CopyEntryWithBody Copy a file or a folder within a share, or restore a version as a copy.
+//
+// Copies `from` to `to` — a folder with everything in it — as it is
+// now or, with `at`, as that snapshot holds it: a previous version
+// restored as a copy. The bytes go through ferry a chunk at a time,
+// under the person's session, and each file is written to a
+// temporary name and renamed once complete, so none is ever left
+// half-copied under its real name.
+//
+// What would be copied is listed first: more than the deployment's
+// entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+// none by default) is `413`; a folder copied into itself is `400`
+// (`copy_into_itself`); a target that exists is `409`, unless it is a
+// file and `overwrite` is set. These come as ordinary problem
+// responses, before anything is copied.
+//
+// Then the answer is `application/x-ndjson`: a `{"progress": …}`
+// line about every second, so that a long copy is never a silent
+// request, and a last line, `{"end": …}` with the new entry, or
+// `{"problem": …}` with how far it got. A copy that fails or is
+// abandoned part-way leaves the files copied so far in place; nothing
+// is deleted to undo it. A client that goes away stops it between two
+// chunks.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/shares/{share}/copy (the `CopyEntry` operationId).
+func (c *Client) CopyEntryWithBody(ctx context.Context, share ShareName, params *CopyEntryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCopyEntryRequestWithBody(c.Server, share, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CopyEntry Copy a file or a folder within a share, or restore a version as a copy.
+//
+// Copies `from` to `to` — a folder with everything in it — as it is
+// now or, with `at`, as that snapshot holds it: a previous version
+// restored as a copy. The bytes go through ferry a chunk at a time,
+// under the person's session, and each file is written to a
+// temporary name and renamed once complete, so none is ever left
+// half-copied under its real name.
+//
+// What would be copied is listed first: more than the deployment's
+// entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+// none by default) is `413`; a folder copied into itself is `400`
+// (`copy_into_itself`); a target that exists is `409`, unless it is a
+// file and `overwrite` is set. These come as ordinary problem
+// responses, before anything is copied.
+//
+// Then the answer is `application/x-ndjson`: a `{"progress": …}`
+// line about every second, so that a long copy is never a silent
+// request, and a last line, `{"end": …}` with the new entry, or
+// `{"problem": …}` with how far it got. A copy that fails or is
+// abandoned part-way leaves the files copied so far in place; nothing
+// is deleted to undo it. A client that goes away stops it between two
+// chunks.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/shares/{share}/copy (the `CopyEntry` operationId).
+func (c *Client) CopyEntry(ctx context.Context, share ShareName, params *CopyEntryParams, body CopyEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCopyEntryRequest(c.Server, share, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2319,6 +2627,66 @@ func NewPutContentRequestWithBody(server string, share ShareName, params *PutCon
 	}
 
 	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Ferry-Request", params.XFerryRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Ferry-Request", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewCopyEntryRequest calls the generic CopyEntry builder with application/json body
+func NewCopyEntryRequest(server string, share ShareName, params *CopyEntryParams, body CopyEntryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := runtime.JSONMarshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCopyEntryRequestWithBody(server, share, params, "application/json", bodyReader)
+}
+
+// NewCopyEntryRequestWithBody constructs an http.Request for the CopyEntry method, with any body, and a specified content type
+func NewCopyEntryRequestWithBody(server string, share ShareName, params *CopyEntryParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/copy"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -3203,6 +3571,64 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v1/shares/{share}/content (the `PutContent` operationId).
 	PutContentWithBodyWithResponse(ctx context.Context, share ShareName, params *PutContentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutContentResponse, error)
 
+	// CopyEntryWithBodyWithResponse Copy a file or a folder within a share, or restore a version as a copy.
+	//
+	// Copies `from` to `to` — a folder with everything in it — as it is
+	// now or, with `at`, as that snapshot holds it: a previous version
+	// restored as a copy. The bytes go through ferry a chunk at a time,
+	// under the person's session, and each file is written to a
+	// temporary name and renamed once complete, so none is ever left
+	// half-copied under its real name.
+	//
+	// What would be copied is listed first: more than the deployment's
+	// entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+	// none by default) is `413`; a folder copied into itself is `400`
+	// (`copy_into_itself`); a target that exists is `409`, unless it is a
+	// file and `overwrite` is set. These come as ordinary problem
+	// responses, before anything is copied.
+	//
+	// Then the answer is `application/x-ndjson`: a `{"progress": …}`
+	// line about every second, so that a long copy is never a silent
+	// request, and a last line, `{"end": …}` with the new entry, or
+	// `{"problem": …}` with how far it got. A copy that fails or is
+	// abandoned part-way leaves the files copied so far in place; nothing
+	// is deleted to undo it. A client that goes away stops it between two
+	// chunks.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/copy (the `CopyEntry` operationId).
+	CopyEntryWithBodyWithResponse(ctx context.Context, share ShareName, params *CopyEntryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CopyEntryResponse, error)
+
+	// CopyEntryWithResponse Copy a file or a folder within a share, or restore a version as a copy.
+	//
+	// Copies `from` to `to` — a folder with everything in it — as it is
+	// now or, with `at`, as that snapshot holds it: a previous version
+	// restored as a copy. The bytes go through ferry a chunk at a time,
+	// under the person's session, and each file is written to a
+	// temporary name and renamed once complete, so none is ever left
+	// half-copied under its real name.
+	//
+	// What would be copied is listed first: more than the deployment's
+	// entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+	// none by default) is `413`; a folder copied into itself is `400`
+	// (`copy_into_itself`); a target that exists is `409`, unless it is a
+	// file and `overwrite` is set. These come as ordinary problem
+	// responses, before anything is copied.
+	//
+	// Then the answer is `application/x-ndjson`: a `{"progress": …}`
+	// line about every second, so that a long copy is never a silent
+	// request, and a last line, `{"end": …}` with the new entry, or
+	// `{"problem": …}` with how far it got. A copy that fails or is
+	// abandoned part-way leaves the files copied so far in place; nothing
+	// is deleted to undo it. A client that goes away stops it between two
+	// chunks.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/copy (the `CopyEntry` operationId).
+	CopyEntryWithResponse(ctx context.Context, share ShareName, params *CopyEntryParams, body CopyEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*CopyEntryResponse, error)
+
 	// DeleteEntryWithResponse Delete a file or a folder.
 	//
 	// A folder is deleted only when it is empty, unless `recursive` is
@@ -3962,6 +4388,89 @@ func (r PutContentResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PutContentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CopyEntryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CopyEntryResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CopyEntryResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CopyEntryResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CopyEntryResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CopyEntryResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r CopyEntryResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r CopyEntryResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r CopyEntryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CopyEntryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CopyEntryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CopyEntryResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4914,6 +5423,76 @@ func (c *ClientWithResponses) PutContentWithBodyWithResponse(ctx context.Context
 	return ParsePutContentResponse(rsp)
 }
 
+// CopyEntryWithBodyWithResponse Copy a file or a folder within a share, or restore a version as a copy.
+//
+// Copies `from` to `to` — a folder with everything in it — as it is
+// now or, with `at`, as that snapshot holds it: a previous version
+// restored as a copy. The bytes go through ferry a chunk at a time,
+// under the person's session, and each file is written to a
+// temporary name and renamed once complete, so none is ever left
+// half-copied under its real name.
+//
+// What would be copied is listed first: more than the deployment's
+// entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+// none by default) is `413`; a folder copied into itself is `400`
+// (`copy_into_itself`); a target that exists is `409`, unless it is a
+// file and `overwrite` is set. These come as ordinary problem
+// responses, before anything is copied.
+//
+// Then the answer is `application/x-ndjson`: a `{"progress": …}`
+// line about every second, so that a long copy is never a silent
+// request, and a last line, `{"end": …}` with the new entry, or
+// `{"problem": …}` with how far it got. A copy that fails or is
+// abandoned part-way leaves the files copied so far in place; nothing
+// is deleted to undo it. A client that goes away stops it between two
+// chunks.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/copy (the `CopyEntry` operationId).
+func (c *ClientWithResponses) CopyEntryWithBodyWithResponse(ctx context.Context, share ShareName, params *CopyEntryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CopyEntryResponse, error) {
+	rsp, err := c.CopyEntryWithBody(ctx, share, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCopyEntryResponse(rsp)
+}
+
+// CopyEntryWithResponse Copy a file or a folder within a share, or restore a version as a copy.
+//
+// Copies `from` to `to` — a folder with everything in it — as it is
+// now or, with `at`, as that snapshot holds it: a previous version
+// restored as a copy. The bytes go through ferry a chunk at a time,
+// under the person's session, and each file is written to a
+// temporary name and renamed once complete, so none is ever left
+// half-copied under its real name.
+//
+// What would be copied is listed first: more than the deployment's
+// entry bound (`FERRY_MAX_ARCHIVE`) or bytes bound (`FERRY_MAX_UPLOAD`,
+// none by default) is `413`; a folder copied into itself is `400`
+// (`copy_into_itself`); a target that exists is `409`, unless it is a
+// file and `overwrite` is set. These come as ordinary problem
+// responses, before anything is copied.
+//
+// Then the answer is `application/x-ndjson`: a `{"progress": …}`
+// line about every second, so that a long copy is never a silent
+// request, and a last line, `{"end": …}` with the new entry, or
+// `{"problem": …}` with how far it got. A copy that fails or is
+// abandoned part-way leaves the files copied so far in place; nothing
+// is deleted to undo it. A client that goes away stops it between two
+// chunks.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/copy (the `CopyEntry` operationId).
+func (c *ClientWithResponses) CopyEntryWithResponse(ctx context.Context, share ShareName, params *CopyEntryParams, body CopyEntryJSONRequestBody, reqEditors ...RequestEditorFn) (*CopyEntryResponse, error) {
+	rsp, err := c.CopyEntry(ctx, share, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCopyEntryResponse(rsp)
+}
+
 // DeleteEntryWithResponse Delete a file or a folder.
 //
 // A folder is deleted only when it is empty, unless `recursive` is
@@ -5630,6 +6209,74 @@ func ParsePutContentResponse(rsp *http.Response) (*PutContentResponse, error) {
 	return response, nil
 }
 
+// ParseCopyEntryResponse parses an HTTP response from a CopyEntryWithResponse call
+func ParseCopyEntryResponse(rsp *http.Response) (*CopyEntryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CopyEntryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseDeleteEntryResponse parses an HTTP response from a DeleteEntryWithResponse call
 func ParseDeleteEntryResponse(rsp *http.Response) (*DeleteEntryResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -6276,6 +6923,9 @@ type ServerInterface interface {
 	// PutContent Upload a file, streamed.
 	// (PUT /api/v1/shares/{share}/content)
 	PutContent(w http.ResponseWriter, r *http.Request, share ShareName, params PutContentParams)
+	// CopyEntry Copy a file or a folder within a share, or restore a version as a copy.
+	// (POST /api/v1/shares/{share}/copy)
+	CopyEntry(w http.ResponseWriter, r *http.Request, share ShareName, params CopyEntryParams)
 	// DeleteEntry Delete a file or a folder.
 	// (DELETE /api/v1/shares/{share}/entries)
 	DeleteEntry(w http.ResponseWriter, r *http.Request, share ShareName, params DeleteEntryParams)
@@ -6674,6 +7324,60 @@ func (siw *ServerInterfaceWrapper) PutContent(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutContent(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CopyEntry operation middleware
+func (siw *ServerInterfaceWrapper) CopyEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CopyEntryParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Ferry-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Ferry-Request")]; found {
+		var XFerryRequest CopyEntryParamsXFerryRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Ferry-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Ferry-Request", valueList[0], &XFerryRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Ferry-Request", Err: err})
+			return
+		}
+
+		params.XFerryRequest = XFerryRequest
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CopyEntry(w, r, share, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7377,6 +8081,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/archive", wrapper.CreateArchive)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/archive/{ticket}", wrapper.GetArchive)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/copy", wrapper.CopyEntry)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/move", wrapper.MoveEntry)
 
 	return m

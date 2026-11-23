@@ -15,6 +15,14 @@ export type Problem = components['schemas']['Problem'];
 export type Version = components['schemas']['Version'];
 export type VersionList = components['schemas']['VersionList'];
 export type SearchEnd = components['schemas']['SearchEnd']['end'];
+export type CopyProgress = components['schemas']['CopyProgress'];
+
+/** How a copy ended: the new entry, or the problem and how far it got. */
+export interface CopyResult {
+  entry?: Entry;
+  error?: ApiError;
+  progress: CopyProgress;
+}
 
 /** An answer of the API that is not a success: its status and stable code. */
 export class ApiError extends Error {
@@ -187,6 +195,66 @@ export class Api {
         }
       }
       if (hits.length) onHits(hits);
+    }
+  }
+
+  /**
+   * Copies a file or a folder within a share, from a snapshot with at: a
+   * version restored as a copy. What the server refuses before it begins
+   * is thrown; once it runs, onProgress hears about every second, and the
+   * result says how it ended — a copy that failed part-way keeps what it
+   * copied, and says how much.
+   */
+  async copy(
+    share: string,
+    from: string,
+    to: string,
+    opts: { overwrite?: boolean; at?: string | null },
+    onProgress: (p: CopyProgress) => void,
+    signal?: AbortSignal,
+  ): Promise<CopyResult> {
+    const body: Record<string, unknown> = { from, to };
+    if (opts.overwrite) body['overwrite'] = true;
+    if (opts.at) body['at'] = opts.at;
+    const res = await this.fetch(
+      'POST',
+      `${BASE}${shareBase(share)}/copy`,
+      body,
+      { Accept: 'application/x-ndjson' },
+      signal,
+    );
+    if (!res.body) throw new ApiError(0, 'network');
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let rest = '';
+    let last: CopyProgress = { files: 0, bytes: 0, totalFiles: 0, totalBytes: 0 };
+    for (;;) {
+      let chunk: ReadableStreamReadResult<string>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        return { error: new ApiError(0, 'network'), progress: last };
+      }
+      if (chunk.done) return { error: new ApiError(0, 'network'), progress: last };
+      const lines = (rest + chunk.value).split('\n');
+      rest = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line) continue;
+        const v = JSON.parse(line) as {
+          progress?: CopyProgress;
+          end?: { entry: Entry; progress: CopyProgress };
+          problem?: Problem;
+        };
+        if (v.end) {
+          void reader.cancel();
+          return { entry: v.end.entry, progress: v.end.progress };
+        }
+        if (v.progress) last = v.progress;
+        if (v.problem) {
+          void reader.cancel();
+          return { error: this.problemOf(v.problem.status, v.problem), progress: last };
+        }
+        if (v.progress) onProgress(v.progress);
+      }
     }
   }
 
