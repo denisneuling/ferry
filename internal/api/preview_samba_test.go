@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metapatrol/ferry/internal/preview"
-	"github.com/metapatrol/ferry/internal/smb"
+	"github.com/denisneuling/ferry/internal/preview"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 // onePagePDF is a page of text — or, with no lines, an empty page.

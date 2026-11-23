@@ -20,9 +20,9 @@
       {
         "preset": "conventionalcommits",
         "presetConfig": {
-          "commitUrlFormat": "https://github.com/metapatrol/ferry/commit/{{hash}}",
-          "compareUrlFormat": "https://github.com/metapatrol/ferry/compare/{{previousTag}}...{{currentTag}}",
-          "issueUrlFormat": "https://github.com/metapatrol/ferry/issues/{{id}}",
+          "commitUrlFormat": "https://github.com/denisneuling/ferry/commit/{{hash}}",
+          "compareUrlFormat": "https://github.com/denisneuling/ferry/compare/{{previousTag}}...{{currentTag}}",
+          "issueUrlFormat": "https://github.com/denisneuling/ferry/issues/{{id}}",
           "issuePrefixes": [
             "ferry-no-issue-links-"
           ],

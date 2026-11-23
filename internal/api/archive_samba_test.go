@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
-	"github.com/metapatrol/ferry/internal/config"
+	v1 "github.com/denisneuling/ferry/api/v1"
+	"github.com/denisneuling/ferry/internal/config"
 )
 
 func archiveRequest(t *testing.T, h *harness, c *http.Cookie, share string, paths ...string) (*http.Response, v1.ArchiveTicket) {

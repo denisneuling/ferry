@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metapatrol/ferry/internal/cache"
-	"github.com/metapatrol/ferry/internal/preview"
-	"github.com/metapatrol/ferry/internal/smb"
-	"github.com/metapatrol/ferry/internal/thumb"
+	"github.com/denisneuling/ferry/internal/cache"
+	"github.com/denisneuling/ferry/internal/preview"
+	"github.com/denisneuling/ferry/internal/smb"
+	"github.com/denisneuling/ferry/internal/thumb"
 )
 
 func failureKey(variant string, size int64, mod time.Time) cache.Key {

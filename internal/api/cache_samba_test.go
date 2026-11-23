@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metapatrol/ferry/internal/cache"
+	"github.com/denisneuling/ferry/internal/cache"
 )
 
 // cacheCounts counts what the cache did, by kind and outcome.

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metapatrol/ferry/internal/smb"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 func login(t *testing.T, user, password string) (*smb.Session, error) {

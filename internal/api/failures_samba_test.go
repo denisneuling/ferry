@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/metapatrol/ferry/internal/metrics"
+	"github.com/denisneuling/ferry/internal/metrics"
 )
 
 // thumbnailOutcome reads ferry_thumbnails_total for one outcome from the

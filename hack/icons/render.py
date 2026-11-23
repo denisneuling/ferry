@@ -6,8 +6,7 @@
 #
 #   python3 hack/icons/render.py ui/public    # needs playwright and its chromium
 #
-# The icons in ui/public are its output, committed; .metapatrol/favicon is the
-# repository's own and not the app's.
+# The icons in ui/public are its output, committed.
 import base64, struct, sys
 from playwright.sync_api import sync_playwright
 

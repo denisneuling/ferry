@@ -185,9 +185,9 @@ jobs:
       - name: Decide and publish a version
         env:
           GIT_AUTHOR_NAME: automation
-          GIT_AUTHOR_EMAIL: automation@forge.metapatrol.com
+          GIT_AUTHOR_EMAIL: automation@ferry.invalid
           GIT_COMMITTER_NAME: automation
-          GIT_COMMITTER_EMAIL: automation@forge.metapatrol.com
+          GIT_COMMITTER_EMAIL: automation@ferry.invalid
           NODE_TLS_REJECT_UNAUTHORIZED: "0"
         run: |
           # Pinned with ci.yml's release-notes job: preset 10 needs a newer
@@ -217,9 +217,9 @@ jobs:
         continue-on-error: true
         env:
           GIT_AUTHOR_NAME: automation
-          GIT_AUTHOR_EMAIL: automation@forge.metapatrol.com
+          GIT_AUTHOR_EMAIL: automation@ferry.invalid
           GIT_COMMITTER_NAME: automation
-          GIT_COMMITTER_EMAIL: automation@forge.metapatrol.com
+          GIT_COMMITTER_EMAIL: automation@ferry.invalid
         run: |
           export GIT_ASKPASS=/tmp/git-askpass.sh
 

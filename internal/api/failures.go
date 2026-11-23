@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/metapatrol/ferry/internal/cache"
-	"github.com/metapatrol/ferry/internal/preview"
-	"github.com/metapatrol/ferry/internal/thumb"
+	"github.com/denisneuling/ferry/internal/cache"
+	"github.com/denisneuling/ferry/internal/preview"
+	"github.com/denisneuling/ferry/internal/thumb"
 )
 
 const (

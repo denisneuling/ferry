@@ -8,7 +8,7 @@ import (
 	"image/jpeg"
 	"testing"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
+	v1 "github.com/denisneuling/ferry/api/v1"
 )
 
 const immutable = "private, max-age=31536000, immutable"

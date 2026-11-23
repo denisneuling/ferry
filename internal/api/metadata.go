@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
-	"github.com/metapatrol/ferry/internal/meta"
-	"github.com/metapatrol/ferry/internal/smb"
+	v1 "github.com/denisneuling/ferry/api/v1"
+	"github.com/denisneuling/ferry/internal/meta"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 // metaConcurrency is how many files have their metadata read at once, each

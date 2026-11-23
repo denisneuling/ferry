@@ -65,7 +65,7 @@ WebDAV page) all break at least one of these rules:
 | contract | OpenAPI 3.0.3 first, with oapi-codegen for server and types (soulforge's setup). The interface's TypeScript client is generated from the same spec |
 | state | sessions in memory only; an optional cache of thumbnails and details on a volume, encrypted |
 | authentication | the SMB session setup (NTLMSSP) against the configured server. No tokens, no OIDC |
-| interface | Angular with its own layout and theme (“Hafen”, §5), not the metapatrol shell; embedded in the binary. English with German as the first translation (`@angular/localize`) |
+| interface | Angular with its own layout and theme (“Hafen”, §5), not a shell shared with other projects; embedded in the binary. English with German as the first translation (`@angular/localize`) |
 | operations | Kubernetes, Helm (OCI), Flux; Prometheus metrics, OTEL traces; Forgejo Actions CI and semantic-release, as in soulforge |
 
 ### Principles
@@ -191,10 +191,9 @@ Illustrative. The contract is `api/openapi/ferry-v1.yaml`.
 
 ## 5. The interface
 
-Angular with its own layout, not the metapatrol shell. Unlike websearch's
+Angular with its own layout, not a shell shared with other projects. Unlike websearch's
 console, the interface *is* the product, so it is designed for people who never
-think about SMB. The repository keeps the metapatrol lockup under `.metapatrol/`
-for the README, as the other projects do.
+think about SMB. The README shows ferry's own app icon.
 
 The look is **direction A, “Hafen”**, from the mockups in
 [docs/mockup/](docs/mockup/index.html) (2026-11-21):
@@ -296,9 +295,8 @@ charts/ferry/               Helm chart
   - Forgejo Actions CI, with integration tests against a Samba container;
   - semantic-release with Conventional Commits;
   - Renovate;
-  - `metapatrol.json`;
   - Apache-2.0.
-- **README:** the same structure as the other projects (lockup, *Why*, *How it
+- **README:** the same structure as the other projects (icon, *Why*, *How it
   works*, scope).
 - **Configuration**, through environment variables, with one secret — the
   cache's key, when the cache is on:
@@ -344,7 +342,7 @@ Filestash for a week before Filestash goes.
 | go-smb2 (cloudsoda fork), not libsmbclient | pure Go, distroless image, the same code rclone runs against many servers |
 | Session cookie, not Basic auth or tokens in the browser | the password is sent once; JavaScript never holds it; logout works |
 | No sharing links | they would need state and a second authorisation model |
-| Own interface components, no `@metapatrol/ng` | the look is ferry's own (“Hafen”), so shared primitives would be restyled everywhere; and the repository is public, so the build must not need a private registry or a token: `npm ci` is enough. Angular CDK supplies behaviour only (focus trap, a11y, overlay positioning), without its styles |
+| Own interface components, no shared component library | the look is ferry's own (“Hafen”), so shared primitives would be restyled everywhere; and the repository is public, so the build must not need a private registry or a token: `npm ci` is enough. Angular CDK supplies behaviour only (focus trap, a11y, overlay positioning), without its styles |
 
 ---
 

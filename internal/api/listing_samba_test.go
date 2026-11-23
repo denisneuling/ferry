@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
-	"github.com/metapatrol/ferry/internal/config"
-	"github.com/metapatrol/ferry/internal/smb"
+	v1 "github.com/denisneuling/ferry/api/v1"
+	"github.com/denisneuling/ferry/internal/config"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 // manyEntries is the size of hack/samba's alex/Many.

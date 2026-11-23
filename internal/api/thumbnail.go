@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"strconv"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
-	"github.com/metapatrol/ferry/internal/cache"
-	"github.com/metapatrol/ferry/internal/meta"
-	"github.com/metapatrol/ferry/internal/preview"
-	"github.com/metapatrol/ferry/internal/smb"
-	"github.com/metapatrol/ferry/internal/thumb"
+	v1 "github.com/denisneuling/ferry/api/v1"
+	"github.com/denisneuling/ferry/internal/cache"
+	"github.com/denisneuling/ferry/internal/meta"
+	"github.com/denisneuling/ferry/internal/preview"
+	"github.com/denisneuling/ferry/internal/smb"
+	"github.com/denisneuling/ferry/internal/thumb"
 )
 
 var probNotAnImage = problem{status: http.StatusUnsupportedMediaType, code: "not_an_image", title: "ferry cannot make a thumbnail of this file."}

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
-	"github.com/metapatrol/ferry/internal/smb"
+	v1 "github.com/denisneuling/ferry/api/v1"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 // problem is an RFC 9457 response: status, a stable code and a title for

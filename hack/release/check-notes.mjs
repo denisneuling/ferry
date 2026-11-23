@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { generateNotes } from "@semantic-release/release-notes-generator";
 
 const repo = process.argv[2] ?? ".";
-const PUBLIC = "https://github.com/metapatrol/ferry/";
+const PUBLIC = "https://github.com/denisneuling/ferry/";
 
 const rc = JSON.parse(readFileSync(`${repo}/.releaserc.json`, "utf8"));
 const GENERATOR = "@semantic-release/release-notes-generator";

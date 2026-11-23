@@ -1,4 +1,4 @@
-module github.com/metapatrol/ferry
+module github.com/denisneuling/ferry
 
 go 1.27.0
 

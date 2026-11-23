@@ -1,6 +1,6 @@
 # ferry
 
-ferry — SMB shares in the browser; log in with your Samba account and see exactly what Samba lets you see, with no users, no database and nothing stored
+ferry — SMB shares in the browser; log in with your Samba account and see exactly what Samba lets you see, with no users and no database
 
 ![Version: 0.6.0](https://img.shields.io/badge/Version-0.6.0-informational?style=flat-square) ![AppVersion: 0.6.0](https://img.shields.io/badge/AppVersion-0.6.0-informational?style=flat-square)
 
@@ -11,7 +11,7 @@ the process's memory. An optional cache of thumbnails and details
 (`cache.enabled`) is the one exception: a volume and a key the chart makes.
 
 ```sh
-helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.6.0 \
+helm install ferry oci://ghcr.io/denisneuling/charts/ferry --version 0.6.0 \
   --set smb.server=nas.example.lan \
   --set ingress.enabled=true --set 'ingress.hosts[0].host=files.example.com' \
   --set 'ingress.hosts[0].paths[0].path=/' \
@@ -20,7 +20,7 @@ helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.6.0 \
 ```
 
 `smb.server` is required; the chart refuses to render without it. The
-image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
+image is `ghcr.io/denisneuling/ferry` at the chart's appVersion, linux/amd64.
 
 ## What the chart decides
 
@@ -36,7 +36,7 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
   `maxUnavailable: 1`, so that the old pod lets go of the volume before the
   new one starts.
 - **Memory.** The defaults — a 512 MiB limit, `GOMEMLIMIT` at 450 MiB, a CPU
-  limit — follow [docs/operations.md](https://github.com/metapatrol/ferry/blob/main/docs/operations.md#memory):
+  limit — follow [docs/operations.md](https://github.com/denisneuling/ferry/blob/main/docs/operations.md#memory):
   they fit a household with 2 CPUs, a dozen sessions and ten transfers at
   once with the default thumbnail budget. Raise the limit with the budget
   (`thumbnails.memory`), never the budget alone; keep a CPU limit, since Go
@@ -65,7 +65,7 @@ image is `ghcr.io/metapatrol/ferry` at the chart's appVersion, linux/amd64.
 | extraEnv | list | `[]` | Further environment variables for the container. |
 | goMemLimit | string | `"400MiB"` | The Go runtime's soft memory limit (GOMEMLIMIT), below `resources.limits.memory`, so that the garbage collector works harder before the kernel would kill the pod — and every session with it. It leaves room for the previews' compiled code (~60 MB), which lives outside Go's heap and outside this limit. Empty leaves it unset. |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
-| image.repository | string | `"ghcr.io/metapatrol/ferry"` | The image; the default is the public one the GitHub mirror publishes. |
+| image.repository | string | `"ghcr.io/denisneuling/ferry"` | The image; the default is the public one the GitHub mirror publishes. |
 | image.tag | string | `""` | The tag; empty means the chart's appVersion. |
 | imagePullSecrets | list | `[]` | Secrets for pulling from a private registry. |
 | ingress.annotations | object | `{}` |  |

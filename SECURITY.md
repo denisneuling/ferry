@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security problems privately through GitHub's
-[private vulnerability reporting](https://github.com/metapatrol/ferry/security/advisories/new)
+[private vulnerability reporting](https://github.com/denisneuling/ferry/security/advisories/new)
 (*Security → Report a vulnerability*), not in a public issue or pull request.
 
 Include what you found, how to reproduce it, and what an attacker could do with

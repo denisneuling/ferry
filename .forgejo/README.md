@@ -78,10 +78,10 @@ cluster tracking a branch runs the commit it tracks.
 `oci://$REGISTRY/charts/mdvc` and attaches it to the release. In the
 repository the chart version stays at what semantic-release last wrote
 (`0.0.0` before the first release); its default image is the public
-`ghcr.io/metapatrol/ferry` at the chart's appVersion, so an installation
+`ghcr.io/denisneuling/ferry` at the chart's appVersion, so an installation
 from either registry needs to set no image.
 
-The interface uses no `@metapatrol/*` packages, so its build needs no forge
+The interface uses no private packages, so its build needs no forge
 token and no private CA: `npm ci` reads only public packages, through the CI
 cache.
 
@@ -149,14 +149,14 @@ requests then go out as the bot, and cross-repository calls quietly fail.
 ## The GitHub mirror
 
 The repository is push-mirrored to GitHub. Issues and pull requests opened
-there are carried in by forgejo-github-bridge (`CONTRIBUTING.md`). GitHub
+there are carried in by a bridge (`CONTRIBUTING.md`). GitHub
 builds the public artifacts from what arrives there, with
 `.github/workflows/publish.yml` (Forgejo ignores `.github/`). It decides
 nothing — a release tag semantic-release made here is built there:
 
-- `ghcr.io/metapatrol/ferry` — `:X.Y.Z`, `:X.Y`, `:latest` from a release
+- `ghcr.io/denisneuling/ferry` — `:X.Y.Z`, `:X.Y`, `:latest` from a release
   tag; `:main` and the short SHA from main;
-- `oci://ghcr.io/metapatrol/charts/ferry` from a release tag;
+- `oci://ghcr.io/denisneuling/charts/ferry` from a release tag;
 - a GitHub release with the binaries and the chart, from a release tag.
 
 Before the first release it built nothing. What GitHub needs outside this

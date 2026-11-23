@@ -17,12 +17,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/metapatrol/ferry/internal/api"
-	"github.com/metapatrol/ferry/internal/config"
-	"github.com/metapatrol/ferry/internal/metrics"
-	"github.com/metapatrol/ferry/internal/session"
-	"github.com/metapatrol/ferry/internal/tracing"
-	"github.com/metapatrol/ferry/internal/ui"
+	"github.com/denisneuling/ferry/internal/api"
+	"github.com/denisneuling/ferry/internal/config"
+	"github.com/denisneuling/ferry/internal/metrics"
+	"github.com/denisneuling/ferry/internal/session"
+	"github.com/denisneuling/ferry/internal/tracing"
+	"github.com/denisneuling/ferry/internal/ui"
 )
 
 // Server is ferry's HTTP side.

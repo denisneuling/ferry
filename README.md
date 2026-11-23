@@ -1,16 +1,13 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".metapatrol/ferry-lockup-dark.png">
-    <img alt="metapatrol / ferry" src=".metapatrol/ferry-lockup-light.png" width="420">
-  </picture>
+  <img alt="ferry" src="ui/public/icon-192.png" width="96">
 </p>
 
 <p align="center">
-  <strong>SMB shares in the browser: log in with your Samba account, and see exactly what Samba lets you see. No users, no database, nothing stored.</strong>
+  <strong>SMB shares in the browser: log in with your Samba account, and see exactly what Samba lets you see. No users, no database; at most an optional, encrypted thumbnail cache.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/metapatrol/ferry/releases"><img alt="Release" src="https://img.shields.io/github/v/release/metapatrol/ferry?sort=semver"></a>
+  <a href="https://github.com/denisneuling/ferry/releases"><img alt="Release" src="https://img.shields.io/github/v/release/denisneuling/ferry?sort=semver"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
   <img alt="Go" src="https://img.shields.io/badge/go-1.27-00add8">
 </p>
@@ -36,7 +33,12 @@
 
 ---
 
-> **Status:** young; 0.1.0 is the first public release. The 0.x releases
+> **A personal project.** I build ferry for my own use. It is public because
+> I publish its image and chart through a public registry (ghcr.io), and the
+> code goes with them. There is no support and no promise of any kind; issues
+> and pull requests are read when I have the time, if at all.
+
+> **Status:** young. The 0.x releases
 > work against Samba and are used at home; the API, the settings and the
 > chart's values may still change before 1.0, and the
 > [changelog](CHANGELOG.md) says when they do.
@@ -125,7 +127,7 @@ NAS's fictional data; `make dev-nas screenshots` makes the pictures again
 ## Installation
 
 ```sh
-helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.1.0 \
+helm install ferry oci://ghcr.io/denisneuling/charts/ferry --version 0.1.0 \
   --set smb.server=nas.example.lan
 ```
 
@@ -133,7 +135,7 @@ helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.1.0 \
 Ingress or your gateway — or passwords cross the network readable.
 [docs/installation.md](docs/installation.md) has TLS, the trusted proxies,
 memory and running without Kubernetes; the
-[releases](https://github.com/metapatrol/ferry/releases) list the newest
+[releases](https://github.com/denisneuling/ferry/releases) list the newest
 version.
 
 ## Quick start
@@ -157,5 +159,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURIT
 
 ## License
 
-Apache-2.0, see [LICENSE](LICENSE). The metapatrol name and marks are not
-covered by it: see [TRADEMARKS.md](TRADEMARKS.md).
+Apache-2.0, see [LICENSE](LICENSE).

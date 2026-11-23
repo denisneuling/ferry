@@ -42,8 +42,8 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 
-	"github.com/metapatrol/ferry/internal/thumb"
-	"github.com/metapatrol/ferry/third_party/heif"
+	"github.com/denisneuling/ferry/internal/thumb"
+	"github.com/denisneuling/ferry/third_party/heif"
 )
 
 var (

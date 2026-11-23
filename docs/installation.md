@@ -10,12 +10,12 @@ read the file.
 ## Helm
 
 The chart and the image are public on GitHub's registry. Pin a version —
-the [releases](https://github.com/metapatrol/ferry/releases) list them; the
+the [releases](https://github.com/denisneuling/ferry/releases) list them; the
 chart's version is the release's, and it runs the image of that release
 unless `image.tag` says otherwise:
 
 ```sh
-helm install ferry oci://ghcr.io/metapatrol/charts/ferry --version 0.1.0 \
+helm install ferry oci://ghcr.io/denisneuling/charts/ferry --version 0.1.0 \
   --namespace ferry --create-namespace \
   --set smb.server=nas.example.lan \
   --set smb.serverName="The NAS" \
@@ -65,7 +65,7 @@ The image (linux/amd64) runs anywhere:
 
 ```sh
 docker run -d --name ferry -p 8080:8080 --read-only --cap-drop ALL \
-  -e FERRY_SMB_SERVER=nas.example.lan ghcr.io/metapatrol/ferry:0.1.0
+  -e FERRY_SMB_SERVER=nas.example.lan ghcr.io/denisneuling/ferry:0.1.0
 ```
 
 Tags are the release (`0.1.0`), its minor line (`0.1`) and `latest`.

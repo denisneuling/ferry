@@ -1,12 +1,14 @@
 # Contributing
 
-Thanks for taking the time.
+Thanks for taking the time. ferry is a personal project (see the README):
+issues and pull requests are read on a best-effort basis, with no promise of
+an answer, a fix or a merge.
 
 ## How this repository works
 
 ferry is developed in a private Forgejo instance and push-mirrored here.
 Issues and pull requests opened on GitHub are carried into Forgejo by
-[forgejo-github-bridge](https://github.com/metapatrol/forgejo-github-bridge), where the maintainers work, and everything
+a bridge, where the maintainers work, and everything
 they say comes back here. From your side it is an ordinary GitHub project; a
 bot account posts the maintainers' replies, naming who wrote them.
 
@@ -44,6 +46,3 @@ if you ever see one in its output, that is a security problem: see
 2. Review comments appear on your pull request, posted by the bot and
    attributed to the maintainer.
 3. When it is merged, the bot says so; your authorship is kept.
-
-The brand assets in `.metapatrol/` are generated: `npx @metapatrol/brand-kit init`
-rewrites them from `metapatrol.json`. Edit `metapatrol.json`, not the files.

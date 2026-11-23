@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ferry
-description: ferry — SMB shares in the browser; log in with your Samba account and see exactly what Samba lets you see, with no users, no database and nothing stored
+description: ferry — SMB shares in the browser; log in with your Samba account and see exactly what Samba lets you see, with no users and no database
 type: application
 version: 0.6.0
 appVersion: "0.6.0"
@@ -10,9 +10,9 @@ keywords:
   - files
   - nas
   - file-manager
-home: https://github.com/metapatrol/ferry
+home: https://github.com/denisneuling/ferry
 sources:
-  - https://github.com/metapatrol/ferry
+  - https://github.com/denisneuling/ferry
 maintainers:
-  - name: metapatrol
-    url: https://github.com/metapatrol
+  - name: denisneuling
+    url: https://github.com/denisneuling

@@ -5,7 +5,7 @@
 
 image:
   # -- The image; the default is the public one the GitHub mirror publishes.
-  repository: ghcr.io/metapatrol/ferry
+  repository: ghcr.io/denisneuling/ferry
   # -- The tag; empty means the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent

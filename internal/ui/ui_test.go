@@ -69,14 +69,13 @@ func TestSingleApp(t *testing.T) {
 	}
 }
 
-// TestOwnIcons holds the app to ferry's own icons: the metapatrol mark in
-// .metapatrol/ is the repository's, never the app's.
+// TestOwnIcons holds the app to ferry's own icons, made by hack/icons.
 func TestOwnIcons(t *testing.T) {
 	svg, err := os.ReadFile("../../ui/public/favicon.svg")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(svg), `aria-label="ferry"`) || strings.Contains(string(svg), "metapatrol") {
+	if !strings.Contains(string(svg), `aria-label="ferry"`) {
 		t.Errorf("ui/public/favicon.svg is not ferry's icon")
 	}
 	for _, name := range []string{"favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "site.webmanifest"} {

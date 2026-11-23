@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
-	"github.com/metapatrol/ferry/internal/smb"
+	v1 "github.com/denisneuling/ferry/api/v1"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 // onShare is the common start of every handler on a share: the session, the

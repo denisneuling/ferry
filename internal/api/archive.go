@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
-	"github.com/metapatrol/ferry/internal/session"
-	"github.com/metapatrol/ferry/internal/smb"
+	v1 "github.com/denisneuling/ferry/api/v1"
+	"github.com/denisneuling/ferry/internal/session"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 // A ZIP download takes two requests. A browser downloads a file to disk only

@@ -7,7 +7,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/metapatrol/ferry/internal/tracing"
+	"github.com/denisneuling/ferry/internal/tracing"
 )
 
 // defaultCallTimeout bounds one SMB call when LoginOptions says nothing.

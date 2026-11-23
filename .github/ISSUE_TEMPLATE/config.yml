@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security problem
-    url: https://github.com/metapatrol/ferry/security/advisories/new
+    url: https://github.com/denisneuling/ferry/security/advisories/new
     about: Report vulnerabilities privately, not in an issue.

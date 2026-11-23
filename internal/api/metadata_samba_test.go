@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
+	v1 "github.com/denisneuling/ferry/api/v1"
 )
 
 // TestMetadata reads what files on the test Samba say about themselves

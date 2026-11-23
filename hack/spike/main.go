@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/metapatrol/ferry/internal/smb"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 func main() {

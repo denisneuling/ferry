@@ -77,9 +77,9 @@ is English.
 - `internal/smb` talks SMB and knows nothing of HTTP; `internal/session` holds
   the table, timeouts and rate limits; `internal/api` translates and maps
   errors. No SMB in handlers beyond calling `internal/smb`.
-- The interface is ferry's own layout, "Hafen" from `docs/mockup/`, not the
-  metapatrol shell, and has its own small components (dialogs on the native
-  `<dialog>`, menu, toasts, lightbox) — no `@metapatrol/*` packages, so the
+- The interface is ferry's own layout, "Hafen" from `docs/mockup/`, not a
+  shell shared with other projects, and has its own small components (dialogs
+  on the native `<dialog>`, menu, toasts, lightbox) — no private packages, so the
   public repository builds with `npm ci` alone. Its global stylesheet
   (`ui/src/styles.css`) keeps the mockup's rules nearly as they are, so the
   two can be compared. The fonts (Fraunces, DM Sans, @fontsource) are served

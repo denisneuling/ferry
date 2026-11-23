@@ -9,10 +9,10 @@
 #
 # Forgejo reads .forgejo/workflows and ignores this directory.
 #
-#   ghcr.io/metapatrol/ferry
+#   ghcr.io/denisneuling/ferry
 #     :1.0.0 :1.0 :latest     from a release tag
 #     :main :<short sha>      from main
-#   oci://ghcr.io/metapatrol/charts/ferry
+#   oci://ghcr.io/denisneuling/charts/ferry
 #     :1.0.0                  from a release tag
 #   a GitHub release with the binaries and the chart, from a release tag
 #

@@ -22,7 +22,7 @@ import (
 )
 
 // Name is the instrumentation scope of ferry's spans.
-const Name = "github.com/metapatrol/ferry"
+const Name = "github.com/denisneuling/ferry"
 
 // Tracer is ferry's tracer, from the provider Init set — or the no-op one.
 func Tracer() trace.Tracer { return otel.Tracer(Name) }

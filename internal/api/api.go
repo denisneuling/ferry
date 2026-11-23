@@ -23,13 +23,13 @@ import (
 
 	"golang.org/x/sync/semaphore"
 
-	v1 "github.com/metapatrol/ferry/api/v1"
-	"github.com/metapatrol/ferry/internal/cache"
-	"github.com/metapatrol/ferry/internal/config"
-	"github.com/metapatrol/ferry/internal/metrics"
-	"github.com/metapatrol/ferry/internal/preview"
-	"github.com/metapatrol/ferry/internal/session"
-	"github.com/metapatrol/ferry/internal/smb"
+	v1 "github.com/denisneuling/ferry/api/v1"
+	"github.com/denisneuling/ferry/internal/cache"
+	"github.com/denisneuling/ferry/internal/config"
+	"github.com/denisneuling/ferry/internal/metrics"
+	"github.com/denisneuling/ferry/internal/preview"
+	"github.com/denisneuling/ferry/internal/session"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 // LoginFunc sets up a person's SMB sessions; smb.LoginGroup, or a stand-in

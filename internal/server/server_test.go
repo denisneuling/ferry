@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metapatrol/ferry/internal/api"
-	"github.com/metapatrol/ferry/internal/config"
-	"github.com/metapatrol/ferry/internal/metrics"
-	"github.com/metapatrol/ferry/internal/session"
-	"github.com/metapatrol/ferry/internal/smb"
+	"github.com/denisneuling/ferry/internal/api"
+	"github.com/denisneuling/ferry/internal/config"
+	"github.com/denisneuling/ferry/internal/metrics"
+	"github.com/denisneuling/ferry/internal/session"
+	"github.com/denisneuling/ferry/internal/smb"
 )
 
 func newTestServer(t *testing.T, smbServer string, log *slog.Logger) *httptest.Server {

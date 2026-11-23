@@ -15,15 +15,15 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/metapatrol/ferry/internal/api"
-	"github.com/metapatrol/ferry/internal/cache"
-	"github.com/metapatrol/ferry/internal/config"
-	"github.com/metapatrol/ferry/internal/metrics"
-	"github.com/metapatrol/ferry/internal/preview"
-	"github.com/metapatrol/ferry/internal/server"
-	"github.com/metapatrol/ferry/internal/session"
-	"github.com/metapatrol/ferry/internal/smb"
-	"github.com/metapatrol/ferry/internal/tracing"
+	"github.com/denisneuling/ferry/internal/api"
+	"github.com/denisneuling/ferry/internal/cache"
+	"github.com/denisneuling/ferry/internal/config"
+	"github.com/denisneuling/ferry/internal/metrics"
+	"github.com/denisneuling/ferry/internal/preview"
+	"github.com/denisneuling/ferry/internal/server"
+	"github.com/denisneuling/ferry/internal/session"
+	"github.com/denisneuling/ferry/internal/smb"
+	"github.com/denisneuling/ferry/internal/tracing"
 )
 
 // Set at build time through -ldflags (Makefile, Dockerfile, release.yml).
