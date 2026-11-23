@@ -330,6 +330,57 @@ export class Api {
   }
 
   /**
+   * A file's bytes, as it is now, and the ETag naming that version: what an
+   * editor opens. More than max bytes is too_large.
+   */
+  async readFile(share: string, path: string, max: number): Promise<{ bytes: Uint8Array; etag: string }> {
+    const res = await this.fetch(
+      'GET',
+      `${BASE}${shareBase(share)}/content?path=${q(path)}`,
+      undefined,
+      {},
+      undefined,
+    );
+    const size = Number(res.headers.get('Content-Length') ?? 0);
+    if (size > max) {
+      void res.body?.cancel();
+      throw new ApiError(413, 'too_large', max);
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length > max) throw new ApiError(413, 'too_large', max);
+    return { bytes, etag: res.headers.get('ETag') ?? '' };
+  }
+
+  /**
+   * Saves an editor's bytes over the version etag names; a file that
+   * changed since is a 412 (changed), and stays as it is. Without etag the
+   * file is replaced whatever it is now: the person chose to.
+   */
+  async saveFile(share: string, path: string, bytes: Uint8Array, etag: string | null): Promise<Entry> {
+    const headers: Record<string, string> = {
+      'X-Ferry-Request': '1',
+      'Content-Type': 'application/octet-stream',
+    };
+    if (etag) headers['If-Match'] = etag;
+    let res: Response;
+    try {
+      res = await fetch(
+        `${BASE}${shareBase(share)}/content?path=${q(path)}${etag ? '' : '&overwrite=true'}`,
+        {
+          method: 'PUT',
+          headers,
+          body: new Blob([bytes as Uint8Array<ArrayBuffer>]),
+          credentials: 'same-origin',
+        },
+      );
+    } catch {
+      throw new ApiError(0, 'network');
+    }
+    if (!res.ok) throw this.problem(res.status, await res.text().catch(() => ''));
+    return (await res.json()) as Entry;
+  }
+
+  /**
    * Uploads a file with progress, which fetch cannot report. abort() cancels
    * it; the server then leaves nothing behind.
    */

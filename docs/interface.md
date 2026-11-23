@@ -165,6 +165,20 @@ While an image is shown, the next and the previous one load ahead, so that
 stepping to them shows them at once; videos and PDFs do not, and nothing
 loads ahead when the browser is set to save data.
 
+## Editing text
+
+A text file up to 1 MiB — notes, a recipe, a configuration — has
+**Edit** in its preview: the whole file in a plain text area, saved with
+**Save** or Ctrl+S (⌘S). Saving replaces the file only while it is still
+the version that was opened; when someone saved it in the meantime, ferry
+says so and asks before writing over it. Line endings and a byte-order
+mark stay as the file had them. A file that is not UTF-8 is not edited
+here — saving it could change it — and neither is a previous version. A
+version is told by the file's size and modification time, as the server
+reports it: on a file system that keeps times coarsely (FAT, two seconds),
+two saves of the same length within that window look alike; ZFS, ext4 and
+NTFS keep them finely enough.
+
 ## Downloading
 
 A file downloads through the browser's own download, with Range, so a large

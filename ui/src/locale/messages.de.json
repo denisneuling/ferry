@@ -229,6 +229,21 @@
     "uploadFolder.title": "Einen Ordner mit allem darin hochladen",
     "uploadFolder": "Ordner",
     "tr.active": "{VAR_PLURAL, plural, =1 {1 Übertragung läuft} other {{INTERPOLATION} Übertragungen laufen}}",
-    "tr.finished": "Übertragungen fertig"
+    "tr.finished": "Übertragungen fertig",
+    "edit.open": "Bearbeiten",
+    "edit.area": "Text der Datei",
+    "edit.unsaved": "Nicht gespeichert",
+    "edit.saved": "Gespeichert",
+    "edit.close": "Editor schließen",
+    "edit.save": "Speichern",
+    "edit.notUtf8": "Diese Datei ist kein UTF-8-Text; hier gespeichert könnte sie sich verändern. Lade sie herunter, um sie zu bearbeiten.",
+    "edit.tooLarge": "Hier werden nur Dateien bis {$max} bearbeitet.",
+    "edit.done": "Gespeichert: {$name}",
+    "edit.changedTitle": "Die Datei wurde inzwischen geändert",
+    "edit.changedText": "Jemand hat „{$name}“ gespeichert, seit du sie geöffnet hast. Deinen Text darüber speichern, oder weiter bearbeiten und vorher kopieren, was du brauchst?",
+    "edit.overwrite": "Darüber speichern",
+    "edit.discardTitle": "Änderungen verwerfen?",
+    "edit.discardText": "Was du in „{$name}“ geändert hast, ist nicht gespeichert.",
+    "edit.discard": "Verwerfen"
   }
 }

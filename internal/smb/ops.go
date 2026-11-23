@@ -316,7 +316,20 @@ const UploadChunk = 1 << 20
 //
 // The request slot is taken per write, not for the whole upload: a slow
 // client must not hold up the same person's browsing.
-func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, overwrite bool, max int64) (_ Entry, err error) {
+func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, overwrite bool, max int64) (Entry, error) {
+	return s.upload(ctx, share, p, r, overwrite, max, nil)
+}
+
+// UploadIfMatch replaces a file with r only while it is still the version
+// match recognises: an editor saving what it opened. A file that changed
+// since, or is gone, is KindChanged. The file is checked before the body is
+// read and again just before the rename, so a change in between is caught
+// all but in the last moment (go-smb2 renames without a condition).
+func (s *Session) UploadIfMatch(ctx context.Context, share, p string, r io.Reader, max int64, match func(Entry) bool) (Entry, error) {
+	return s.upload(ctx, share, p, r, true, max, match)
+}
+
+func (s *Session) upload(ctx context.Context, share, p string, r io.Reader, overwrite bool, max int64, match func(Entry) bool) (_ Entry, err error) {
 	ctx, done := span(ctx, "smb.upload")
 	defer func() { done(err) }()
 	sp, err := CleanPath(p)
@@ -346,7 +359,7 @@ func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, over
 			if err != nil {
 				return err
 			}
-			if err := s.refuseExisting(m, sp, overwrite); err != nil {
+			if err := s.refuseChanged(m, sp, overwrite, match); err != nil {
 				return err
 			}
 			if f, err = m.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644); err != nil {
@@ -401,7 +414,7 @@ func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, over
 		}
 	}
 
-	e, err := s.finishUpload(ctx, fctx, fcancel, share, f, tmp, sp, overwrite)
+	e, err := s.finishUpload(ctx, fctx, fcancel, share, f, tmp, sp, overwrite, match)
 	if err != nil {
 		cleanup()
 		return Entry{}, err
@@ -411,7 +424,7 @@ func (s *Session) Upload(ctx context.Context, share, p string, r io.Reader, over
 
 // finishUpload closes the temporary file and renames it to the real name,
 // checking once more that the target may be written.
-func (s *Session) finishUpload(ctx, fctx context.Context, fcancel context.CancelFunc, share string, f *smb2.File, tmp, sp string, overwrite bool) (Entry, error) {
+func (s *Session) finishUpload(ctx, fctx context.Context, fcancel context.CancelFunc, share string, f *smb2.File, tmp, sp string, overwrite bool, match func(Entry) bool) (Entry, error) {
 	if err := s.begin(ctx); err != nil {
 		return Entry{}, err
 	}
@@ -425,7 +438,7 @@ func (s *Session) finishUpload(ctx, fctx context.Context, fcancel context.Cancel
 		if err != nil {
 			return err
 		}
-		if err := s.refuseExisting(m, sp, overwrite); err != nil {
+		if err := s.refuseChanged(m, sp, overwrite, match); err != nil {
 			return err
 		}
 		if err := m.Rename(tmp, sp); err != nil {
@@ -455,6 +468,26 @@ func (s *Session) writeChunk(ctx context.Context, fcancel context.CancelFunc, f 
 		}
 		return nil
 	})
+}
+
+// refuseChanged is refuseExisting, or with match, KindChanged unless the
+// file is there and still the version match recognises.
+func (s *Session) refuseChanged(m *smb2.Share, sp string, overwrite bool, match func(Entry) bool) error {
+	if match == nil {
+		return s.refuseExisting(m, sp, overwrite)
+	}
+	e, err := s.stat(m, sp)
+	switch {
+	case KindOf(err) == KindNotFound:
+		return &Error{Kind: KindChanged}
+	case err != nil:
+		return err
+	case e.Dir:
+		return &Error{Kind: KindIsDir}
+	case !match(e):
+		return &Error{Kind: KindChanged}
+	}
+	return nil
 }
 
 // tempName is the temporary name of an upload, in the target's folder. It

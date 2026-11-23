@@ -20,6 +20,8 @@ import { Icon } from '../ui/icon';
 import { FileDetails } from '../ui/file-details';
 import { Snapshot } from '../core/snapshot';
 import { Versions } from '../ui/versions';
+import { TextEditor } from '../ui/text-editor';
+import { MAX_EDIT_BYTES } from '../core/text-file';
 
 /**
  * The preview: a file of the folder over everything, with the files of the
@@ -30,7 +32,7 @@ import { Versions } from '../ui/versions';
 @Component({
   selector: 'f-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, FileDetails],
+  imports: [Icon, FileDetails, TextEditor],
   host: { '(document:keydown)': 'key($event)' },
   template: `@if (entry(); as e) {
     <div
@@ -49,6 +51,17 @@ import { Versions } from '../ui/versions';
             {{ format.size(e.size) }}</small
           >
         </div>
+        @if (editable(e)) {
+          <button
+            class="lb-btn"
+            type="button"
+            (click)="editing.set(true)"
+            title="Edit"
+            i18n-title="@@edit.open"
+          >
+            <f-icon name="pencil" [size]="20" />
+          </button>
+        }
         <button
           class="lb-btn"
           type="button"
@@ -113,16 +126,22 @@ import { Versions } from '../ui/versions';
             <iframe [src]="frameUrl()" [title]="e.name"></iframe>
           }
           @case ('text') {
-            <div class="textview" [class.loading]="text() === null">
-              @if (text() === null) {
-                <ng-container i18n="@@loading">Loading…</ng-container>
-              } @else {
-                {{ text() }}
-                @if (truncated()) {
-                  <p i18n="@@pv.truncated">… The rest of the file is not shown; download it to see it all.</p>
+            @if (editing() && browser.share(); as share) {
+              <f-text-editor [share]="share" [entry]="e" (done)="edited($event)" />
+            } @else {
+              <div class="textview" [class.loading]="text() === null">
+                @if (text() === null) {
+                  <ng-container i18n="@@loading">Loading…</ng-container>
+                } @else {
+                  {{ text() }}
+                  @if (truncated()) {
+                    <p i18n="@@pv.truncated">
+                      … The rest of the file is not shown; download it to see it all.
+                    </p>
+                  }
                 }
-              }
-            </div>
+              </div>
+            }
           }
           @default {
             <div class="noprev">
@@ -212,6 +231,9 @@ export class Preview {
   private readonly box = viewChild<ElementRef<HTMLElement>>('box');
 
   protected readonly info = signal(false);
+  /** Whether the text shown is being edited. */
+  protected readonly editing = signal(false);
+  private readonly editor = viewChild(TextEditor);
   protected readonly files = this.browser.files;
   protected readonly index = computed(() => this.browser.preview() ?? 0);
   protected readonly entry = computed(() => {
@@ -323,12 +345,33 @@ export class Preview {
     this.broken.update((s) => new Set(s).add(e.path));
   }
 
-  protected step(d: number): void {
+  /** Whether the file can be edited here: text, small enough, the share as it is now. */
+  protected editable(e: Entry): boolean {
+    return previewKind(e.name) === 'text' && e.size <= MAX_EDIT_BYTES && !this.snapshot.at();
+  }
+
+  /** The editor closed; what it saved is shown, and the folder knows. */
+  protected edited(saved: Entry | null): void {
+    this.editing.set(false);
+    if (saved) void this.browser.reload();
+  }
+
+  /** Leaves the editor first, asking about unsaved text; false when the person stays. */
+  private async leaveEditor(): Promise<boolean> {
+    const ed = this.editor();
+    return !this.editing() || !ed || ed.leave();
+  }
+
+  protected async step(d: number): Promise<void> {
+    if (!(await this.leaveEditor())) return;
+    this.editing.set(false);
     const n = this.files().length;
     if (n) this.browser.preview.set((this.index() + d + n) % n);
   }
 
-  protected close(): void {
+  protected async close(): Promise<void> {
+    if (!(await this.leaveEditor())) return;
+    this.editing.set(false);
     this.browser.preview.set(null);
     this.opener?.focus();
     this.opener = null;
@@ -346,9 +389,11 @@ export class Preview {
   protected key(ev: KeyboardEvent): void {
     if (this.browser.preview() === null || document.querySelector('dialog[open]')) return;
     const media = /VIDEO|AUDIO/.test((document.activeElement as HTMLElement | null)?.tagName ?? '');
-    if (ev.key === 'Escape') this.close();
-    else if (ev.key === 'ArrowRight' && !media) this.step(1);
-    else if (ev.key === 'ArrowLeft' && !media) this.step(-1);
+    const typing = this.editing() && (document.activeElement as HTMLElement | null)?.tagName === 'TEXTAREA';
+    if (ev.key === 'Escape' && !typing) void this.close();
+    else if (typing) return;
+    else if (ev.key === 'ArrowRight' && !media) void this.step(1);
+    else if (ev.key === 'ArrowLeft' && !media) void this.step(-1);
     else if (ev.key === 'i') this.info.update((v) => !v);
     else if (ev.key === 'Tab') this.trapFocus(ev);
   }

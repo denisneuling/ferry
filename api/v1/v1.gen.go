@@ -614,7 +614,7 @@ type Problem struct {
 	// `missing_ferry_request`, `version_read_only`, `copy_into_itself`, `unauthenticated`, `login_failed`,
 	// `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
 	// `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
-	// `range_not_satisfiable`, `server_unreachable`, `session_lost`,
+	// `range_not_satisfiable`, `changed`, `server_unreachable`, `session_lost`,
 	// `too_many_sessions`, `not_an_image`, `preview_timeout`, `internal`.
 	Code   string  `json:"code"`
 	Detail *string `json:"detail,omitempty"`
@@ -805,6 +805,9 @@ type PutContentParams struct {
 
 	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
 	XFerryRequest PutContentParamsXFerryRequest `json:"X-Ferry-Request"`
+
+	// IfMatch The ETag `getContent` gave for the version being replaced.
+	IfMatch *string `json:"If-Match,omitempty"`
 }
 
 // PutContentParamsXFerryRequest defines parameters for PutContent.
@@ -1425,6 +1428,13 @@ type ClientInterface interface {
 	// An existing file is replaced only with `overwrite=true`; otherwise
 	// it is a `409`. The deployment's upload limit applies (`413`).
 	//
+	// With `If-Match`, the file is replaced only while it is still the
+	// version that ETag names — an editor saving what it opened, as
+	// `getContent` gave it. A file that changed since, or is gone, is
+	// `412` (`changed`) and stays as it is; `overwrite` is then implied.
+	// The file is checked before the body is read and again just before
+	// the new one takes its place.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /api/v1/shares/{share}/content (the `PutContent` operationId).
@@ -1859,6 +1869,13 @@ func (c *Client) GetContent(ctx context.Context, share ShareName, params *GetCon
 // interrupted upload never leaves a partial file under the real name.
 // An existing file is replaced only with `overwrite=true`; otherwise
 // it is a `409`. The deployment's upload limit applies (`413`).
+//
+// With `If-Match`, the file is replaced only while it is still the
+// version that ETag names — an editor saving what it opened, as
+// `getContent` gave it. A file that changed since, or is gone, is
+// `412` (`changed`) and stays as it is; `overwrite` is then implied.
+// The file is checked before the body is read and again just before
+// the new one takes its place.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2643,6 +2660,17 @@ func NewPutContentRequestWithBody(server string, share ShareName, params *PutCon
 		}
 
 		req.Header.Set("X-Ferry-Request", headerParam0)
+
+		if params.IfMatch != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam1)
+		}
 
 	}
 
@@ -3566,6 +3594,13 @@ type ClientWithResponsesInterface interface {
 	// An existing file is replaced only with `overwrite=true`; otherwise
 	// it is a `409`. The deployment's upload limit applies (`413`).
 	//
+	// With `If-Match`, the file is replaced only while it is still the
+	// version that ETag names — an editor saving what it opened, as
+	// `getContent` gave it. A file that changed since, or is gone, is
+	// `412` (`changed`) and stays as it is; `overwrite` is then implied.
+	// The file is checked before the body is read and again just before
+	// the new one takes its place.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/shares/{share}/content (the `PutContent` operationId).
@@ -4319,6 +4354,8 @@ type PutContentResponse struct {
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *Problem
 	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
 	ApplicationproblemJSON413 *TooLarge
 	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
@@ -4353,6 +4390,11 @@ func (r PutContentResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r PutContentResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r PutContentResponse) GetApplicationproblemJSON412() *Problem {
+	return r.ApplicationproblemJSON412
 }
 
 // GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
@@ -5412,6 +5454,13 @@ func (c *ClientWithResponses) GetContentWithResponse(ctx context.Context, share 
 // An existing file is replaced only with `overwrite=true`; otherwise
 // it is a `409`. The deployment's upload limit applies (`413`).
 //
+// With `If-Match`, the file is replaced only while it is still the
+// version that ETag names — an editor saving what it opened, as
+// `getContent` gave it. A file that changed since, or is gone, is
+// `412` (`changed`) and stays as it is; `overwrite` is then implied.
+// The file is checked before the body is read and again just before
+// the new one takes its place.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/v1/shares/{share}/content (the `PutContent` operationId).
@@ -6189,6 +6238,13 @@ func ParsePutContentResponse(rsp *http.Response) (*PutContentResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
 		var dest TooLarge
@@ -7320,6 +7376,25 @@ func (siw *ServerInterfaceWrapper) PutContent(w http.ResponseWriter, r *http.Req
 		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
 		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
 		return
+	}
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

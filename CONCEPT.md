@@ -51,7 +51,11 @@ WebDAV page) all break at least one of these rules:
 - Sync clients, WebDAV and apps. SMB already serves those clients.
 - Indexed search: it needs an index, which means state and background reads of
   every share.
-- Editing documents in the browser, beyond replacing a file by uploading it.
+- Editing documents in the browser beyond plain text: no office documents,
+  no collaborative editing, no drafts kept on ferry's side. Plain text files
+  up to 1 MiB, UTF-8, are edited in the preview and saved over the version
+  that was opened (`If-Match`); a file changed since is never overwritten
+  without the person deciding (decided 2026-11-23).
 - Backends other than SMB2/3: no S3, SFTP or local filesystem.
 - TLS termination. The gateway in front does it, or the deployment decides
   deliberately against it (§7).

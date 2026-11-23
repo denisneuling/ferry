@@ -31,6 +31,7 @@ const (
 	KindInvalidPath              // refused before it reached the server
 	KindLimit                    // a bound of ferry's own was reached
 	KindCanceled                 // the request's context ended
+	KindChanged                  // the file is not the version the request was made for
 )
 
 var kindNames = map[Kind]string{
@@ -49,6 +50,7 @@ var kindNames = map[Kind]string{
 	KindInvalidPath:  "invalid_path",
 	KindLimit:        "limit",
 	KindCanceled:     "canceled",
+	KindChanged:      "changed",
 }
 
 // String is the kind's name, fit for a metric label.

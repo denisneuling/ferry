@@ -308,8 +308,20 @@ paths:
         interrupted upload never leaves a partial file under the real name.
         An existing file is replaced only with `overwrite=true`; otherwise
         it is a `409`. The deployment's upload limit applies (`413`).
+
+        With `If-Match`, the file is replaced only while it is still the
+        version that ETag names — an editor saving what it opened, as
+        `getContent` gave it. A file that changed since, or is gone, is
+        `412` (`changed`) and stays as it is; `overwrite` is then implied.
+        The file is checked before the body is read and again just before
+        the new one takes its place.
       parameters:
         - $ref: "#/components/parameters/FerryRequest"
+        - name: If-Match
+          in: header
+          required: false
+          description: The ETag `getContent` gave for the version being replaced.
+          schema: { type: string, maxLength: 256 }
         - name: overwrite
           in: query
           required: false
@@ -331,6 +343,11 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "412":
+          description: The file changed since the version `If-Match` names (`changed`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
         "413": { $ref: "#/components/responses/TooLarge" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
@@ -804,7 +821,7 @@ components:
             `missing_ferry_request`, `version_read_only`, `copy_into_itself`, `unauthenticated`, `login_failed`,
             `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
             `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
-            `range_not_satisfiable`, `server_unreachable`, `session_lost`,
+            `range_not_satisfiable`, `changed`, `server_unreachable`, `session_lost`,
             `too_many_sessions`, `not_an_image`, `preview_timeout`, `internal`.
         limit:
           type: integer

@@ -45,6 +45,7 @@ func (p problem) write(w http.ResponseWriter) {
 var (
 	probInvalidRequest    = problem{status: http.StatusBadRequest, code: "invalid_request", title: "The request is not valid."}
 	probInvalidPath       = problem{status: http.StatusBadRequest, code: "invalid_path", title: "The path is not valid."}
+	probChanged           = problem{status: http.StatusPreconditionFailed, code: "changed", title: "The file changed since it was opened."}
 	probCopyIntoItself    = problem{status: http.StatusBadRequest, code: "copy_into_itself", title: "A folder cannot be copied into itself."}
 	probVersionReadOnly   = problem{status: http.StatusBadRequest, code: "version_read_only", title: "A previous version cannot be changed."}
 	probMissingFerryReq   = problem{status: http.StatusBadRequest, code: "missing_ferry_request", title: "The request lacks the header X-Ferry-Request: 1."}
@@ -100,6 +101,8 @@ func smbProblem(err error) problem {
 		return p
 	case smb.KindCanceled:
 		return probIncomplete
+	case smb.KindChanged:
+		return probChanged
 	}
 	return probInternal
 }

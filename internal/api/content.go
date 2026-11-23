@@ -331,7 +331,18 @@ func (a *API) PutContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 	wd := newWatchdog(r.Context(), a.cfg.RequestTimeout)
 	defer wd.stop()
 	body := &stallReader{r: r.Body, rc: http.NewResponseController(w), wd: wd, stall: a.cfg.StallTimeout}
-	e, err := conn.Upload(wd.ctx, share, p, body, params.Overwrite != nil && *params.Overwrite, a.cfg.MaxUpload)
+	var e smb.Entry
+	var err error
+	if params.IfMatch != nil {
+		// An editor's save: only over the version it opened. The tag is the
+		// one GetContent sends for the file as it is now (never a snapshot's).
+		want := *params.IfMatch
+		e, err = conn.UploadIfMatch(wd.ctx, share, p, body, a.cfg.MaxUpload, func(cur smb.Entry) bool {
+			return etagMatches(want, etag(cur.Size, cur.ModTime))
+		})
+	} else {
+		e, err = conn.Upload(wd.ctx, share, p, body, params.Overwrite != nil && *params.Overwrite, a.cfg.MaxUpload)
+	}
 	a.metrics.Up(body.n)
 	if err != nil {
 		if smb.KindOf(err) == smb.KindLimit {
