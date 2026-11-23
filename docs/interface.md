@@ -94,7 +94,14 @@ same folder, the copy is named "… (copy)".
 | Esc | clear the selection or the search, close the preview or a dialog |
 
 In the preview: ← → for the previous and next file, `i` for the details,
-Esc to close.
+`+` `-` `0` to zoom a picture in, out and back, Esc to close.
+
+A picture the browser shows itself (JPEG, PNG, GIF, WebP, AVIF, BMP) zooms
+with the wheel or a pinch, at the pointer; a double click goes to its own
+pixels — the original's — and back, and a drag moves the zoomed picture,
+never past its edges. The 640-pixel pictures the server makes of HEIC,
+TIFF and raw photos are not zoomed: their own pixels are not the
+original's.
 
 ## Details
 

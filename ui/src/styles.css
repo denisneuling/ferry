@@ -1120,6 +1120,17 @@ a.brand:hover span {
   border-radius: 6px;
   box-shadow: 0 30px 80px #0008;
 }
+/* A zoomed picture stays inside its stage, and moves without delay. */
+.lb-stage:has(img.zoomed) {
+  overflow: hidden;
+}
+.lb-stage img[fzoom] {
+  user-select: none;
+}
+.lb-stage img.zoomed {
+  border-radius: 0;
+  box-shadow: none;
+}
 .lb-stage .page {
   max-height: 100%;
   width: auto;

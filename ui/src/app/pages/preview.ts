@@ -23,6 +23,7 @@ import { FileDetails } from '../ui/file-details';
 import { Snapshot } from '../core/snapshot';
 import { Versions } from '../ui/versions';
 import { TextEditor } from '../ui/text-editor';
+import { Zoom } from '../ui/zoom';
 import { MAX_EDIT_BYTES } from '../core/text-file';
 import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../core/subtitles';
 
@@ -35,7 +36,7 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
 @Component({
   selector: 'f-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, FileDetails, TextEditor],
+  imports: [Icon, FileDetails, TextEditor, Zoom],
   host: { '(document:keydown)': 'key($event)' },
   template: `@if (entry(); as e) {
     <div
@@ -96,7 +97,7 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
       <div class="lb-stage">
         @switch (kind()) {
           @case ('image') {
-            <img [src]="url()" [alt]="e.name" (load)="shown.set(url())" (error)="shown.set(url())" />
+            <img fZoom [src]="url()" [alt]="e.name" (load)="shown.set(url())" (error)="shown.set(url())" />
           }
           @case ('derived') {
             <!-- The 320-pixel thumbnail, at the size of the 640 one, until that
@@ -324,6 +325,7 @@ export class Preview {
   /** Whether the text shown is being edited. */
   protected readonly editing = signal(false);
   private readonly editor = viewChild(TextEditor);
+  private readonly zoom = viewChild(Zoom);
   protected readonly files = this.browser.files;
   protected readonly index = computed(() => this.browser.preview() ?? 0);
   protected readonly entry = computed(() => {
@@ -580,6 +582,9 @@ export class Preview {
     else if (ev.key === 'ArrowRight' && !media) void this.step(1);
     else if (ev.key === 'ArrowLeft' && !media) void this.step(-1);
     else if (ev.key === 'i') this.info.update((v) => !v);
+    else if ((ev.key === '+' || ev.key === '=') && this.zoom()) this.zoom()!.by(1.25);
+    else if (ev.key === '-' && this.zoom()) this.zoom()!.by(0.8);
+    else if (ev.key === '0' && this.zoom()) this.zoom()!.reset();
     else if (ev.key === 'Tab') this.trapFocus(ev);
   }
 
