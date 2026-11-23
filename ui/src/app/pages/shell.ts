@@ -1,3 +1,4 @@
+import { PlayerBar } from '../ui/player-bar';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { Api } from '../core/api';
@@ -17,7 +18,7 @@ import { TransfersPanel } from './transfers-panel';
 @Component({
   selector: 'f-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, Icon, Mark, Preview, TransfersPanel],
+  imports: [RouterOutlet, RouterLink, Icon, Mark, Preview, TransfersPanel, PlayerBar],
   host: { '(document:keydown.escape)': 'drawer.set(false)' },
   template: `<div class="app" [class.drawer]="drawer()">
       <aside class="side" aria-label="Shares" i18n-aria-label="@@shares">
@@ -89,6 +90,7 @@ import { TransfersPanel } from './transfers-panel';
         <router-outlet />
       </main>
     </div>
+    <f-player />
     <f-transfers />
     <f-preview />`,
 })

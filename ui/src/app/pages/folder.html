@@ -95,6 +95,17 @@
         <f-icon name="list" [size]="17" />
       </button>
     </div>
+    @if (recordings().length) {
+      <button
+        class="btn"
+        type="button"
+        (click)="playFolder()"
+        title="Play the folder's recordings"
+        i18n-title="@@play.title"
+      >
+        <f-icon name="play" [size]="17" /><ng-container i18n="@@play">Play</ng-container>
+      </button>
+    }
     @if (!snapshot.at()) {
       <button
         class="btn"

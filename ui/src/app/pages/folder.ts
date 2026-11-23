@@ -22,6 +22,7 @@ import { Search } from '../core/search';
 import { Snapshot, isToken, tokenTime } from '../core/snapshot';
 import { MAX_TREE_FILES, TreeFile, Transfers } from '../core/transfers';
 import { Session } from '../core/session';
+import { Player } from '../core/player';
 import { Icon } from '../ui/icon';
 import { Menu, MenuItem } from '../ui/menu';
 import { Space } from '../ui/space';
@@ -84,6 +85,9 @@ export class Folder {
   private readonly api = inject(Api);
   private readonly transfers = inject(Transfers);
   private readonly session = inject(Session);
+  private readonly player = inject(Player);
+  /** The folder's recordings, as shown: what Play plays. */
+  protected readonly recordings = computed(() => Player.recordings(this.browser.files()));
   private readonly versions = inject(Versions);
   /** The search below this folder, while the field asks for one. */
   protected readonly finder = inject(Search);
@@ -186,6 +190,16 @@ export class Folder {
     const at = this.snapshot.at();
     if (at) q['at'] = at;
     return q;
+  }
+
+  /** Plays the folder's recordings, from the one given or the first. */
+  protected playFolder(from?: Entry): void {
+    const share = this.browser.share();
+    if (!share) return;
+    this.player.play(
+      { share, folder: this.browser.title(), at: this.snapshot.at(), tracks: this.recordings() },
+      from,
+    );
   }
 
   /** A search's hit, shown in its folder and selected there. */
@@ -401,6 +415,12 @@ export class Folder {
         : $localize`:@@act.downloadN:Download ${sel.length}:n:`,
       run: () => this.actions.download(sel),
     });
+    if (one && Player.recordings([e]).length)
+      items.push({
+        icon: 'play',
+        label: $localize`:@@act.play:Play from here`,
+        run: () => this.playFolder(e),
+      });
     if (one)
       items.push({
         icon: 'clock',

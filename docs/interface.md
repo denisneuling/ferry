@@ -179,6 +179,17 @@ reports it: on a file system that keeps times coarsely (FAT, two seconds),
 two saves of the same length within that window look alike; ZFS, ext4 and
 NTFS keep them finely enough.
 
+## Playing music
+
+A folder with recordings has **Play**: its recordings play one after the
+other, in the folder's order, from the first or — **Play from here** in a
+recording's menu — from that one. The player stays at the bottom while you
+browse on: the cover when the recording carries one, the time, previous,
+next, shuffle and stop. The system's media controls — a phone's lock
+screen, a keyboard's media keys — work too. The browser streams each
+recording from ferry as it would download it; nothing is kept, and logging
+out stops it.
+
 ## Downloading
 
 A file downloads through the browser's own download, with Range, so a large

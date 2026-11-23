@@ -1995,3 +1995,62 @@ a {
   border-radius: 12px;
   padding: 14px 16px;
 }
+
+/* The playlist playing: along the bottom, the panels above it. */
+.player {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px #0002;
+  z-index: 31;
+  animation: rise 0.2s;
+}
+.player-cover {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--sunk);
+  color: var(--ink-2);
+}
+.player-what {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.player-what b,
+.player-what small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-what small {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.player-what input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.player .icon-btn.on {
+  color: var(--accent);
+}
+.player .icon-btn.play {
+  color: var(--accent);
+}
+body.fx-playing .transfers {
+  bottom: 96px;
+}

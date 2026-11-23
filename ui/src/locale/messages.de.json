@@ -244,6 +244,17 @@
     "edit.overwrite": "Darüber speichern",
     "edit.discardTitle": "Änderungen verwerfen?",
     "edit.discardText": "Was du in „{$name}“ geändert hast, ist nicht gespeichert.",
-    "edit.discard": "Verwerfen"
+    "edit.discard": "Verwerfen",
+    "play.title": "Die Aufnahmen des Ordners abspielen",
+    "play": "Abspielen",
+    "act.play": "Ab hier abspielen",
+    "player.label": "Wiedergabe",
+    "player.position": "Position",
+    "player.prev": "Zurück",
+    "player.next": "Weiter",
+    "player.shuffle": "Zufällige Reihenfolge",
+    "player.stop": "Beenden",
+    "player.play": "Abspielen",
+    "player.pause": "Pause"
   }
 }
