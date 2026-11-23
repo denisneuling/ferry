@@ -68,6 +68,13 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 			return
 		}
 	}
+	// A file that made no thumbnail a moment ago makes none now: the same
+	// answer, without reading or decoding it again.
+	if err, ok := a.failures.get(key); ok {
+		a.metrics.Thumbnail("remembered")
+		thumbProblemWrite(w, err)
+		return
+	}
 
 	// The picture is the file itself, or the cover a recording carries: then
 	// only the cover is read, found by the tags' headers.
@@ -115,10 +122,10 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 			probUnreachable.write(w)
 			return
 		case errors.Is(err, meta.ErrCoverTooLarge):
-			a.thumbProblem(w, thumb.ErrTooLarge)
+			a.thumbFailed(w, key, thumb.ErrTooLarge)
 			return
 		case err != nil:
-			a.thumbProblem(w, thumb.ErrUnsupported)
+			a.thumbFailed(w, key, thumb.ErrUnsupported)
 			return
 		}
 		src, srcSize = chunked{c.Reader()}, c.Size
@@ -142,7 +149,7 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		err = thumb.ErrTooLarge
 	}
 	if err != nil {
-		a.thumbProblem(w, err)
+		a.thumbFailed(w, key, err)
 		return
 	}
 	if err := a.thumbMemory.Acquire(ctx, cost); err != nil {
@@ -176,7 +183,7 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	out, err := thumb.Make(buf.Bytes(), size, a.cfg.ThumbnailMaxPixels)
 	<-a.thumbs
 	if err != nil {
-		a.thumbProblem(w, err)
+		a.thumbFailed(w, key, err)
 		return
 	}
 	a.metrics.Thumbnail("made")
@@ -208,9 +215,14 @@ func (a *API) pdfThumbnail(ctx context.Context, w http.ResponseWriter, r *http.R
 		probUnreachable.write(w)
 	case errors.Is(err, preview.ErrTimeout):
 		a.previewTimeout(w)
-	case errors.Is(err, preview.ErrUnsupported), errors.Is(err, preview.ErrBlank), errors.Is(err, preview.ErrUnavailable):
-		// Off, unreadable, or white — perhaps for want of memory: an icon,
-		// and nothing cached.
+	case errors.Is(err, preview.ErrUnavailable):
+		// Off, or no budget now: an icon, and nothing remembered.
+		a.thumbProblem(w, thumb.ErrUnsupported)
+	case errors.Is(err, preview.ErrUnsupported), errors.Is(err, preview.ErrBlank):
+		// Unreadable, or white — for want of the instance's memory, which
+		// is the same for this file every time: an icon, remembered for a
+		// while but not cached.
+		a.failures.put(key, err)
 		a.thumbProblem(w, thumb.ErrUnsupported)
 	default:
 		a.thumbProblem(w, err)
@@ -237,9 +249,11 @@ func (a *API) heicThumbnail(ctx context.Context, w http.ResponseWriter, r *http.
 	case errors.Is(err, preview.ErrTimeout):
 		a.previewTimeout(w)
 	case errors.Is(err, preview.ErrTooLarge):
-		a.thumbProblem(w, thumb.ErrTooLarge)
+		a.thumbFailed(w, key, thumb.ErrTooLarge)
 	default:
-		// Off, unreadable, or more than the instance may hold: an icon.
+		// Off, unreadable, or more than the instance may hold: an icon,
+		// remembered when the file decided it.
+		a.failures.put(key, err)
 		a.thumbProblem(w, thumb.ErrUnsupported)
 	}
 }
@@ -295,11 +309,27 @@ func (a *API) previewTimeout(w http.ResponseWriter) {
 	probPreviewTimeout.write(w)
 }
 
+// thumbProblemWrite answers a remembered failure as it was answered.
+func thumbProblemWrite(w http.ResponseWriter, err error) {
+	if errors.Is(err, thumb.ErrTooLarge) {
+		probTooLarge.write(w)
+		return
+	}
+	probNotAnImage.write(w)
+}
+
 func writeThumbnail(w http.ResponseWriter, out []byte) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Content-Length", strconv.Itoa(len(out)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(out)
+}
+
+// thumbFailed answers a thumbnail that failed and remembers it, when the
+// file decided it (failures).
+func (a *API) thumbFailed(w http.ResponseWriter, key cache.Key, err error) {
+	a.failures.put(key, err)
+	a.thumbProblem(w, err)
 }
 
 func (a *API) thumbProblem(w http.ResponseWriter, err error) {

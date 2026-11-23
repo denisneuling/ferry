@@ -146,6 +146,9 @@ func TestPreviewTimeout(t *testing.T) {
 		}
 		return nil
 	})
+	if n := h.api.failures.len(); n != 0 {
+		t.Errorf("a timeout remembered as a failure (%d)", n)
+	}
 	if used, _ := h.api.ThumbnailMemory(); used != 0 {
 		t.Fatalf("%d bytes still taken from the budget", used)
 	}
@@ -222,6 +225,20 @@ func TestHEICThumbnail(t *testing.T) {
 	h.api.cfg.ThumbnailMaxPixels = 1_000_000
 	if res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=640&path="+q(dir+"/IMG_2117.HEIC"), nil, nil, c); res.StatusCode != 413 {
 		t.Fatalf("over the pixel bound: %d", res.StatusCode)
+	}
+	// The 640 that was too large is remembered for the 640 only: the 320,
+	// which a phone's photo makes from its thumbnail item, is still made.
+	// (The bound is raised here so that this photo, which has no such item,
+	// stands in for one that has.)
+	if h.api.failures.len() != 1 {
+		t.Fatalf("%d failures remembered", h.api.failures.len())
+	}
+	h.api.cfg.ThumbnailMaxPixels = 50_000_000
+	if res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=320&path="+q(dir+"/IMG_2117.HEIC"), nil, nil, c); res.StatusCode != 200 {
+		t.Fatalf("the 320 after the 640 failed: %d", res.StatusCode)
+	}
+	if res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?size=640&path="+q(dir+"/IMG_2117.HEIC"), nil, nil, c); res.StatusCode != 413 {
+		t.Fatalf("the 640, remembered: %d", res.StatusCode)
 	}
 	if used, _ := h.api.ThumbnailMemory(); used != 0 {
 		t.Fatalf("%d bytes still taken from the budget", used)

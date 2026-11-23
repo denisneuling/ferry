@@ -58,8 +58,10 @@ type API struct {
 	// metaSlots admits metaConcurrency metadata readings at once.
 	metaSlots   chan struct{}
 	thumbMemory *semaphore.Weighted
-	thumbUsed   atomic.Int64
-	metrics     *metrics.Metrics
+	// failures are files that made no thumbnail a moment ago (failures.go).
+	failures  *failures
+	thumbUsed atomic.Int64
+	metrics   *metrics.Metrics
 	// archives holds the ZIP downloads listed and not yet fetched.
 	archives archiveTickets
 	// cache keeps thumbnails and details across restarts and people; nil
@@ -116,6 +118,7 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		coverSlots:  make(chan struct{}, max(1, cfg.ThumbnailConcurrency)),
 		metaSlots:   make(chan struct{}, metaConcurrency),
 		thumbMemory: semaphore.NewWeighted(max(1, cfg.ThumbnailMemory)),
+		failures:    newFailures(),
 	}
 	o := preview.Options{
 		PDF: cfg.PreviewPDF, CodeDir: cfg.WASMDir, Budget: a.budget, BudgetSize: cfg.ThumbnailMemory,
