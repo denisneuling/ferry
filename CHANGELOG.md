@@ -5,6 +5,20 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.7.0](https://github.com/denisneuling/ferry/compare/v0.6.0...v0.7.0) (2026-11-23)
+
+### ⚠ BREAKING CHANGES
+
+* the image is ghcr.io/denisneuling/ferry and the chart
+oci://ghcr.io/denisneuling/charts/ferry. Releases already published under
+ghcr.io/metapatrol stay where they are, but new ones appear only at the
+new path: change the chart reference (and an image override, if you set
+one) to update.
+
+### Features
+
+* ferry moves to github.com/denisneuling/ferry ([9ecf89d](https://github.com/denisneuling/ferry/commit/9ecf89df839188d77faf20c4a099168c2dd8961b))
+
 ## [0.6.0](https://github.com/metapatrol/ferry/compare/v0.5.1...v0.6.0) (2026-11-23)
 
 ### Features
