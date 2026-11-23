@@ -166,7 +166,11 @@ for it: OpenDocument files (`.odt`, `.ods`, `.odp`) nearly always, Office
 files (`.docx`, `.xlsx`, `.pptx`) when they were saved with one, an EPUB
 its cover; the rest an icon. A Word or OpenDocument text shows its plain
 text in the preview — the paragraphs, no formatting, nothing of the
-document that could run. Videos get an icon rather than a thumbnail, as do
+document that could run. A ZIP archive shows what it holds: each file
+with its size, to open in a new tab or to download on its own, unpacked
+as it is sent — nothing is unpacked onto the share. Entries that are
+encrypted, or packed otherwise than ZIP's usual way, are listed but not
+unpacked. Videos get an icon rather than a thumbnail, as do
 recordings without a cover.
 
 While an image is shown, the next and the previous one load ahead, so that

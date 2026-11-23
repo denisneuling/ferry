@@ -2054,3 +2054,31 @@ a {
 body.fx-playing .transfers {
   bottom: 96px;
 }
+
+/* A ZIP's contents in the preview. */
+.zipview {
+  white-space: normal;
+}
+.zip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.zip-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.zip-name {
+  margin-right: auto;
+  overflow-wrap: anywhere;
+}
+.zip-list small {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.zip-list .btn {
+  text-decoration: none;
+}

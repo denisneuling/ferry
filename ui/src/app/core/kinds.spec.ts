@@ -52,7 +52,8 @@ describe('kinds', () => {
     expect(previewKind('logo.svg')).toBe('text');
     expect(previewKind('photo.png')).toBe('image');
     expect(previewKind('song.flac')).toBe('audio');
-    expect(previewKind('archive.zip')).toBe('none');
+    expect(previewKind('archive.zip')).toBe('archive'); // its contents, listed
+    expect(previewKind('backup.7z')).toBe('none');
   });
 
   it('guesses share icons from their names', () => {

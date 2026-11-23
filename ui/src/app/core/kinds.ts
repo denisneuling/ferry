@@ -114,7 +114,8 @@ export function hasThumbnail(name: string): boolean {
  * `derived` is a picture the browser cannot show itself (HEIC, TIFF and raw photos, outside
  * Safari), shown as the server's 640-pixel thumbnail.
  */
-export type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'document' | 'derived' | 'none';
+export type PreviewKind =
+  'image' | 'video' | 'audio' | 'pdf' | 'text' | 'document' | 'archive' | 'derived' | 'none';
 
 const browserImages = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif']);
 const browserVideo = new Set(['mp4', 'm4v', 'webm', 'mov', 'ogv']);
@@ -128,6 +129,8 @@ export function previewKind(name: string): PreviewKind {
   if (ext === 'pdf') return 'pdf';
   // A Word or OpenDocument text: its plain text, read by the server.
   if (ext === 'docx' || ext === 'odt') return 'document';
+  // A ZIP: what it holds, each entry to open or download.
+  if (ext === 'zip') return 'archive';
   if ((ext === 'heic' || ext === 'heif') && previewed().has(ext)) return 'derived';
   // TIFF and raw photos: no browser but Safari shows TIFF, none a raw file.
   if (ext === 'tif' || ext === 'tiff' || rawPhotos.includes(ext)) return 'derived';

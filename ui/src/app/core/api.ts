@@ -16,6 +16,7 @@ export type Version = components['schemas']['Version'];
 export type VersionList = components['schemas']['VersionList'];
 export type SearchEnd = components['schemas']['SearchEnd']['end'];
 export type CopyProgress = components['schemas']['CopyProgress'];
+export type ZipEntry = components['schemas']['ZipEntry'];
 
 /** How a copy ended: the new entry, or the problem and how far it got. */
 export interface CopyResult {
@@ -256,6 +257,18 @@ export class Api {
         if (v.progress) onProgress(v.progress);
       }
     }
+  }
+
+  /** What a ZIP archive holds, as its table of contents says. */
+  async zip(share: string, path: string): Promise<ZipEntry[]> {
+    return (
+      await this.json<{ entries: ZipEntry[] }>('GET', `${shareBase(share)}/zip?path=${q(path)}${this.at()}`)
+    ).entries;
+  }
+
+  /** The URL one entry of a ZIP is downloaded from, or shown inline from. */
+  zipEntryUrl(share: string, path: string, entry: string, inline = false): string {
+    return `${BASE}${shareBase(share)}/zip/entry?path=${q(path)}&entry=${encodeURIComponent(entry)}${inline ? '&disposition=inline' : ''}${this.at()}`;
   }
 
   /** The plain text of a Word or OpenDocument text, read by the server. */

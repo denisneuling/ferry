@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { Api, Entry } from '../core/api';
+import { Api, Entry, ZipEntry } from '../core/api';
 import { Actions } from '../core/actions';
 import { Browser } from '../core/browser';
 import { describe } from '../core/errors';
@@ -125,6 +125,51 @@ import { MAX_EDIT_BYTES } from '../core/text-file';
           @case ('pdf') {
             <iframe [src]="frameUrl()" [title]="e.name"></iframe>
           }
+          @case ('archive') {
+            <div class="textview zipview" [class.loading]="zipEntries() === null">
+              @if (zipError(); as err) {
+                <p>{{ err }}</p>
+              } @else if (zipEntries() === null) {
+                <ng-container i18n="@@loading">Loading…</ng-container>
+              } @else {
+                <p class="zip-count">
+                  <ng-container i18n="@@zip.count">{zipFiles().length, plural,
+                    =1 {1 file}
+                    other {{{ zipFiles().length }} files}
+                  }</ng-container>
+                </p>
+                <ul class="zip-list">
+                  @for (z of zipFiles(); track z.name) {
+                    <li>
+                      <span class="zip-name">{{ z.name }}</span>
+                      <small>{{ format.size(z.size) }}</small>
+                      @if (z.readable && browser.share(); as share) {
+                        <a
+                          class="btn"
+                          [href]="api.zipEntryUrl(share, e.path, z.name, true)"
+                          target="_blank"
+                          rel="noopener"
+                          i18n="@@zip.open"
+                          >Open</a
+                        >
+                        <a
+                          class="btn"
+                          [href]="api.zipEntryUrl(share, e.path, z.name)"
+                          [attr.download]="''"
+                          i18n="@@zip.download"
+                          >Download</a
+                        >
+                      } @else {
+                        <small i18n="@@zip.unreadable"
+                          >encrypted or packed in a way ferry does not unpack</small
+                        >
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          }
           @case ('document') {
             <div class="textview" [class.loading]="text() === null">
               @if (text() === null) {
@@ -237,7 +282,7 @@ export class Preview {
   protected readonly format = inject(Format);
   protected readonly snapshot = inject(Snapshot);
   protected readonly versions = inject(Versions);
-  private readonly api = inject(Api);
+  protected readonly api = inject(Api);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly preloader = inject(Preloader);
   private readonly box = viewChild<ElementRef<HTMLElement>>('box');
@@ -283,6 +328,10 @@ export class Preview {
     return this.api.thumbnailUrl(share, e.path, 640, e.version);
   });
   protected readonly text = signal<string | null>(null);
+  /** A ZIP's entries, for the preview; folders are left out, their files carry the path. */
+  protected readonly zipEntries = signal<ZipEntry[] | null>(null);
+  protected readonly zipError = signal<string | null>(null);
+  protected readonly zipFiles = computed(() => (this.zipEntries() ?? []).filter((z) => z.type === 'file'));
   protected readonly truncated = signal(false);
   private opener: HTMLElement | null = null;
 
@@ -292,6 +341,14 @@ export class Preview {
       const share = this.browser.share();
       this.text.set(null);
       this.truncated.set(false);
+      this.zipEntries.set(null);
+      this.zipError.set(null);
+      if (e && share && previewKind(e.name) === 'archive') {
+        this.api.zip(share, e.path).then(
+          (z) => this.entry() === e && this.zipEntries.set(z),
+          (err) => this.entry() === e && this.zipError.set(describe(err)),
+        );
+      }
       if (e && share && previewKind(e.name) === 'document') {
         this.api.documentText(share, e.path).then(
           (r) => {

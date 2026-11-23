@@ -255,6 +255,10 @@
     "player.shuffle": "Zufällige Reihenfolge",
     "player.stop": "Beenden",
     "player.play": "Abspielen",
-    "player.pause": "Pause"
+    "player.pause": "Pause",
+    "zip.count": "{VAR_PLURAL, plural, =1 {1 Datei} other {{INTERPOLATION} Dateien}}",
+    "zip.open": "Öffnen",
+    "zip.download": "Herunterladen",
+    "zip.unreadable": "verschlüsselt oder so gepackt, dass ferry es nicht entpackt"
   }
 }

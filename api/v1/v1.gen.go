@@ -338,6 +338,24 @@ func (e GetThumbnailParamsSize) Valid() bool {
 	}
 }
 
+// Defines values for GetZipEntryParamsDisposition.
+const (
+	GetZipEntryParamsDispositionAttachment GetZipEntryParamsDisposition = "attachment"
+	GetZipEntryParamsDispositionInline     GetZipEntryParamsDisposition = "inline"
+)
+
+// Valid indicates whether the value is a known member of the GetZipEntryParamsDisposition enum.
+func (e GetZipEntryParamsDisposition) Valid() bool {
+	switch e {
+	case GetZipEntryParamsDispositionAttachment:
+		return true
+	case GetZipEntryParamsDispositionInline:
+		return true
+	default:
+		return false
+	}
+}
+
 // ArchiveRequest defines model for ArchiveRequest.
 type ArchiveRequest struct {
 	// Paths The entries to archive, all in the same folder.
@@ -622,7 +640,7 @@ type Problem struct {
 	// `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
 	// `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
 	// `range_not_satisfiable`, `changed`, `server_unreachable`, `session_lost`,
-	// `too_many_sessions`, `not_an_image`, `not_a_document`, `preview_timeout`, `internal`.
+	// `too_many_sessions`, `not_an_image`, `not_a_document`, `not_an_archive`, `preview_timeout`, `internal`.
 	Code   string  `json:"code"`
 	Detail *string `json:"detail,omitempty"`
 
@@ -712,6 +730,27 @@ type VersionList struct {
 	// Truncated More snapshots than were looked at, in the time allowed or the bound.
 	Truncated bool      `json:"truncated"`
 	Versions  []Version `json:"versions"`
+}
+
+// ZipEntry defines model for ZipEntry.
+type ZipEntry struct {
+	Modified *time.Time `json:"modified,omitempty"`
+
+	// Name The archive's own name for it: show it as text, never use it as a path.
+	Name   string `json:"name"`
+	Packed int64  `json:"packed"`
+
+	// Readable Neither encrypted nor compressed otherwise than Store or Deflate.
+	Readable bool `json:"readable"`
+
+	// Size Unpacked bytes, as the archive declares them.
+	Size int64     `json:"size"`
+	Type EntryType `json:"type"`
+}
+
+// ZipList defines model for ZipList.
+type ZipList struct {
+	Entries []ZipEntry `json:"entries"`
 }
 
 // At defines model for At.
@@ -976,6 +1015,41 @@ type ListVersionsParams struct {
 	// Path Slash-separated, relative to the share's root; empty for the root.
 	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
 }
+
+// ListZipParams defines parameters for ListZip.
+type ListZipParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+}
+
+// GetZipEntryParams defines parameters for GetZipEntry.
+type GetZipEntryParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At          *At                           `form:"at,omitempty" json:"at,omitempty"`
+	Entry       string                        `form:"entry" json:"entry"`
+	Disposition *GetZipEntryParamsDisposition `form:"disposition,omitempty" json:"disposition,omitempty"`
+}
+
+// GetZipEntryParamsDisposition defines parameters for GetZipEntry.
+type GetZipEntryParamsDisposition string
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -1678,6 +1752,33 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/versions (the `ListVersions` operationId).
 	ListVersions(ctx context.Context, share ShareName, params *ListVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListZip What a ZIP archive holds.
+	//
+	// The table of contents of a ZIP file, read from its central
+	// directory as it lies on the share: nothing is unpacked, nothing is
+	// written. Names are the archive's own, shown as text and never used
+	// as a path. An entry that is encrypted, or compressed otherwise than
+	// Store or Deflate, is listed with `readable: false`. More entries
+	// than the deployment lists (`FERRY_MAX_LISTING`) is `413`; a file
+	// that is no ZIP, `415` (`not_an_archive`).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/zip (the `ListZip` operationId).
+	ListZip(ctx context.Context, share ShareName, params *ListZipParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetZipEntry One file out of a ZIP archive, unpacked as it is sent.
+	//
+	// The entry named `entry`, exactly as `listZip` gave its name,
+	// unpacked while it streams and never more than its header declares
+	// (a stream that would be more is broken off). It is sent like a
+	// download: `attachment` with the entry's base name, cleaned; with
+	// `disposition=inline`, images, audio, video, PDF and plain text may
+	// show in the browser, under the same sandbox as `getContent`. An
+	// entry that cannot be read — encrypted, or another compression — is
+	// `415`.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/zip/entry (the `GetZipEntry` operationId).
+	GetZipEntry(ctx context.Context, share ShareName, params *GetZipEntryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // GetInfo What the login page shows before anyone is logged in.
@@ -2262,6 +2363,53 @@ func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetT
 // Corresponds with GET /api/v1/shares/{share}/versions (the `ListVersions` operationId).
 func (c *Client) ListVersions(ctx context.Context, share ShareName, params *ListVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListVersionsRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListZip What a ZIP archive holds.
+//
+// The table of contents of a ZIP file, read from its central
+// directory as it lies on the share: nothing is unpacked, nothing is
+// written. Names are the archive's own, shown as text and never used
+// as a path. An entry that is encrypted, or compressed otherwise than
+// Store or Deflate, is listed with `readable: false`. More entries
+// than the deployment lists (`FERRY_MAX_LISTING`) is `413`; a file
+// that is no ZIP, `415` (`not_an_archive`).
+//
+// Corresponds with GET /api/v1/shares/{share}/zip (the `ListZip` operationId).
+func (c *Client) ListZip(ctx context.Context, share ShareName, params *ListZipParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListZipRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetZipEntry One file out of a ZIP archive, unpacked as it is sent.
+//
+// The entry named `entry`, exactly as `listZip` gave its name,
+// unpacked while it streams and never more than its header declares
+// (a stream that would be more is broken off). It is sent like a
+// download: `attachment` with the entry's base name, cleaned; with
+// `disposition=inline`, images, audio, video, PDF and plain text may
+// show in the browser, under the same sandbox as `getContent`. An
+// entry that cannot be read — encrypted, or another compression — is
+// `415`.
+//
+// Corresponds with GET /api/v1/shares/{share}/zip/entry (the `GetZipEntry` operationId).
+func (c *Client) GetZipEntry(ctx context.Context, share ShareName, params *GetZipEntryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetZipEntryRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3542,6 +3690,172 @@ func NewListVersionsRequest(server string, share ShareName, params *ListVersions
 	return req, nil
 }
 
+// NewListZipRequest constructs an http.Request for the ListZip method
+func NewListZipRequest(server string, share ShareName, params *ListZipParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/zip"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetZipEntryRequest constructs an http.Request for the GetZipEntry method
+func NewGetZipEntryRequest(server string, share ShareName, params *GetZipEntryParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/zip/entry"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "entry", params.Entry, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Disposition != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "disposition", *params.Disposition, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -3967,6 +4281,37 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/versions (the `ListVersions` operationId).
 	ListVersionsWithResponse(ctx context.Context, share ShareName, params *ListVersionsParams, reqEditors ...RequestEditorFn) (*ListVersionsResponse, error)
+
+	// ListZipWithResponse What a ZIP archive holds.
+	//
+	// The table of contents of a ZIP file, read from its central
+	// directory as it lies on the share: nothing is unpacked, nothing is
+	// written. Names are the archive's own, shown as text and never used
+	// as a path. An entry that is encrypted, or compressed otherwise than
+	// Store or Deflate, is listed with `readable: false`. More entries
+	// than the deployment lists (`FERRY_MAX_LISTING`) is `413`; a file
+	// that is no ZIP, `415` (`not_an_archive`).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/zip (the `ListZip` operationId).
+	ListZipWithResponse(ctx context.Context, share ShareName, params *ListZipParams, reqEditors ...RequestEditorFn) (*ListZipResponse, error)
+
+	// GetZipEntryWithResponse One file out of a ZIP archive, unpacked as it is sent.
+	//
+	// The entry named `entry`, exactly as `listZip` gave its name,
+	// unpacked while it streams and never more than its header declares
+	// (a stream that would be more is broken off). It is sent like a
+	// download: `attachment` with the entry's base name, cleaned; with
+	// `disposition=inline`, images, audio, video, PDF and plain text may
+	// show in the browser, under the same sandbox as `getContent`. An
+	// entry that cannot be read — encrypted, or another compression — is
+	// `415`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/zip/entry (the `GetZipEntry` operationId).
+	GetZipEntryWithResponse(ctx context.Context, share ShareName, params *GetZipEntryParams, reqEditors ...RequestEditorFn) (*GetZipEntryResponse, error)
 }
 
 type GetInfoResponse struct {
@@ -5496,6 +5841,179 @@ func (r ListVersionsResponse) ContentType() string {
 	return ""
 }
 
+type ListZipResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ZipList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListZipResponse) GetJSON200() *ZipList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListZipResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListZipResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListZipResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListZipResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r ListZipResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r ListZipResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r ListZipResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r ListZipResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListZipResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListZipResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListZipResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetZipEntryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetZipEntryResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetZipEntryResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetZipEntryResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetZipEntryResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r GetZipEntryResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r GetZipEntryResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetZipEntryResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetZipEntryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetZipEntryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetZipEntryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetZipEntryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetInfoWithResponse What the login page shows before anyone is logged in.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -6020,6 +6538,49 @@ func (c *ClientWithResponses) ListVersionsWithResponse(ctx context.Context, shar
 		return nil, err
 	}
 	return ParseListVersionsResponse(rsp)
+}
+
+// ListZipWithResponse What a ZIP archive holds.
+//
+// The table of contents of a ZIP file, read from its central
+// directory as it lies on the share: nothing is unpacked, nothing is
+// written. Names are the archive's own, shown as text and never used
+// as a path. An entry that is encrypted, or compressed otherwise than
+// Store or Deflate, is listed with `readable: false`. More entries
+// than the deployment lists (`FERRY_MAX_LISTING`) is `413`; a file
+// that is no ZIP, `415` (`not_an_archive`).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/zip (the `ListZip` operationId).
+func (c *ClientWithResponses) ListZipWithResponse(ctx context.Context, share ShareName, params *ListZipParams, reqEditors ...RequestEditorFn) (*ListZipResponse, error) {
+	rsp, err := c.ListZip(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListZipResponse(rsp)
+}
+
+// GetZipEntryWithResponse One file out of a ZIP archive, unpacked as it is sent.
+//
+// The entry named `entry`, exactly as `listZip` gave its name,
+// unpacked while it streams and never more than its header declares
+// (a stream that would be more is broken off). It is sent like a
+// download: `attachment` with the entry's base name, cleaned; with
+// `disposition=inline`, images, audio, video, PDF and plain text may
+// show in the browser, under the same sandbox as `getContent`. An
+// entry that cannot be read — encrypted, or another compression — is
+// `415`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/zip/entry (the `GetZipEntry` operationId).
+func (c *ClientWithResponses) GetZipEntryWithResponse(ctx context.Context, share ShareName, params *GetZipEntryParams, reqEditors ...RequestEditorFn) (*GetZipEntryResponse, error) {
+	rsp, err := c.GetZipEntry(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetZipEntryResponse(rsp)
 }
 
 // ParseGetInfoResponse parses an HTTP response from a GetInfoWithResponse call
@@ -7288,6 +7849,149 @@ func ParseListVersionsResponse(rsp *http.Response) (*ListVersionsResponse, error
 	return response, nil
 }
 
+// ParseListZipResponse parses an HTTP response from a ListZipWithResponse call
+func ParseListZipResponse(rsp *http.Response) (*ListZipResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListZipResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ZipList
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetZipEntryResponse parses an HTTP response from a GetZipEntryWithResponse call
+func ParseGetZipEntryResponse(rsp *http.Response) (*GetZipEntryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetZipEntryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetInfo What the login page shows before anyone is logged in.
@@ -7350,6 +8054,12 @@ type ServerInterface interface {
 	// ListVersions The previous versions of a file or a folder.
 	// (GET /api/v1/shares/{share}/versions)
 	ListVersions(w http.ResponseWriter, r *http.Request, share ShareName, params ListVersionsParams)
+	// ListZip What a ZIP archive holds.
+	// (GET /api/v1/shares/{share}/zip)
+	ListZip(w http.ResponseWriter, r *http.Request, share ShareName, params ListZipParams)
+	// GetZipEntry One file out of a ZIP archive, unpacked as it is sent.
+	// (GET /api/v1/shares/{share}/zip/entry)
+	GetZipEntry(w http.ResponseWriter, r *http.Request, share ShareName, params GetZipEntryParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -8415,6 +9125,142 @@ func (siw *ServerInterfaceWrapper) ListVersions(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListZip operation middleware
+func (siw *ServerInterfaceWrapper) ListZip(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListZipParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListZip(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetZipEntry operation middleware
+func (siw *ServerInterfaceWrapper) GetZipEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetZipEntryParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "entry" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "entry", r.URL.Query(), &params.Entry, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "entry"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entry", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "disposition" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "disposition", r.URL.Query(), &params.Disposition, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "disposition"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "disposition", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetZipEntry(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -8548,6 +9394,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/metadata", wrapper.GetMetadata)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/thumbnail", wrapper.GetThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/text", wrapper.GetDocumentText)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/zip", wrapper.ListZip)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/zip/entry", wrapper.GetZipEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/versions", wrapper.ListVersions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/search", wrapper.Search)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)

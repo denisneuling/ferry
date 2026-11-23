@@ -482,6 +482,88 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/zip:
+    get:
+      operationId: listZip
+      tags: [files]
+      summary: What a ZIP archive holds.
+      description: |
+        The table of contents of a ZIP file, read from its central
+        directory as it lies on the share: nothing is unpacked, nothing is
+        written. Names are the archive's own, shown as text and never used
+        as a path. An entry that is encrypted, or compressed otherwise than
+        Store or Deflate, is listed with `readable: false`. More entries
+        than the deployment lists (`FERRY_MAX_LISTING`) is `413`; a file
+        that is no ZIP, `415` (`not_an_archive`).
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: The archive's entries, in its order.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ZipList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415":
+          description: Not a ZIP archive (`not_an_archive`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/zip/entry:
+    get:
+      operationId: getZipEntry
+      tags: [files]
+      summary: One file out of a ZIP archive, unpacked as it is sent.
+      description: |
+        The entry named `entry`, exactly as `listZip` gave its name,
+        unpacked while it streams and never more than its header declares
+        (a stream that would be more is broken off). It is sent like a
+        download: `attachment` with the entry's base name, cleaned; with
+        `disposition=inline`, images, audio, video, PDF and plain text may
+        show in the browser, under the same sandbox as `getContent`. An
+        entry that cannot be read — encrypted, or another compression — is
+        `415`.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/At"
+        - name: entry
+          in: query
+          required: true
+          schema: { type: string, maxLength: 65535 }
+        - name: disposition
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [attachment, inline]
+            default: attachment
+      responses:
+        "200":
+          description: The entry's bytes.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415":
+          description: Not a ZIP archive, or an entry that cannot be read.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/versions:
     get:
       operationId: listVersions
@@ -856,7 +938,7 @@ components:
             `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
             `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
             `range_not_satisfiable`, `changed`, `server_unreachable`, `session_lost`,
-            `too_many_sessions`, `not_an_image`, `not_a_document`, `preview_timeout`, `internal`.
+            `too_many_sessions`, `not_an_image`, `not_a_document`, `not_an_archive`, `preview_timeout`, `internal`.
         limit:
           type: integer
           format: int64
@@ -975,6 +1057,23 @@ components:
         version:
           type: string
           description: As `Entry.version`, for `v` together with `at`.
+    ZipEntry:
+      type: object
+      required: [name, type, size, packed, readable]
+      properties:
+        name: { type: string, description: "The archive's own name for it: show it as text, never use it as a path." }
+        type: { $ref: "#/components/schemas/EntryType" }
+        size: { type: integer, format: int64, description: "Unpacked bytes, as the archive declares them." }
+        packed: { type: integer, format: int64 }
+        modified: { type: string, format: date-time }
+        readable: { type: boolean, description: "Neither encrypted nor compressed otherwise than Store or Deflate." }
+    ZipList:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/ZipEntry" }
     DocumentText:
       type: object
       required: [text, truncated]
