@@ -5,6 +5,12 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.9.1](https://github.com/denisneuling/ferry/compare/v0.9.0...v0.9.1) (2026-11-23)
+
+### Bug Fixes
+
+* **preview:** compile once for a CPU the image's code was not made for ([d905116](https://github.com/denisneuling/ferry/commit/d9051161ab62c4ea884cfd8854d3436d5dd03e02))
+
 ## [0.9.0](https://github.com/denisneuling/ferry/compare/v0.8.0...v0.9.0) (2026-11-23)
 
 ### Features
