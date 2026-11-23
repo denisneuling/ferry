@@ -27,6 +27,9 @@ describe('kinds', () => {
     expect(previewKind('Brief.odt')).toBe('document');
     expect(previewKind('book.epub')).toBe('none');
     expect(previewKind('slides.pptx')).toBe('none');
+    expect(previewKind('Haushalt.XLSX')).toBe('table');
+    expect(previewKind('Haushalt.ods')).toBe('table');
+    expect(previewKind('alt.xls')).toBe('none');
     expect(hasThumbnail('a.svg')).toBe(false);
     // Recordings by their cover; the server answers 415 for one without.
     expect(hasThumbnail('a.mp3')).toBe(true);

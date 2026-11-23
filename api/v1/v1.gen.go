@@ -700,6 +700,16 @@ type ShareList struct {
 	Shares []Share `json:"shares"`
 }
 
+// Sheet defines model for Sheet.
+type Sheet struct {
+	// Name The sheet's name, as the file gives it; may be empty.
+	Name string `json:"name"`
+
+	// Rows Rows from the first, each up to its last cell with a value; an empty row is an empty array. Cells are text, to be shown as text.
+	Rows      [][]string `json:"rows"`
+	Truncated bool       `json:"truncated"`
+}
+
 // Space defines model for Space.
 type Space struct {
 	// Free Bytes this user may still write, as the server reports it.
@@ -958,6 +968,21 @@ type SearchParams struct {
 
 	// Q What names must contain.
 	Q string `form:"q" json:"q"`
+}
+
+// GetSheetParams defines parameters for GetSheet.
+type GetSheetParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
 }
 
 // GetSpaceParams defines parameters for GetSpace.
@@ -1689,6 +1714,20 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/shares/{share}/search (the `Search` operationId).
 	Search(ctx context.Context, share ShareName, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetSheet The first sheet of a spreadsheet, as text.
+	//
+	// The first sheet of an Excel workbook (`.xlsx`) or an OpenDocument
+	// spreadsheet (`.ods`): what each cell showed when the file was last
+	// saved, as text — a formula's stored result, never the formula worked
+	// out anew; no formatting, nothing that could run. Excel's date and time
+	// numbers are written as ISO 8601 when their cell's format is a date
+	// or a time; other numbers as stored. At most the first 1000 rows and
+	// 100 columns, 1 KB a cell; `truncated` when there is more. A file that
+	// is neither is `415` (`not_a_document`).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/sheet (the `GetSheet` operationId).
+	GetSheet(ctx context.Context, share ShareName, params *GetSheetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetSpace The size and free space of the volume a folder is on.
 	//
 	// What the SMB server reports to this session for the folder
@@ -2259,6 +2298,30 @@ func (c *Client) MoveEntry(ctx context.Context, share ShareName, params *MoveEnt
 // Corresponds with GET /api/v1/shares/{share}/search (the `Search` operationId).
 func (c *Client) Search(ctx context.Context, share ShareName, params *SearchParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSheet The first sheet of a spreadsheet, as text.
+//
+// The first sheet of an Excel workbook (`.xlsx`) or an OpenDocument
+// spreadsheet (`.ods`): what each cell showed when the file was last
+// saved, as text — a formula's stored result, never the formula worked
+// out anew; no formatting, nothing that could run. Excel's date and time
+// numbers are written as ISO 8601 when their cell's format is a date
+// or a time; other numbers as stored. At most the first 1000 rows and
+// 100 columns, 1 KB a cell; `truncated` when there is more. A file that
+// is neither is `415` (`not_a_document`).
+//
+// Corresponds with GET /api/v1/shares/{share}/sheet (the `GetSheet` operationId).
+func (c *Client) GetSheet(ctx context.Context, share ShareName, params *GetSheetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSheetRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3398,6 +3461,79 @@ func NewSearchRequest(server string, share ShareName, params *SearchParams) (*ht
 	return req, nil
 }
 
+// NewGetSheetRequest constructs an http.Request for the GetSheet method
+func NewGetSheetRequest(server string, share ShareName, params *GetSheetParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/sheet"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetSpaceRequest constructs an http.Request for the GetSpace method
 func NewGetSpaceRequest(server string, share ShareName, params *GetSpaceParams) (*http.Request, error) {
 	var err error
@@ -4209,6 +4345,22 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/search (the `Search` operationId).
 	SearchWithResponse(ctx context.Context, share ShareName, params *SearchParams, reqEditors ...RequestEditorFn) (*SearchResponse, error)
+
+	// GetSheetWithResponse The first sheet of a spreadsheet, as text.
+	//
+	// The first sheet of an Excel workbook (`.xlsx`) or an OpenDocument
+	// spreadsheet (`.ods`): what each cell showed when the file was last
+	// saved, as text — a formula's stored result, never the formula worked
+	// out anew; no formatting, nothing that could run. Excel's date and time
+	// numbers are written as ISO 8601 when their cell's format is a date
+	// or a time; other numbers as stored. At most the first 1000 rows and
+	// 100 columns, 1 KB a cell; `truncated` when there is more. A file that
+	// is neither is `415` (`not_a_document`).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/sheet (the `GetSheet` operationId).
+	GetSheetWithResponse(ctx context.Context, share ShareName, params *GetSheetParams, reqEditors ...RequestEditorFn) (*GetSheetResponse, error)
 
 	// GetSpaceWithResponse The size and free space of the volume a folder is on.
 	//
@@ -5495,6 +5647,103 @@ func (r SearchResponse) ContentType() string {
 	return ""
 }
 
+type GetSheetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sheet
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSheetResponse) GetJSON200() *Sheet {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetSheetResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetSheetResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetSheetResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetSheetResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r GetSheetResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r GetSheetResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r GetSheetResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetSheetResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSheetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSheetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSheetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSheetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetSpaceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -6442,6 +6691,28 @@ func (c *ClientWithResponses) SearchWithResponse(ctx context.Context, share Shar
 		return nil, err
 	}
 	return ParseSearchResponse(rsp)
+}
+
+// GetSheetWithResponse The first sheet of a spreadsheet, as text.
+//
+// The first sheet of an Excel workbook (`.xlsx`) or an OpenDocument
+// spreadsheet (`.ods`): what each cell showed when the file was last
+// saved, as text — a formula's stored result, never the formula worked
+// out anew; no formatting, nothing that could run. Excel's date and time
+// numbers are written as ISO 8601 when their cell's format is a date
+// or a time; other numbers as stored. At most the first 1000 rows and
+// 100 columns, 1 KB a cell; `truncated` when there is more. A file that
+// is neither is `415` (`not_a_document`).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/sheet (the `GetSheet` operationId).
+func (c *ClientWithResponses) GetSheetWithResponse(ctx context.Context, share ShareName, params *GetSheetParams, reqEditors ...RequestEditorFn) (*GetSheetResponse, error) {
+	rsp, err := c.GetSheet(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSheetResponse(rsp)
 }
 
 // GetSpaceWithResponse The size and free space of the volume a folder is on.
@@ -7560,6 +7831,88 @@ func ParseSearchResponse(rsp *http.Response) (*SearchResponse, error) {
 	return response, nil
 }
 
+// ParseGetSheetResponse parses an HTTP response from a GetSheetWithResponse call
+func ParseGetSheetResponse(rsp *http.Response) (*GetSheetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSheetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sheet
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetSpaceResponse parses an HTTP response from a GetSpaceWithResponse call
 func ParseGetSpaceResponse(rsp *http.Response) (*GetSpaceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -8042,6 +8395,9 @@ type ServerInterface interface {
 	// Search Find names below a folder.
 	// (GET /api/v1/shares/{share}/search)
 	Search(w http.ResponseWriter, r *http.Request, share ShareName, params SearchParams)
+	// GetSheet The first sheet of a spreadsheet, as text.
+	// (GET /api/v1/shares/{share}/sheet)
+	GetSheet(w http.ResponseWriter, r *http.Request, share ShareName, params GetSheetParams)
 	// GetSpace The size and free space of the volume a folder is on.
 	// (GET /api/v1/shares/{share}/space)
 	GetSpace(w http.ResponseWriter, r *http.Request, share ShareName, params GetSpaceParams)
@@ -8905,6 +9261,61 @@ func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r)
 }
 
+// GetSheet operation middleware
+func (siw *ServerInterfaceWrapper) GetSheet(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSheetParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSheet(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSpace operation middleware
 func (siw *ServerInterfaceWrapper) GetSpace(w http.ResponseWriter, r *http.Request) {
 
@@ -9394,6 +9805,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/metadata", wrapper.GetMetadata)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/thumbnail", wrapper.GetThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/text", wrapper.GetDocumentText)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/sheet", wrapper.GetSheet)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/zip", wrapper.ListZip)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/zip/entry", wrapper.GetZipEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/versions", wrapper.ListVersions)

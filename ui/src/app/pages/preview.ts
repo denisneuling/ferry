@@ -17,7 +17,7 @@ import { Browser } from '../core/browser';
 import { describe } from '../core/errors';
 import { Format } from '../core/format';
 import { Preloader, neighbours } from '../core/preloader';
-import { hasThumbnail, kindIcon, kindLabel, kindOf, previewKind } from '../core/kinds';
+import { hasThumbnail, isWorkbook, kindIcon, kindLabel, kindOf, previewKind } from '../core/kinds';
 import { Icon } from '../ui/icon';
 import { FileDetails } from '../ui/file-details';
 import { Snapshot } from '../core/snapshot';
@@ -137,6 +137,9 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
               @if (text() === null) {
                 <ng-container i18n="@@loading">Loading…</ng-container>
               } @else if (table(); as tb) {
+                @if (sheetName(); as n) {
+                  <p class="sheet-name">{{ n }}</p>
+                }
                 <table class="csv">
                   @for (row of tb.rows; track $index) {
                     <tr>
@@ -358,10 +361,15 @@ export class Preview {
     return this.api.thumbnailUrl(share, e.path, 640, e.version);
   });
   protected readonly text = signal<string | null>(null);
-  /** A CSV's or TSV's first rows, as cells: text, shown as text. */
+  /** A workbook's first sheet, as the server read it. */
+  private readonly sheet = signal<{ name: string; rows: string[][]; truncated: boolean } | null>(null);
+  protected readonly sheetName = computed(() => this.sheet()?.name ?? '');
+  /** A CSV's or TSV's first rows, or a workbook's, as cells: text, shown as text. */
   protected readonly table = computed(() => {
     const t = this.text();
     const e = this.entry();
+    const sh = this.sheet();
+    if (sh) return { rows: sh.rows, more: sh.truncated };
     return t === null || !e ? null : parseTable(t, e.name.toLowerCase().endsWith('.tsv'));
   });
   /** A ZIP's entries, for the preview; folders are left out, their files carry the path. */
@@ -378,6 +386,7 @@ export class Preview {
       const e = this.entry();
       const share = this.browser.share();
       this.text.set(null);
+      this.sheet.set(null);
       this.truncated.set(false);
       this.zipEntries.set(null);
       this.zipError.set(null);
@@ -398,7 +407,17 @@ export class Preview {
           (err) => this.entry() === e && this.text.set(describe(err)),
         );
       }
-      if (e && share && (previewKind(e.name) === 'text' || previewKind(e.name) === 'table')) {
+      if (e && share && isWorkbook(e.name)) {
+        this.api.sheet(share, e.path).then(
+          (sh) => {
+            if (this.entry() === e) {
+              this.sheet.set(sh);
+              this.text.set('');
+            }
+          },
+          (err) => this.entry() === e && this.text.set(describe(err)),
+        );
+      } else if (e && share && (previewKind(e.name) === 'text' || previewKind(e.name) === 'table')) {
         this.api.text(share, e.path).then(
           (r) => {
             if (this.entry() === e) {

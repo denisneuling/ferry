@@ -168,7 +168,13 @@ its cover; the rest an icon. A Word or OpenDocument text shows its plain
 text in the preview — the paragraphs, no formatting, nothing of the
 document that could run. A CSV or TSV file shows as a table of its first
 1000 rows — commas, the semicolons a German spreadsheet writes, or tabs —
-its cells as text. A ZIP archive shows what it holds: each file
+its cells as text. An Excel workbook (`.xlsx`) or an OpenDocument
+spreadsheet (`.ods`) shows its first sheet the same way, read by the server:
+the first 1000 rows and 100 columns, each cell as it was when the file was
+last saved — a formula's stored result, never the formula worked out again.
+Excel's dates and times are written as 2026-11-24 or 14:30:00 where the
+cell is formatted as one; an OpenDocument cell shows the text it displays.
+A ZIP archive shows what it holds: each file
 with its size, to open in a new tab or to download on its own, unpacked
 as it is sent — nothing is unpacked onto the share. Entries that are
 encrypted, or packed otherwise than ZIP's usual way, are listed but not

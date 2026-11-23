@@ -2083,7 +2083,7 @@ body.fx-playing .transfers {
   text-decoration: none;
 }
 
-/* A CSV's or TSV's first rows in the preview. */
+/* A CSV's or TSV's first rows, or a workbook's, in the preview. */
 .tableview {
   white-space: normal;
   overflow: auto;
@@ -2101,4 +2101,10 @@ table.csv td {
 table.csv tr:first-child td {
   font-weight: 600;
   background: var(--sunk);
+}
+/* A workbook's sheet: its name above the table, as a tab would show it. */
+.sheet-name {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--ink-2);
 }

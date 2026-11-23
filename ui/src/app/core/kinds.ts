@@ -126,6 +126,12 @@ const browserImages = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif
 const browserVideo = new Set(['mp4', 'm4v', 'webm', 'mov', 'ogv']);
 const browserAudio = new Set(['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'oga', 'opus']);
 
+/** An Excel workbook or an OpenDocument spreadsheet, whose first sheet the server reads. */
+export function isWorkbook(name: string): boolean {
+  const ext = extension(name);
+  return ext === 'xlsx' || ext === 'ods';
+}
+
 export function previewKind(name: string): PreviewKind {
   const ext = extension(name);
   if (browserImages.has(ext)) return 'image';
@@ -134,8 +140,8 @@ export function previewKind(name: string): PreviewKind {
   if (ext === 'pdf') return 'pdf';
   // A Word or OpenDocument text: its plain text, read by the server.
   if (ext === 'docx' || ext === 'odt') return 'document';
-  // CSV and TSV: a table of their first rows.
-  if (ext === 'csv' || ext === 'tsv') return 'table';
+  // CSV and TSV: a table of their first rows; a workbook's first sheet, read by the server.
+  if (ext === 'csv' || ext === 'tsv' || isWorkbook(name)) return 'table';
   // A ZIP: what it holds, each entry to open or download.
   if (ext === 'zip') return 'archive';
   if ((ext === 'heic' || ext === 'heif') && previewed().has(ext)) return 'derived';
