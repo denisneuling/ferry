@@ -1,0 +1,9 @@
+# gitleaks' default rules, with one exception: the test server's password
+# in go-smb2's own CI configuration, part of the upstream copy that
+# hack/check-fork.sh keeps byte for byte (third_party/go-smb2/PATCHES.md).
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "go-smb2's CI test configuration, upstream's dummy values"
+paths = ['''(^|/)third_party/go-smb2/\.github/client_conf\.json$''']

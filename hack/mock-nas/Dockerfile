@@ -12,6 +12,8 @@ ARG UBUNTU_IMAGE=docker.io/library/ubuntu:22.04
 FROM ${GO_IMAGE} AS seed
 WORKDIR /src
 COPY go.mod go.sum ./
+# go.mod replaces go-smb2 with this copy, which Go reads even here.
+COPY third_party/go-smb2/ ./third_party/go-smb2/
 COPY hack/mock-nas/gen ./hack/mock-nas/gen
 RUN go run ./hack/mock-nas/gen -out /seed
 

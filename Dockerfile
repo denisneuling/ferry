@@ -32,6 +32,8 @@ ARG BUILT_AT=unknown
 
 WORKDIR /src
 COPY go.mod go.sum ./
+# go.mod replaces go-smb2 with this copy (third_party/go-smb2/PATCHES.md).
+COPY third_party/go-smb2/ third_party/go-smb2/
 RUN go mod download
 
 COPY . .

@@ -179,5 +179,27 @@ should not set `DEBUG` regardless.
   server's `ResponseError` does not match `os.ErrPermission` — and
   `TestReadOnlyShare` shows a refused delete leaves the file as it was. A
   go-smb2 update that changes that matching would make ferry change files it
-  was told it may not delete; read its changes (Renovate keeps go-smb2 in
-  pull requests of its own).
+  was told it may not delete; read its changes when updating the copy (below).
+
+## Previous versions: what go-smb2 lacks (2026-11-23)
+
+Against a Samba 4.15 with `vfs_shadow_copy2` configured as on a ZFS NAS
+(snapshots in `.zfs/snapshot`, names with a prefix and a suffix, nested
+datasets with `shadow:snapdirseverywhere`):
+
+- Listing a path's snapshots needs `FSCTL_SRV_ENUMERATE_SNAPSHOTS`, and
+  go-smb2's ioctl is unexported. Opening a path as it was needs the `TWrp`
+  create context: Samba no longer reads `@GMT-…` tokens in SMB2 paths. Both
+  are in ferry's copy of go-smb2, `third_party/go-smb2`, together with a fix
+  of the create contexts' length, which go-smb2 counted wrongly for names of
+  some lengths (`STATUS_INVALID_PARAMETER`); `PATCHES.md` there has the
+  diff, and `hack/check-fork.sh` holds the copy to it. go-smb2 is updated by
+  hand since, not by Renovate.
+- With prefixed snapshot names, Samba resolves the time in an open against
+  the list it last enumerated on the connection: an open after enumerating
+  another dataset, or none, fails. internal/smb enumerates the same path in
+  the same call before every open at a time (`versions.go`,
+  `TestOpenAtEnumeratesItsPath`).
+- Reading `.zfs/snapshot` directly was rejected: it is one file system's
+  layout, a nested dataset has its own, and it would go around Samba's view
+  of the snapshots.

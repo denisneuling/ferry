@@ -351,7 +351,17 @@ type File struct {
 }
 
 // Open opens a file for reading. A folder is KindIsDir.
-func (s *Session) Open(ctx context.Context, share, p string) (_ *File, err error) {
+func (s *Session) Open(ctx context.Context, share, p string) (*File, error) {
+	return s.open(ctx, share, p, time.Time{})
+}
+
+// OpenAt opens a file for reading as it was in the snapshot taken at at
+// (versions.go); a time that is no snapshot of the path is KindNotFound.
+func (s *Session) OpenAt(ctx context.Context, share, p string, at time.Time) (*File, error) {
+	return s.open(ctx, share, p, at)
+}
+
+func (s *Session) open(ctx context.Context, share, p string, at time.Time) (_ *File, err error) {
 	ctx, done := span(ctx, "smb.open")
 	defer func() { done(err) }()
 	sp, err := CleanPath(p)
@@ -373,8 +383,12 @@ func (s *Session) Open(ctx context.Context, share, p string) (_ *File, err error
 		if err != nil {
 			return err
 		}
-		if f, err = m.OpenFile(sp, os.O_RDONLY, 0); err != nil {
-			return s.fail(err)
+		if at.IsZero() {
+			if f, err = m.OpenFile(sp, os.O_RDONLY, 0); err != nil {
+				return s.fail(err)
+			}
+		} else if f, err = s.openAt(m, sp, at); err != nil {
+			return err
 		}
 		if fi, err = f.Stat(); err != nil {
 			_ = f.Close()

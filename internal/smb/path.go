@@ -16,6 +16,7 @@ const (
 
 // CleanPath turns a path from the API — slash-separated, relative to the
 // share's root — into the backslash-separated form SMB expects, or refuses it.
+// It refuses a component that begins with "@GMT-" as well.
 //
 // It refuses what could leave the share or confuse the server about where a
 // name ends: `..`, NUL bytes, backslashes (a separator to SMB, never part of a
@@ -39,6 +40,11 @@ func CleanPath(p string) (string, error) {
 		case c == "..":
 			return "", &Error{Kind: KindInvalidPath}
 		case len(c) > MaxComponentBytes:
+			return "", &Error{Kind: KindInvalidPath}
+		case len(c) >= 5 && strings.EqualFold(c[:5], "@GMT-"):
+			// A snapshot token: older servers read one in a path as a
+			// time to open the path at. A version is asked for with its
+			// own parameter (versions.go), never through the path.
 			return "", &Error{Kind: KindInvalidPath}
 		}
 		out = append(out, c)

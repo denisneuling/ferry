@@ -46,6 +46,33 @@ if [ ! -d /srv/alex/Many ]; then
 	mkdir -p /srv/alex/Many
 	(cd /srv/alex/Many && seq -w 1 60000 | sed 's/^/photo-/; s/$/.jpg/' | xargs touch)
 fi
+# Snapshots for the Versions share (smb.conf), made anew each time so that
+# their times are the ones the tests expect: Docs/letter.txt in three
+# states, stable.txt unchanged, gone.txt deleted since, new.txt new since,
+# and Sub a nested dataset with a snapshot of its own.
+V=/srv/versions
+rm -rf "$V" && mkdir -p "$V/Docs" "$V/Sub/Inner"
+snap() { d="$1/.zfs/snapshot/autosnap_$2"; mkdir -p "$d"; echo "$d"; }
+echo "v3 now" > "$V/Docs/letter.txt"
+echo "stable" > "$V/Docs/stable.txt"
+echo "new since" > "$V/Docs/new.txt"
+echo "inner now" > "$V/Sub/Inner/inner.txt"
+S1=$(snap "$V" 2026-11-23_13:00:09_hourly) && mkdir -p "$S1/Docs" "$S1/Sub"
+echo "v1" > "$S1/Docs/letter.txt"
+echo "stable" > "$S1/Docs/stable.txt"
+echo "gone since" > "$S1/Docs/gone.txt"
+S2=$(snap "$V" 2026-11-23_14:00:09_hourly) && mkdir -p "$S2/Docs" "$S2/Sub"
+echo "v2 middle" > "$S2/Docs/letter.txt"
+echo "stable" > "$S2/Docs/stable.txt"
+S3=$(snap "$V/Sub" 2026-11-22_00:00:01_daily) && mkdir -p "$S3/Inner"
+echo "inner then" > "$S3/Inner/inner.txt"
+touch -d '2026-11-23 12:00:00' "$S1/Docs/letter.txt" "$S1/Docs/gone.txt"
+touch -d '2026-11-23 13:30:00' "$S2/Docs/letter.txt"
+touch -d '2026-11-21 10:00:00' "$S3/Inner/inner.txt"
+touch -d '2026-11-20 09:00:00' "$V/Docs/stable.txt" "$S1/Docs/stable.txt" "$S2/Docs/stable.txt"
+touch -d '2026-11-23 12:00:00' "$S1/Docs" "$S2/Docs"
+touch -d '2026-11-23 15:00:00' "$V/Docs"
+chown -R alex:family "$V" && chmod 0700 "$V"
 chown -R alex:family /srv/alex /srv/hidden && chmod 0700 /srv/alex
 chown -R sam:family /srv/sam && chmod 0700 /srv/sam
 chown -R root:family /srv/family && chmod 2775 /srv/family

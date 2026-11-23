@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	smb2 "github.com/cloudsoda/go-smb2"
 )
@@ -32,6 +33,34 @@ func (s *Session) Stat(ctx context.Context, share, p string) (Entry, error) {
 		return Entry{}, err
 	}
 	return s.stat(m, sp)
+}
+
+// StatAt returns the entry at a path as it was in the snapshot taken at at
+// (versions.go); a time that is no snapshot of the path is KindNotFound.
+func (s *Session) StatAt(ctx context.Context, share, p string, at time.Time) (Entry, error) {
+	sp, err := CleanPath(p)
+	if err != nil {
+		return Entry{}, err
+	}
+	c, err := s.start(ctx, "smb.stat")
+	if err != nil {
+		return Entry{}, err
+	}
+	defer c.end()
+	m, err := s.mount(c.ctx, share)
+	if err != nil {
+		return Entry{}, err
+	}
+	f, err := s.openAt(m, sp, at)
+	if err != nil {
+		return Entry{}, err
+	}
+	defer func() { _ = f.Close() }()
+	fi, err := f.Stat()
+	if err != nil {
+		return Entry{}, s.fail(err)
+	}
+	return Entry{Name: base(sp), Dir: fi.IsDir(), Size: size(fi), ModTime: fi.ModTime()}, nil
 }
 
 func (s *Session) stat(m *smb2.Share, sp string) (Entry, error) {

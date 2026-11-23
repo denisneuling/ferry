@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"time"
 
 	smb2 "github.com/cloudsoda/go-smb2"
 )
@@ -33,7 +34,17 @@ type Dir struct {
 // OpenDir opens a folder for listing. It yields at most max entries (a
 // bound of ferry's own: Next answers KindLimit beyond it); a file is
 // KindNotDir.
-func (s *Session) OpenDir(ctx context.Context, share, p string, max int) (_ *Dir, err error) {
+func (s *Session) OpenDir(ctx context.Context, share, p string, max int) (*Dir, error) {
+	return s.openDir(ctx, share, p, max, time.Time{})
+}
+
+// OpenDirAt opens a folder for listing as it was in the snapshot taken at
+// at (versions.go); a time that is no snapshot of the path is KindNotFound.
+func (s *Session) OpenDirAt(ctx context.Context, share, p string, max int, at time.Time) (*Dir, error) {
+	return s.openDir(ctx, share, p, max, at)
+}
+
+func (s *Session) openDir(ctx context.Context, share, p string, max int, at time.Time) (_ *Dir, err error) {
 	ctx, done := span(ctx, "smb.opendir")
 	defer func() { done(err) }()
 	sp, err := CleanPath(p)
@@ -55,8 +66,12 @@ func (s *Session) OpenDir(ctx context.Context, share, p string, max int) (_ *Dir
 		if err != nil {
 			return err
 		}
-		if f, err = m.Open(dir); err != nil {
-			return s.fail(err)
+		if at.IsZero() {
+			if f, err = m.Open(dir); err != nil {
+				return s.fail(err)
+			}
+		} else if f, err = s.openAt(m, sp, at); err != nil {
+			return err
 		}
 		fi, err := f.Stat()
 		if err != nil {

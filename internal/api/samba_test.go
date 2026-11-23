@@ -78,7 +78,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	shares := decode[v1.ShareList](t, h.do(t, "GET", "/api/v1/shares", nil, nil, c))
-	if len(shares.Shares) != 5 || shares.Shares[0].Name != "alex" {
+	if len(shares.Shares) != 6 || shares.Shares[0].Name != "alex" {
 		t.Fatalf("shares %+v", shares)
 	}
 

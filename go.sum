@@ -10,8 +10,6 @@ github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1x
 github.com/cenkalti/backoff/v5 v5.0.3/go.mod h1:rkhZdG3JZukswDf7f0cwqPNk4K0sa+F97BxZthm/crw=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
-github.com/cloudsoda/go-smb2 v0.0.0-20261105190815-95be04a983b8 h1:lBnZ8FJ6W+ftjYb3Exp5udAlHLLl5J3wO1nStg6abVI=
-github.com/cloudsoda/go-smb2 v0.0.0-20261105190815-95be04a983b8/go.mod h1:LryNlMPoHo2c2K8tlyI/c0OH8yAryg9wPFvgRGmt2pA=
 github.com/cloudsoda/sddl v0.0.0-20261105185302-1c8f96799263 h1:gua/EcVKg9gnxPrSrvHrz3jwrdnrYHKxmynexDwCrto=
 github.com/cloudsoda/sddl v0.0.0-20261105185302-1c8f96799263/go.mod h1:uvR42Hb/t52HQd7x5/ZLzZEK8oihrFpgnodIJ1vte2E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

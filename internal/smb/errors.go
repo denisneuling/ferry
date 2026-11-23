@@ -127,6 +127,7 @@ const (
 	statusPasswordMustChange    = 0xC0000224
 	statusNetworkSessionExpired = 0xC000035C
 	statusAccountExpired        = 0xC0000193
+	statusInvalidDeviceRequest  = 0xC0000010
 )
 
 var statusKinds = map[uint32]Kind{

@@ -116,7 +116,10 @@ jobs:
       - name: Start the test Samba
         run: |
           set -eu
-          command -v smbd >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq samba >/dev/null)
+          # vfs_shadow_copy2, for the Versions share, is in samba-vfs-modules
+          # on Debian and Ubuntu, not in samba itself.
+          { command -v smbd >/dev/null && [ -e "$(smbd -b | sed -n 's/^ *MODULESDIR: //p')/vfs/shadow_copy2.so" ]; } \
+            || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq samba samba-vfs-modules >/dev/null)
           sh hack/samba/setup.sh daemon
           for port in 445 446; do
             i=0

@@ -135,7 +135,7 @@ func TestShares(t *testing.T) {
 	}
 	// Samba enumerates every browseable share, including sam's, which alex
 	// cannot open; hidden$ and IPC$ are left out by ferry.
-	want := "alex,Family,Public,sam,Scans"
+	want := "alex,Family,Public,sam,Scans,Versions"
 	if got := strings.Join(names, ","); got != want {
 		t.Fatalf("shares %s, want %s", got, want)
 	}

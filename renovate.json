@@ -78,6 +78,13 @@
         "major"
       ],
       "enabled": false
+    },
+    {
+      "description": "go-smb2 is a patched copy in third_party (third_party/go-smb2/PATCHES.md): updated by hand, with the patches rebased",
+      "matchPackageNames": [
+        "github.com/cloudsoda/go-smb2"
+      ],
+      "enabled": false
     }
   ]
 }
