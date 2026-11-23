@@ -5,6 +5,16 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.6.0](https://github.com/metapatrol/ferry/compare/v0.5.1...v0.6.0) (2026-11-23)
+
+### Features
+
+* a time limit for each preview job, and metrics for the preview engine ([60ace8d](https://github.com/metapatrol/ferry/commit/60ace8db06722a25027553fb1a1c154e55f3d505))
+
+### Performance Improvements
+
+* remember for a while which files make no thumbnail ([dce0f63](https://github.com/metapatrol/ferry/commit/dce0f639367ecd3e61c62e4b3e0128b1e5a4c4a3))
+
 ## [0.5.1](https://github.com/metapatrol/ferry/compare/v0.5.0...v0.5.1) (2026-11-22)
 
 ### Bug Fixes
