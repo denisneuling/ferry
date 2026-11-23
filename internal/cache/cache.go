@@ -310,7 +310,10 @@ func (c *Cache) sweep() {
 			return nil
 		}
 		if d.IsDir() {
-			if d.Name() == "tmp" {
+			// tmp holds writes in progress; wasm, beside the entries,
+			// the previews' compiled code (FERRY_WASM_CACHE_DIR's
+			// default), which is no entry and never evicted.
+			if p != c.dir && (d.Name() == "tmp" || d.Name() == "wasm" && filepath.Dir(p) == c.dir) {
 				return filepath.SkipDir
 			}
 			return nil

@@ -124,7 +124,7 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		searches:    newSearches(),
 	}
 	o := preview.Options{
-		PDF: cfg.PreviewPDF, CodeDir: cfg.WASMDir, Budget: a.budget, BudgetSize: cfg.ThumbnailMemory,
+		PDF: cfg.PreviewPDF, CodeDir: cfg.WASMDir, CacheDir: cfg.WASMCacheDir, Budget: a.budget, BudgetSize: cfg.ThumbnailMemory,
 		Concurrency: cfg.PreviewConcurrency, Timeout: cfg.PreviewTimeout, Observe: m.Preview, Log: log,
 		HEIC: cfg.PreviewHEIC, HEIFMemory: cfg.PreviewHEICMemory,
 	}

@@ -133,6 +133,12 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.cache.existingSecret | default (printf "%s-cache" (include "ferry.fullname" .)) }}
                   key: key
+            {{- else }}
+            # Without the cache's volume, code compiled for this node's CPU
+            # (when the image's was made for another) is kept here, for the
+            # pod's life: compiled once, not after every idle close.
+            - name: FERRY_WASM_CACHE_DIR
+              value: /var/cache/ferry-wasm
             {{- end }}
             {{- with .Values.trustedProxies }}
             - name: FERRY_TRUSTED_PROXIES
@@ -169,17 +175,24 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.cache.enabled }}
           volumeMounts:
+            {{- if .Values.cache.enabled }}
             - name: cache
               mountPath: /var/cache/ferry
-          {{- end }}
-      {{- if .Values.cache.enabled }}
+            {{- else }}
+            - name: wasm-cache
+              mountPath: /var/cache/ferry-wasm
+            {{- end }}
       volumes:
+        {{- if .Values.cache.enabled }}
         - name: cache
           persistentVolumeClaim:
             claimName: {{ .Values.cache.persistence.existingClaim | default (printf "%s-cache" (include "ferry.fullname" .)) }}
-      {{- end }}
+        {{- else }}
+        - name: wasm-cache
+          emptyDir:
+            sizeLimit: 256Mi
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

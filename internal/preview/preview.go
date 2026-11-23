@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
+	"golang.org/x/sys/cpu"
 
 	"github.com/denisneuling/ferry/internal/thumb"
 	"github.com/denisneuling/ferry/third_party/heif"
@@ -96,8 +98,14 @@ type Options struct {
 	HEIFModule []byte
 	HEIFMemory int64
 	// CodeDir holds compiled code made by Precompile; it may be read-only.
-	// Empty or not matching this build: modules are compiled when needed.
+	// Empty, or made by another build or for another CPU: modules are
+	// compiled when needed.
 	CodeDir string
+	// CacheDir, writable, keeps the code compiled here — for a CPU the
+	// image's code was not made for — so that it is compiled once per
+	// version and CPU, not after every restart or idle close. Empty: code
+	// compiled here lives only as long as its runtime.
+	CacheDir string
 	// Budget is charged for every job and every compile; BudgetSize is all
 	// of it. A format whose job alone would not fit is off from the start.
 	Budget     Budget
@@ -139,7 +147,8 @@ type slot struct {
 	mu    sync.Mutex
 	res   closer
 	cache wazero.CompilationCache
-	off   error // why the format is off for this process
+	off   error     // why the format is off, until offAt+Idle
+	offAt time.Time // when it went off: it is tried again after Idle
 	jobs  int
 	timer *time.Timer
 }
@@ -323,7 +332,12 @@ func (s *slot) acquire(ctx context.Context, e *Engine) (closer, func(), error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.off != nil {
-		return nil, nil, s.off
+		// Off for a while, not for good: what failed — the budget taken, a
+		// disk full — may not fail on the next try.
+		if time.Since(s.offAt) < e.o.Idle {
+			return nil, nil, s.off
+		}
+		s.off = nil
 	}
 	if s.timer != nil {
 		s.timer.Stop()
@@ -332,8 +346,8 @@ func (s *slot) acquire(ctx context.Context, e *Engine) (closer, func(), error) {
 	if s.res == nil {
 		if err := s.open(ctx, e); err != nil {
 			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-				s.off = fmt.Errorf("%w: %w", ErrUnavailable, err)
-				e.o.Log.Warn(s.name+" previews are off", "error", err.Error())
+				s.off, s.offAt = fmt.Errorf("%w: %w", ErrUnavailable, err), time.Now()
+				e.o.Log.Warn(s.name+" previews are off for now", "error", err.Error(), "retry_after", e.o.Idle.String())
 				return nil, nil, s.off
 			}
 			return nil, nil, err
@@ -374,37 +388,117 @@ func (s *slot) close() {
 	debug.FreeOSMemory()
 }
 
-// open makes the runtime: from the compiled code when it matches this
-// build, otherwise by compiling — charged to the budget. Code that matches
-// by its marker but that wazero refuses (damaged) is compiled anew, the
-// same way.
+// open makes the runtime. The image's compiled code is used when it was
+// made by this build for this CPU; then code compiled here before, kept in
+// CacheDir; otherwise the module is compiled — charged to the budget — and
+// kept in CacheDir for next time.
+//
+// wazero files its code under a key that includes the CPU's features, and
+// on a miss compiles and writes, which the image's read-only directory
+// refuses. So ferry decides from the marker, which records the CPU, before
+// it asks wazero: a compile must be charged before it starts, never found
+// out about by its failure.
 func (s *slot) open(ctx context.Context, e *Engine) error {
 	start := time.Now()
-	if e.o.CodeDir != "" && markerMatches(e.o.CodeDir, s.key, s.want) {
-		cache, err := wazero.NewCompilationCacheWithDir(e.o.CodeDir)
-		if err == nil {
-			res, err := s.load(cache)
-			if err == nil {
-				s.res, s.cache = res, cache
-				e.o.Log.Info(s.name+" previews ready", "compiled", false, "seconds", time.Since(start).Seconds())
-				return nil
-			}
-			_ = cache.Close(context.Background())
-			e.o.Log.Warn("compiled "+s.name+" code refused, compiling anew", "error", err.Error())
-		}
+	// Compiling takes more memory than any job: all of the budget at
+	// most, so that thumbnails wait while it runs rather than run beside
+	// it, and a budget smaller than the compile's peak — which the
+	// process's memory around it covers — does not turn the format off.
+	cost := s.compile
+	if e.o.BudgetSize > 0 && cost > e.o.BudgetSize {
+		cost = e.o.BudgetSize
 	}
-	release, err := e.o.Budget(ctx, s.compile)
+	for _, dir := range []string{e.o.CodeDir, e.o.CacheDir} {
+		if dir == "" {
+			continue
+		}
+		if !markerMatches(dir, s.key, s.want) {
+			if dir == e.o.CodeDir && markerFor(dir) {
+				e.o.Log.Info("the image's compiled "+s.name+" code is for another CPU or build; compiling once",
+					"into", cacheName(e.o.CacheDir))
+			}
+			continue
+		}
+		// The image's code is charged as a compile while it loads: the
+		// marker names the CPU's features as x/sys/cpu sees them, and
+		// should wazero's key still differ (it reads one more, LZCNT),
+		// wazero compiles before it finds it cannot write — and that must
+		// not run outside the budget. Loading takes 50 ms; thumbnails wait
+		// those. Code ferry compiled into CacheDir itself, on this CPU, is
+		// loaded without the charge.
+		release := func() {}
+		if dir == e.o.CodeDir {
+			r, err := e.o.Budget(ctx, cost)
+			if err != nil {
+				return fmt.Errorf("no budget to load the compiled code: %w", err)
+			}
+			release = r
+		}
+		cache, err := wazero.NewCompilationCacheWithDir(dir)
+		if err != nil {
+			release()
+			continue
+		}
+		res, err := s.load(cache)
+		release()
+		if err == nil {
+			s.res, s.cache = res, cache
+			e.o.Log.Info(s.name+" previews ready", "compiled", false, "from", dirName(e, dir), "seconds", time.Since(start).Seconds())
+			return nil
+		}
+		_ = cache.Close(context.Background())
+		e.o.Log.Warn("compiled "+s.name+" code refused, compiling anew", "from", dirName(e, dir), "error", err.Error())
+	}
+	release, err := e.o.Budget(ctx, cost)
 	if err != nil {
-		return fmt.Errorf("no compiled code, and no budget to compile: %w", err)
+		return fmt.Errorf("no budget to compile: %w", err)
 	}
 	defer release()
-	res, err := s.load(nil)
+	var cache wazero.CompilationCache
+	if e.o.CacheDir != "" {
+		if err := os.MkdirAll(e.o.CacheDir, 0o700); err == nil {
+			cache, _ = wazero.NewCompilationCacheWithDir(e.o.CacheDir)
+		}
+	}
+	res, err := s.load(cache)
+	if err != nil && cache != nil {
+		// The cache directory may be what failed (full, not writable):
+		// compile once more without it.
+		_ = cache.Close(context.Background())
+		cache = nil
+		res, err = s.load(nil)
+	}
 	if err != nil {
 		return err
 	}
-	s.res = res
-	e.o.Log.Info(s.name+" previews ready", "compiled", true, "seconds", time.Since(start).Seconds())
+	s.res, s.cache = res, cache
+	if compiledHook != nil {
+		compiledHook(s.name)
+	}
+	if cache != nil {
+		if err := markCompiled(e.o.CacheDir, s.key, s.want); err != nil {
+			e.o.Log.Warn("compiled "+s.name+" code not marked; it is compiled again next time", "error", err.Error())
+		}
+	}
+	e.o.Log.Info(s.name+" previews ready", "compiled", true, "kept", cache != nil, "seconds", time.Since(start).Seconds())
 	return nil
+}
+
+// compiledHook, when tests set it, is told of every module compiled here.
+var compiledHook func(name string)
+
+func dirName(e *Engine, dir string) string {
+	if dir == e.o.CodeDir {
+		return "image"
+	}
+	return "cache"
+}
+
+func cacheName(dir string) string {
+	if dir == "" {
+		return "memory"
+	}
+	return dir
 }
 
 // initPDF compiles or loads pdfium. Every instance gets the memory limit,
@@ -504,18 +598,46 @@ func blank(img image.Image) bool {
 const markerName = "ferry-compiled.json"
 
 // marker says what compiled code was made from: wazero's version and each
-// module's, and the architecture. wazero keeps its code under its version
-// and architecture already; the marker is what tells ferry, before it asks
-// wazero, whether the code is there at all — a cold compile must be
+// module's, the architecture and the CPU's features. wazero keeps its code
+// under a key of all of these; the marker is what tells ferry, before it
+// asks wazero, whether the code is there at all — a cold compile must be
 // charged before it starts.
 type marker struct {
 	Wazero  string            `json:"wazero"`
 	GOARCH  string            `json:"goarch"`
+	CPU     string            `json:"cpu"`
 	Modules map[string]string `json:"modules"`
 }
 
+// cpuFeatures names the CPU features wazero's compiler chooses its code by
+// (SSE4.1, BMI1 and LZCNT on amd64, LSE atomics on arm64), and a few beside,
+// so that code made on one CPU is never taken for another's. Naming more
+// than wazero uses costs at most one compile on a CPU that differs only
+// there.
+func cpuFeatures() string {
+	var f []string
+	add := func(name string, has bool) {
+		if has {
+			f = append(f, name)
+		}
+	}
+	switch runtime.GOARCH {
+	case "amd64":
+		add("sse41", cpu.X86.HasSSE41)
+		add("sse42", cpu.X86.HasSSE42)
+		add("popcnt", cpu.X86.HasPOPCNT)
+		add("bmi1", cpu.X86.HasBMI1)
+		add("bmi2", cpu.X86.HasBMI2)
+		add("avx", cpu.X86.HasAVX)
+		add("avx2", cpu.X86.HasAVX2)
+	case "arm64":
+		add("atomics", cpu.ARM64.HasATOMICS)
+	}
+	return strings.Join(f, ",")
+}
+
 func current() marker {
-	m := marker{GOARCH: runtime.GOARCH, Modules: map[string]string{}}
+	m := marker{GOARCH: runtime.GOARCH, CPU: cpuFeatures(), Modules: map[string]string{}}
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, d := range bi.Deps {
 			v := d.Version
@@ -543,8 +665,42 @@ func markerMatches(dir, key, want string) bool {
 		return false
 	}
 	c := current()
-	return c.Wazero != "" && m.Wazero == c.Wazero && m.GOARCH == c.GOARCH &&
+	return c.Wazero != "" && m.Wazero == c.Wazero && m.GOARCH == c.GOARCH && m.CPU == c.CPU &&
 		want != "" && m.Modules[key] == want
+}
+
+// markerFor says whether dir has a marker at all, matching or not.
+func markerFor(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, markerName))
+	return err == nil
+}
+
+// markMu keeps two modules compiled at once from writing CacheDir's marker
+// over each other.
+var markMu sync.Mutex
+
+// markCompiled records in dir's marker that the module key, at version
+// want, is compiled there for this build and CPU. A marker for another
+// build or CPU is replaced: wazero's code for those is no use here.
+func markCompiled(dir, key, want string) error {
+	markMu.Lock()
+	defer markMu.Unlock()
+	m := current()
+	if b, err := os.ReadFile(filepath.Join(dir, markerName)); err == nil {
+		var old marker
+		if json.Unmarshal(b, &old) == nil && old.Wazero == m.Wazero && old.GOARCH == m.GOARCH && old.CPU == m.CPU {
+			for k, v := range old.Modules {
+				m.Modules[k] = v
+			}
+		}
+	}
+	m.Modules[key] = want
+	b, _ := json.MarshalIndent(m, "", "  ")
+	tmp := filepath.Join(dir, markerName+".tmp")
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(dir, markerName))
 }
 
 // Precompile compiles every module into dir and writes the marker last, so

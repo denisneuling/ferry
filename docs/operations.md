@@ -147,14 +147,20 @@ Measured (amd64, 2 CPUs):
 Each page is charged 208 MB (twice the instance's limit and 16 MB) against
 `FERRY_THUMBNAIL_MEMORY`, `FERRY_PREVIEW_CONCURRENCY` (default 1) at a
 time — so PDF previews need a budget of at least 208 MiB; below that they
-are off, with one warning at the start. A compile is charged 400 MB, more than the default budget: the image
-therefore compiles pdfium when it is built (`ferry precompile`, into
-`/usr/lib/ferry/wasm`, read-only) and ferry only loads it. It trusts that
-code while the marker written with it names the same wazero, go-pdfium and
-architecture as the binary; code that does not match, or that wazero
-refuses as damaged, is not used, and ferry compiles anew if the budget
-allows it — otherwise PDF previews are off for the process, with a
-warning, and PDFs show an icon.
+are off, with one warning at the start. The image compiles pdfium when it
+is built (`ferry precompile`, into `/usr/lib/ferry/wasm`, read-only), and
+ferry loads it while the marker written with it names the same wazero,
+go-pdfium, architecture and CPU features as where it runs. wazero's code
+depends on the CPU: code compiled on a build machine with AVX2 and BMI is
+no use on a NAS's Pentium. Then ferry compiles once — "the image's
+compiled pdf code is for another CPU or build; compiling once" in the log
+— into `FERRY_WASM_CACHE_DIR` (`FERRY_CACHE_DIR/wasm` with the cache on,
+an `emptyDir` from the chart otherwise), and loads from there from then
+on: after an idle close, and with the cache's volume after a restart. The
+compile takes all of the budget while it runs, up to 400 MB — thumbnails
+wait for those seconds rather than run beside it — and fits a pod of the
+chart's defaults since the budget is otherwise idle. Should it fail, the
+format is off and tried again after the idle time (5 minutes).
 
 Under the chart's limits (512 MiB, the default thumbnail budget;
 `hack/loadtest/run.sh`) a scanned PDF at 640 pixels three times over, a wall

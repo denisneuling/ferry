@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -66,12 +67,15 @@ type Config struct {
 	CacheKey      string
 	// Previews of formats Go cannot decode, run as WebAssembly: PDF's first
 	// page (FERRY_PREVIEW_PDF), how many at once (FERRY_PREVIEW_CONCURRENCY),
-	// how long one may run (FERRY_PREVIEW_TIMEOUT), and where the compiled
-	// code is (FERRY_WASM_DIR; the image ships it).
+	// how long one may run (FERRY_PREVIEW_TIMEOUT), where the compiled
+	// code is (FERRY_WASM_DIR; the image ships it), and where code compiled
+	// here is kept (FERRY_WASM_CACHE_DIR, writable; FERRY_CACHE_DIR/wasm by
+	// default when the cache is on).
 	PreviewPDF         bool
 	PreviewConcurrency int
 	PreviewTimeout     time.Duration
 	WASMDir            string
+	WASMCacheDir       string
 	// HEIC photos (FERRY_PREVIEW_HEIC), the memory one may take
 	// (FERRY_PREVIEW_HEIC_MEMORY), and a module to use instead of the one
 	// ferry carries (FERRY_HEIF_WASM, a file; third_party/heif/README.md).
@@ -263,6 +267,10 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		c.WASMDir = v
 	}
 	c.CacheDir = strings.TrimSpace(getenv("FERRY_CACHE_DIR"))
+	c.WASMCacheDir = strings.TrimSpace(getenv("FERRY_WASM_CACHE_DIR"))
+	if c.WASMCacheDir == "" && c.CacheDir != "" {
+		c.WASMCacheDir = filepath.Join(c.CacheDir, "wasm")
+	}
 	c.CacheKey = getenv("FERRY_CACHE_KEY")
 	if v := getenv("FERRY_CACHE_MAX_BYTES"); v != "" {
 		n, err := parseBytes(v)

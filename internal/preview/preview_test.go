@@ -3,6 +3,7 @@ package preview
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -129,6 +130,15 @@ func engine(t *testing.T, o Options) *Engine {
 	e := New(o)
 	t.Cleanup(e.Close)
 	return e
+}
+
+// countCompiles counts the modules compiled for the rest of the test.
+func countCompiles(t *testing.T) *atomic.Int32 {
+	t.Helper()
+	var n atomic.Int32
+	compiledHook = func(string) { n.Add(1) }
+	t.Cleanup(func() { compiledHook = nil })
+	return &n
 }
 
 // renderWait bounds a render in the tests. A cold one compiles pdfium's
@@ -280,14 +290,8 @@ func TestCompiledCode(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			dir := copyCode(t)
 			c.prepare(dir)
-			var compiles atomic.Int32
-			budget := func(_ context.Context, n int64) (func(), error) {
-				if n == compileCost {
-					compiles.Add(1)
-				}
-				return func() {}, nil
-			}
-			e := engine(t, Options{CodeDir: dir, Budget: budget})
+			compiles := countCompiles(t)
+			e := engine(t, Options{CodeDir: dir})
 			if _, err := render(t, e, invoice(), 160); err != nil {
 				t.Fatal(err)
 			}
@@ -517,13 +521,8 @@ func TestCompiledCodeReadOnly(t *testing.T) {
 				damageCode(dir)
 			}
 			readOnly(t, dir)
-			var compiles atomic.Int32
-			e := engine(t, Options{CodeDir: dir, Budget: func(_ context.Context, n int64) (func(), error) {
-				if n == compileCost {
-					compiles.Add(1)
-				}
-				return func() {}, nil
-			}})
+			compiles := countCompiles(t)
+			e := engine(t, Options{CodeDir: dir})
 			if _, err := render(t, e, invoice(), 160); err != nil {
 				t.Fatal(err)
 			}
@@ -609,5 +608,165 @@ func TestOutcome(t *testing.T) {
 		if got := Outcome(err); got != want {
 			t.Errorf("%v: %q, want %q", err, got, want)
 		}
+	}
+}
+
+// The image's code made on another CPU: wazero would miss its cache and
+// try to write into the read-only image. ferry sees from the marker that
+// the code is not for this CPU, compiles once — charged — into CacheDir,
+// and the next engine, after a restart, loads from there without a compile.
+func TestCompiledForAnotherCPU(t *testing.T) {
+	image := copyCode(t)
+	b, err := os.ReadFile(filepath.Join(image, markerName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m marker
+	_ = json.Unmarshal(b, &m)
+	m.CPU = "a CPU unlike this one"
+	b, _ = json.Marshal(m)
+	if err := os.WriteFile(filepath.Join(image, markerName), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Read-only, as the image's directory is.
+	setMode := func(file, dir os.FileMode) {
+		_ = filepath.Walk(image, func(p string, info os.FileInfo, err error) error {
+			if err == nil && info.IsDir() {
+				return os.Chmod(p, dir)
+			}
+			return os.Chmod(p, file)
+		})
+	}
+	setMode(0o444, 0o555)
+	t.Cleanup(func() { setMode(0o644, 0o755) })
+
+	cache := t.TempDir()
+	var compiles atomic.Int32
+	budget := func(_ context.Context, n int64) (func(), error) {
+		if n == compileCost {
+			compiles.Add(1)
+		}
+		return func() {}, nil
+	}
+	first := engine(t, Options{CodeDir: image, CacheDir: cache, Budget: budget})
+	if _, err := render(t, first, invoice(), 160); err != nil {
+		t.Fatal(err)
+	}
+	if compiles.Load() != 1 || !markerMatches(cache, "pdf", current().Modules["pdf"]) {
+		t.Fatalf("compiled %d times, cache marked %v", compiles.Load(), markerMatches(cache, "pdf", current().Modules["pdf"]))
+	}
+	first.Close()
+	again := engine(t, Options{CodeDir: image, CacheDir: cache, Budget: budget})
+	if _, err := render(t, again, invoice(), 160); err != nil {
+		t.Fatal(err)
+	}
+	if compiles.Load() != 1 {
+		t.Fatalf("compiled again after a restart: %d", compiles.Load())
+	}
+}
+
+// A budget smaller than a compile's peak takes the whole budget for it,
+// rather than turning the format off.
+func TestCompileTakesTheWholeBudget(t *testing.T) {
+	const size = 300 << 20 // more than a job, less than a compile
+	var charged []int64
+	var mu sync.Mutex
+	e := engine(t, Options{CodeDir: t.TempDir(), BudgetSize: size, Budget: func(_ context.Context, n int64) (func(), error) {
+		mu.Lock()
+		charged = append(charged, n)
+		mu.Unlock()
+		return func() {}, nil
+	}})
+	if _, err := render(t, e, invoice(), 160); err != nil {
+		t.Fatal(err)
+	}
+	if len(charged) == 0 || charged[0] != size {
+		t.Fatalf("charged %v, want the whole budget, %d, first", charged, size)
+	}
+}
+
+// A format turned off by a failure is tried again after the idle time,
+// not only after a restart.
+func TestOffIsTriedAgain(t *testing.T) {
+	fail := true
+	var mu sync.Mutex
+	e := engine(t, Options{CodeDir: t.TempDir(), Idle: 50 * time.Millisecond, Budget: func(_ context.Context, n int64) (func(), error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if fail && n == compileCost {
+			return nil, errors.New("no budget just now")
+		}
+		return func() {}, nil
+	}})
+	if _, err := render(t, e, invoice(), 160); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("first: %v", err)
+	}
+	mu.Lock()
+	fail = false
+	mu.Unlock()
+	if _, err := render(t, e, invoice(), 160); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("at once: %v, want still off", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if _, err := render(t, e, invoice(), 160); err != nil {
+		t.Fatalf("after the idle time: %v", err)
+	}
+}
+
+// The marker says the image's code is for this CPU, but wazero's key says
+// otherwise (it reads a feature the marker does not name): wazero misses,
+// compiles and cannot write into the read-only image. That attempt runs
+// under the budget, and ferry then compiles into CacheDir, once.
+func TestMarkerMatchesButWazeroMisses(t *testing.T) {
+	image := copyCode(t)
+	// wazero's code gone, the marker kept: what a different key looks
+	// like. Its directory becomes a file of the same name, so that wazero
+	// cannot write there — not even as root, as CI runs, which a
+	// read-only mode would not stop.
+	entries, _ := os.ReadDir(image)
+	for _, d := range entries {
+		if d.Name() != markerName {
+			p := filepath.Join(image, d.Name())
+			_ = os.RemoveAll(p)
+			if d.IsDir() {
+				if err := os.WriteFile(p, []byte("not a directory"), 0o444); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	if !markerMatches(image, "pdf", current().Modules["pdf"]) {
+		t.Fatal("the marker should match")
+	}
+	cache := t.TempDir()
+	var mu sync.Mutex
+	held, most, charges := int64(0), int64(0), 0
+	budget := func(_ context.Context, n int64) (func(), error) {
+		mu.Lock()
+		defer mu.Unlock()
+		held += n
+		most = max(most, held)
+		if n == compileCost {
+			charges++
+		}
+		return func() { mu.Lock(); held -= n; mu.Unlock() }, nil
+	}
+	e := engine(t, Options{CodeDir: image, CacheDir: cache, Budget: budget})
+	if _, err := render(t, e, invoice(), 160); err != nil {
+		t.Fatal(err)
+	}
+	// Charged for the attempt on the image, and for the compile after it.
+	if charges != 2 || !markerMatches(cache, "pdf", current().Modules["pdf"]) {
+		t.Fatalf("charged %d compiles, cache marked %v", charges, markerMatches(cache, "pdf", current().Modules["pdf"]))
+	}
+	e.Close()
+	charges = 0
+	again := engine(t, Options{CodeDir: image, CacheDir: cache, Budget: budget})
+	if _, err := render(t, again, invoice(), 160); err != nil {
+		t.Fatal(err)
+	}
+	// The image tried again (charged), then CacheDir loaded: no third compile.
+	if charges != 1 {
+		t.Fatalf("after a restart: %d charges", charges)
 	}
 }

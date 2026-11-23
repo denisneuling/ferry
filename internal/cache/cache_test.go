@@ -196,6 +196,15 @@ func TestSweep(t *testing.T) {
 		_ = os.Chtimes(c.path(c.name(other(i))), at, at)
 	}
 
+	// The previews' compiled code beside the entries, older than all of
+	// them and larger than the limit: never an entry, never swept.
+	code := filepath.Join(dir, "wasm", "pdfium.bin")
+	_ = os.MkdirAll(filepath.Dir(code), 0o700)
+	if err := os.WriteFile(code, make([]byte, limit*2), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Chtimes(code, base.Add(-48*time.Hour), base.Add(-48*time.Hour))
+
 	// keep is used; then two more push the cache over its size.
 	c = open(t, dir, limit, obs)
 	if _, ok := c.Get(keep); !ok {
@@ -221,6 +230,9 @@ func TestSweep(t *testing.T) {
 	}
 	if _, ok := c.Get(other(10)); !ok {
 		t.Fatal("the newest entry was swept")
+	}
+	if _, err := os.Stat(code); err != nil {
+		t.Fatalf("the compiled code was swept: %v", err)
 	}
 }
 
