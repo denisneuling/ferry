@@ -63,33 +63,37 @@ type Version struct {
 // Versions lists what the server's snapshots hold of a path, newest
 // first: one Version for each state that differs from the one after it
 // and from the path as it is now, at the newest snapshot holding that
-// state. Snapshots in which the path does not exist are left out. At most
-// max snapshots are looked at, the newest. A server without snapshots
-// gives none.
-func (s *Session) Versions(ctx context.Context, share, p string, max int) ([]Version, error) {
+// state. Snapshots in which the path does not exist are left out. A server
+// without snapshots gives none.
+//
+// Each snapshot costs an open on the share. At most max are looked at, the
+// newest; and when ctx's deadline passes, between two of them, the versions
+// found so far are the answer. Either way truncated says so. A request
+// that ended otherwise is an error.
+func (s *Session) Versions(ctx context.Context, share, p string, max int) (_ []Version, truncated bool, err error) {
 	sp, err := CleanPath(p)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	c, err := s.start(ctx, "smb.versions")
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer c.end()
 	m, err := s.mount(c.ctx, share)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	now, nowErr := s.stat(m, sp)
 	if nowErr != nil && KindOf(nowErr) != KindNotFound {
-		return nil, nowErr
+		return nil, false, nowErr
 	}
 	tokens, err := s.snapshots(m, sp)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if len(tokens) > max {
-		tokens = tokens[:max]
+		tokens, truncated = tokens[:max], true
 	}
 	var out []Version
 	last := Version{}
@@ -97,8 +101,11 @@ func (s *Session) Versions(ctx context.Context, share, p string, max int) ([]Ver
 		last = Version{Dir: now.Dir, Size: now.Size, ModTime: now.ModTime}
 	}
 	for _, tok := range tokens {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return out, true, nil
+		}
 		if err := c.canceled(); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		c.kick()
 		at, err := ParseToken(tok)
@@ -111,7 +118,7 @@ func (s *Session) Versions(ctx context.Context, share, p string, max int) ([]Ver
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if v.Dir == last.Dir && v.Size == last.Size && v.ModTime.Equal(last.ModTime) {
 			continue
@@ -119,7 +126,7 @@ func (s *Session) Versions(ctx context.Context, share, p string, max int) ([]Ver
 		last = v
 		out = append(out, v)
 	}
-	return out, nil
+	return out, truncated, nil
 }
 
 // snapshots enumerates the snapshots for a path, newest first. A path that

@@ -39,7 +39,7 @@ func TestVersions(t *testing.T) {
 		{"Docs", []time.Time{at1400}},
 	}
 	for _, c := range cases {
-		vs, err := s.Versions(ctx, "Versions", c.path, MaxVersions)
+		vs, _, err := s.Versions(ctx, "Versions", c.path, MaxVersions)
 		if err != nil {
 			t.Fatalf("%s: %v", c.path, err)
 		}
@@ -57,18 +57,21 @@ func TestVersions(t *testing.T) {
 			}
 		}
 	}
-	vs, err := s.Versions(ctx, "Versions", "Docs/letter.txt", MaxVersions)
+	vs, _, err := s.Versions(ctx, "Versions", "Docs/letter.txt", MaxVersions)
 	if err != nil || len(vs) != 2 || vs[0].Size != int64(len("v2 middle\n")) || vs[1].Size != int64(len("v1\n")) ||
 		!vs[0].ModTime.Equal(time.Date(2026, 11, 23, 13, 30, 0, 0, time.UTC)) {
 		t.Fatalf("letter.txt's versions: %+v, %v", vs, err)
 	}
 	// A share without snapshots offers none, and that is no error.
-	if vs, err := s.Versions(ctx, "alex", "hello.txt", MaxVersions); err != nil || len(vs) != 0 {
+	if vs, _, err := s.Versions(ctx, "alex", "hello.txt", MaxVersions); err != nil || len(vs) != 0 {
 		t.Fatalf("a share without snapshots: %+v, %v", vs, err)
 	}
 	// The bound: only the newest snapshots are looked at.
-	if vs, err := s.Versions(ctx, "Versions", "Docs/letter.txt", 1); err != nil || len(vs) != 1 || !vs[0].At.Equal(at1400) {
-		t.Fatalf("bounded to one: %+v, %v", vs, err)
+	if vs, truncated, err := s.Versions(ctx, "Versions", "Docs/letter.txt", 1); err != nil || !truncated || len(vs) != 1 || !vs[0].At.Equal(at1400) {
+		t.Fatalf("bounded to one: %+v, %v, %v", vs, truncated, err)
+	}
+	if _, truncated, err := s.Versions(ctx, "Versions", "Docs/letter.txt", MaxVersions); err != nil || truncated {
+		t.Fatalf("all looked at: truncated %v, %v", truncated, err)
 	}
 }
 

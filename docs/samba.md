@@ -32,6 +32,35 @@ may quietly get one.
   name if the server allows — unless the deployment narrows what ferry
   offers with `FERRY_SHARES` ([configuration.md](configuration.md)).
 
+## Previous versions
+
+ferry shows a file's or a folder's **previous versions** where the server
+offers them, the same ones Explorer's *Previous versions* tab shows: from
+`vfs_shadow_copy2` on Samba (or shadow copies on Windows). Without it the
+feature is simply absent. ferry asks with the person's own session, so
+Samba decides who may read a version, as for the file now; a version is
+read-only, and restoring one is a copy into the share as it is.
+
+On a ZFS server with snapshots made by a tool such as sanoid, something
+like this in the share (or `[global]`), with the names the tool writes —
+here `autosnap_2026-11-23_15:00:09_hourly`:
+
+```ini
+vfs objects = shadow_copy2
+shadow:snapdir = .zfs/snapshot
+shadow:snapdirseverywhere = yes   # nested datasets, each with its own .zfs
+shadow:crossmountpoints = yes
+shadow:snapprefix = ^autosnap
+shadow:delimiter = _
+shadow:format = _%Y-%m-%d_%H:%M:%S
+shadow:sort = desc
+```
+
+On Debian and Ubuntu the module is in `samba-vfs-modules`. The times are
+UTC unless `shadow:localtime = yes`. Listing a path's versions costs one
+open per snapshot; ferry looks at the newest 500 and stops after 20 s,
+saying the list is incomplete.
+
 ## Worth knowing
 
 - **A file being downloaded cannot be renamed or deleted** until the
@@ -42,4 +71,5 @@ may quietly get one.
   applies on top, and is the stronger guard.
 
 ferry has been tried against Samba 4.15 (Ubuntu 22.04, the mock NAS in
-`hack/mock-nas`), 4.17 (Debian 12) and 4.21 (Alpine, the tests' Samba).
+`hack/mock-nas`), 4.17 (Debian 12) and 4.21 (Alpine, the tests' Samba);
+previous versions against 4.15.

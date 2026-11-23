@@ -33,6 +33,10 @@ func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.Share
 	if !ok {
 		return
 	}
+	at, ok := atParam(w, params.At)
+	if !ok {
+		return
+	}
 	ctx, cancel := context.WithTimeout(ctx, metaTimeout)
 	defer cancel()
 	select {
@@ -42,7 +46,7 @@ func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.Share
 		probUnreachable.write(w)
 		return
 	}
-	f, again, err := a.openDerived(ctx, r, conn, share, p)
+	f, again, err := a.openDerived(ctx, r, conn, share, p, at)
 	if err != nil {
 		a.fail(w, r, err)
 		return
@@ -51,7 +55,7 @@ func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.Share
 	defer func() { _ = f.Close() }()
 
 	tag := etag(f.Size, f.ModTime)
-	tag = tag[:len(tag)-1] + `-meta"`
+	tag = atTag(tag[:len(tag)-1]+`-meta"`, at)
 	h := w.Header()
 	h.Set("ETag", tag)
 	cacheDerived(h, params.V, f.Size, f.ModTime)
@@ -61,7 +65,7 @@ func (a *API) GetMetadata(w http.ResponseWriter, r *http.Request, share v1.Share
 	}
 	// As for thumbnails: the file is open for reading under this person's
 	// session, so what was read of it may be given from the cache.
-	key := derivedKey("metadata", "", share, p, f)
+	key := derivedKey("metadata", atVariant("", at), share, p, f)
 	if a.cache != nil {
 		if body, ok := a.cache.Get(key); ok {
 			writeJSONBytes(w, body)

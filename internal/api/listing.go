@@ -32,7 +32,17 @@ func (a *API) ListEntries(w http.ResponseWriter, r *http.Request, share v1.Share
 	if !ok {
 		return
 	}
-	d, err := conn.OpenDir(ctx, share, dir, a.cfg.MaxListing)
+	at, ok := atParam(w, params.At)
+	if !ok {
+		return
+	}
+	var d *smb.Dir
+	var err error
+	if at.IsZero() {
+		d, err = conn.OpenDir(ctx, share, dir, a.cfg.MaxListing)
+	} else {
+		d, err = conn.OpenDirAt(ctx, share, dir, a.cfg.MaxListing, at)
+	}
 	if err != nil {
 		a.fail(w, r, err)
 		return

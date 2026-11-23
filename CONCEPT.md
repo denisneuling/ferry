@@ -369,6 +369,7 @@ What the spike found for each of them, and how ferry holds it:
 
 ## 12. Open questions
 
-- **Previous versions:** show ZFS snapshots through SMB's `@GMT` tokens? This
-  needs `vfs_shadow_copy2` configured in Samba; ferry would only use it where a
-  server offers it.
+- ~~**Previous versions**~~ — decided (0.8.0): through SMB's own snapshot
+  requests (the snapshot list, and an open at a snapshot's time), where the
+  server offers them with `vfs_shadow_copy2`; read-only, a restore is a copy.
+  Not through a file system's snapshot directory. docs/samba.md, docs/spike.md.

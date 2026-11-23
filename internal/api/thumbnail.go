@@ -38,7 +38,11 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	if !ok {
 		return
 	}
-	f, again, err := a.openDerived(ctx, r, conn, share, p)
+	at, ok := atParam(w, params.At)
+	if !ok {
+		return
+	}
+	f, again, err := a.openDerived(ctx, r, conn, share, p, at)
 	if err != nil {
 		a.fail(w, r, err)
 		return
@@ -49,7 +53,7 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	// The ETag follows the file and the size asked for: revalidating costs
 	// an open on the share, not a decode.
 	tag := etag(f.Size, f.ModTime)
-	tag = tag[:len(tag)-1] + "-" + strconv.Itoa(size) + `"`
+	tag = atTag(tag[:len(tag)-1]+"-"+strconv.Itoa(size)+`"`, at)
 	h := w.Header()
 	h.Set("ETag", tag)
 	cacheDerived(h, params.V, f.Size, f.ModTime)
@@ -60,7 +64,7 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 	}
 	// The file is open for reading under this person's session: whoever
 	// gets this far may have what was made of it, by whomever.
-	key := derivedKey("thumbnail", strconv.Itoa(size), share, p, f)
+	key := derivedKey("thumbnail", atVariant(strconv.Itoa(size), at), share, p, f)
 	if a.cache != nil {
 		if out, ok := a.cache.Get(key); ok {
 			a.metrics.Thumbnail("cached")

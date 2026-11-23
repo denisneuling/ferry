@@ -161,7 +161,7 @@ func (a *API) Handler() http.Handler {
 			probInvalidRequest.write(w)
 		},
 	})
-	return apiHeaders(requireFerryRequest(h))
+	return apiHeaders(requireFerryRequest(refuseVersionWrites(h)))
 }
 
 // requireFerryRequest refuses a request that changes something unless it
@@ -516,8 +516,8 @@ func (a *API) groupLost(r *http.Request) bool {
 // person did not start, which is worth not failing for a dropped
 // connection. Content and uploads do not: what a person started fails as
 // it is. done gives the second connection back.
-func (a *API) openDerived(ctx context.Context, r *http.Request, c *smb.Session, share, p string) (_ *smb.File, done func(), err error) {
-	f, err := c.Open(ctx, share, p)
+func (a *API) openDerived(ctx context.Context, r *http.Request, c *smb.Session, share, p string, at time.Time) (_ *smb.File, done func(), err error) {
+	f, err := openFile(ctx, c, share, p, at)
 	if smb.KindOf(err) != smb.KindSessionLost || a.groupLost(r) {
 		return f, func() {}, err
 	}
@@ -531,12 +531,20 @@ func (a *API) openDerived(ctx context.Context, r *http.Request, c *smb.Session, 
 		return nil, func() {}, err
 	}
 	a.log.Warn("smb connection lost", "pool", smb.PoolBackground, "route", r.Pattern, "session", "continues", "retry", true)
-	f, err = other.Open(ctx, share, p)
+	f, err = openFile(ctx, other, share, p, at)
 	if err != nil {
 		given()
 		return nil, func() {}, err
 	}
 	return f, given, nil
+}
+
+// openFile opens a file as it is now, or as the snapshot at at holds it.
+func openFile(ctx context.Context, c *smb.Session, share, p string, at time.Time) (*smb.File, error) {
+	if at.IsZero() {
+		return c.Open(ctx, share, p)
+	}
+	return c.OpenAt(ctx, share, p, at)
 }
 
 // connFor is the SMB session of a person's group that serves the pool: the

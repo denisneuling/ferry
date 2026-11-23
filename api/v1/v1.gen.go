@@ -515,7 +515,7 @@ type MoveRequest struct {
 // Problem RFC 9457 problem details.
 type Problem struct {
 	// Code Stable, machine-readable: `invalid_request`, `invalid_path`,
-	// `missing_ferry_request`, `unauthenticated`, `login_failed`,
+	// `missing_ferry_request`, `version_read_only`, `unauthenticated`, `login_failed`,
 	// `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
 	// `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
 	// `range_not_satisfiable`, `server_unreachable`, `session_lost`,
@@ -554,6 +554,32 @@ type Space struct {
 	// Total The volume's size in bytes, as the server reports it.
 	Total int64 `json:"total"`
 }
+
+// Version defines model for Version.
+type Version struct {
+	// At The snapshot's time, to pass as `at`; UTC.
+	//
+	// Example: @GMT-2026.11.23-15.00.09
+	At       string    `json:"at"`
+	Modified time.Time `json:"modified"`
+
+	// Size Bytes; 0 for folders.
+	Size int64     `json:"size"`
+	Type EntryType `json:"type"`
+
+	// Version As `Entry.version`, for `v` together with `at`.
+	Version string `json:"version"`
+}
+
+// VersionList defines model for VersionList.
+type VersionList struct {
+	// Truncated More snapshots than were looked at, in the time allowed or the bound.
+	Truncated bool      `json:"truncated"`
+	Versions  []Version `json:"versions"`
+}
+
+// At defines model for At.
+type At = string
 
 // EntryPath defines model for EntryPath.
 type EntryPath = string
@@ -623,6 +649,14 @@ type CreateArchiveParamsXFerryRequest string
 
 // GetContentParams defines parameters for GetContent.
 type GetContentParams struct {
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At          *At                          `form:"at,omitempty" json:"at,omitempty"`
 	Disposition *GetContentParamsDisposition `form:"disposition,omitempty" json:"disposition,omitempty"`
 
 	// Path Slash-separated, relative to the share's root; empty for the root.
@@ -664,6 +698,15 @@ type DeleteEntryParamsXFerryRequest string
 
 // ListEntriesParams defines parameters for ListEntries.
 type ListEntriesParams struct {
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+
 	// Path Slash-separated, relative to the share's root; empty for the root.
 	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
 }
@@ -692,6 +735,15 @@ type GetMetadataParams struct {
 	// the listing — the answer is the current file's, revalidated as
 	// without `v`. Never an error.
 	V *FileVersion `form:"v,omitempty" json:"v,omitempty"`
+
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
 }
 
 // MoveEntryParams defines parameters for MoveEntry.
@@ -722,12 +774,27 @@ type GetThumbnailParams struct {
 	// without `v`. Never an error.
 	V *FileVersion `form:"v,omitempty" json:"v,omitempty"`
 
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+
 	// Size The edge of the square the thumbnail fits in, in pixels.
 	Size *GetThumbnailParamsSize `form:"size,omitempty" json:"size,omitempty"`
 }
 
 // GetThumbnailParamsSize defines parameters for GetThumbnail.
 type GetThumbnailParamsSize int
+
+// ListVersionsParams defines parameters for ListVersions.
+type ListVersionsParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+}
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -1010,6 +1077,8 @@ type ClientInterface interface {
 	// video, audio, PDF and plain text itself; anything else — HTML and SVG
 	// included — is sent as an attachment regardless.
 	//
+	// With `at`, the file as the snapshot holds it (`At`).
+	//
 	// Corresponds with GET /api/v1/shares/{share}/content (the `GetContent` operationId).
 	GetContent(ctx context.Context, share ShareName, params *GetContentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1055,6 +1124,8 @@ type ClientInterface interface {
 	// A folder with more entries than the deployment shows
 	// (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
 	// number.
+	//
+	// With `at`, the folder as the snapshot holds it (`At`).
 	//
 	// Corresponds with GET /api/v1/shares/{share}/entries (the `ListEntries` operationId).
 	ListEntries(ctx context.Context, share ShareName, params *ListEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1127,6 +1198,25 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListVersions The previous versions of a file or a folder.
+	//
+	// What the server's snapshots hold of the path — Samba's
+	// `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
+	// entry for each state that differs from the one after it and from
+	// the path as it is now. Each comes with the `at` that reads it
+	// (`At`). A path deleted since has versions all the same; a server or
+	// share without snapshots has none, which is no error.
+	//
+	// Looking costs one open on the share for each snapshot. When the
+	// answer takes longer than ferry allows, or the snapshots are more
+	// than it looks at, the newest found so far come with
+	// `truncated: true`.
+	//
+	// Only time and size are told: who changed a file is not.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/versions (the `ListVersions` operationId).
+	ListVersions(ctx context.Context, share ShareName, params *ListVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // GetInfo What the login page shows before anyone is logged in.
@@ -1329,6 +1419,8 @@ func (c *Client) GetArchive(ctx context.Context, share ShareName, ticket string,
 // video, audio, PDF and plain text itself; anything else — HTML and SVG
 // included — is sent as an attachment regardless.
 //
+// With `at`, the file as the snapshot holds it (`At`).
+//
 // Corresponds with GET /api/v1/shares/{share}/content (the `GetContent` operationId).
 func (c *Client) GetContent(ctx context.Context, share ShareName, params *GetContentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetContentRequest(c.Server, share, params)
@@ -1404,6 +1496,8 @@ func (c *Client) DeleteEntry(ctx context.Context, share ShareName, params *Delet
 // A folder with more entries than the deployment shows
 // (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
 // number.
+//
+// With `at`, the folder as the snapshot holds it (`At`).
 //
 // Corresponds with GET /api/v1/shares/{share}/entries (the `ListEntries` operationId).
 func (c *Client) ListEntries(ctx context.Context, share ShareName, params *ListEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1537,6 +1631,35 @@ func (c *Client) GetSpace(ctx context.Context, share ShareName, params *GetSpace
 // Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetThumbnailRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListVersions The previous versions of a file or a folder.
+//
+// What the server's snapshots hold of the path — Samba's
+// `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
+// entry for each state that differs from the one after it and from
+// the path as it is now. Each comes with the `at` that reads it
+// (`At`). A path deleted since has versions all the same; a server or
+// share without snapshots has none, which is no error.
+//
+// Looking costs one open on the share for each snapshot. When the
+// answer takes longer than ferry allows, or the snapshots are more
+// than it looks at, the newest found so far come with
+// `truncated: true`.
+//
+// Only time and size are told: who changed a file is not.
+//
+// Corresponds with GET /api/v1/shares/{share}/versions (the `ListVersions` operationId).
+func (c *Client) ListVersions(ctx context.Context, share ShareName, params *ListVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListVersionsRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1857,6 +1980,18 @@ func NewGetContentRequest(server string, share ShareName, params *GetContentPara
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
 
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Disposition != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "disposition", *params.Disposition, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
@@ -2104,6 +2239,18 @@ func NewListEntriesRequest(server string, share ShareName, params *ListEntriesPa
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
 
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Path != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
@@ -2254,6 +2401,18 @@ func NewGetMetadataRequest(server string, share ShareName, params *GetMetadataPa
 		if params.V != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "v", *params.V, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -2457,9 +2616,82 @@ func NewGetThumbnailRequest(server string, share ShareName, params *GetThumbnail
 
 		}
 
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Size != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "size", *params.Size, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListVersionsRequest constructs an http.Request for the ListVersions method
+func NewListVersionsRequest(server string, share ShareName, params *ListVersionsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/versions"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -2647,6 +2879,8 @@ type ClientWithResponsesInterface interface {
 	// video, audio, PDF and plain text itself; anything else — HTML and SVG
 	// included — is sent as an attachment regardless.
 	//
+	// With `at`, the file as the snapshot holds it (`At`).
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/shares/{share}/content (the `GetContent` operationId).
@@ -2696,6 +2930,8 @@ type ClientWithResponsesInterface interface {
 	// A folder with more entries than the deployment shows
 	// (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
 	// number.
+	//
+	// With `at`, the folder as the snapshot holds it (`At`).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2778,6 +3014,27 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnailWithResponse(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*GetThumbnailResponse, error)
+
+	// ListVersionsWithResponse The previous versions of a file or a folder.
+	//
+	// What the server's snapshots hold of the path — Samba's
+	// `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
+	// entry for each state that differs from the one after it and from
+	// the path as it is now. Each comes with the `at` that reads it
+	// (`At`). A path deleted since has versions all the same; a server or
+	// share without snapshots has none, which is no error.
+	//
+	// Looking costs one open on the share for each snapshot. When the
+	// answer takes longer than ferry allows, or the snapshots are more
+	// than it looks at, the newest found so far come with
+	// `truncated: true`.
+	//
+	// Only time and size are told: who changed a file is not.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/versions (the `ListVersions` operationId).
+	ListVersionsWithResponse(ctx context.Context, share ShareName, params *ListVersionsParams, reqEditors ...RequestEditorFn) (*ListVersionsResponse, error)
 }
 
 type GetInfoResponse struct {
@@ -3968,6 +4225,82 @@ func (r GetThumbnailResponse) ContentType() string {
 	return ""
 }
 
+type ListVersionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *VersionList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListVersionsResponse) GetJSON200() *VersionList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListVersionsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListVersionsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListVersionsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListVersionsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r ListVersionsResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r ListVersionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListVersionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListVersionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListVersionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetInfoWithResponse What the login page shows before anyone is logged in.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -4142,6 +4475,8 @@ func (c *ClientWithResponses) GetArchiveWithResponse(ctx context.Context, share 
 // video, audio, PDF and plain text itself; anything else — HTML and SVG
 // included — is sent as an attachment regardless.
 //
+// With `at`, the file as the snapshot holds it (`At`).
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/shares/{share}/content (the `GetContent` operationId).
@@ -4209,6 +4544,8 @@ func (c *ClientWithResponses) DeleteEntryWithResponse(ctx context.Context, share
 // A folder with more entries than the deployment shows
 // (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
 // number.
+//
+// With `at`, the folder as the snapshot holds it (`At`).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4332,6 +4669,33 @@ func (c *ClientWithResponses) GetThumbnailWithResponse(ctx context.Context, shar
 		return nil, err
 	}
 	return ParseGetThumbnailResponse(rsp)
+}
+
+// ListVersionsWithResponse The previous versions of a file or a folder.
+//
+// What the server's snapshots hold of the path — Samba's
+// `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
+// entry for each state that differs from the one after it and from
+// the path as it is now. Each comes with the `at` that reads it
+// (`At`). A path deleted since has versions all the same; a server or
+// share without snapshots has none, which is no error.
+//
+// Looking costs one open on the share for each snapshot. When the
+// answer takes longer than ferry allows, or the snapshots are more
+// than it looks at, the newest found so far come with
+// `truncated: true`.
+//
+// Only time and size are told: who changed a file is not.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/versions (the `ListVersions` operationId).
+func (c *ClientWithResponses) ListVersionsWithResponse(ctx context.Context, share ShareName, params *ListVersionsParams, reqEditors ...RequestEditorFn) (*ListVersionsResponse, error) {
+	rsp, err := c.ListVersions(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListVersionsResponse(rsp)
 }
 
 // ParseGetInfoResponse parses an HTTP response from a GetInfoWithResponse call
@@ -5321,6 +5685,67 @@ func ParseGetThumbnailResponse(rsp *http.Response) (*GetThumbnailResponse, error
 	return response, nil
 }
 
+// ParseListVersionsResponse parses an HTTP response from a ListVersionsWithResponse call
+func ParseListVersionsResponse(rsp *http.Response) (*ListVersionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListVersionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest VersionList
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetInfo What the login page shows before anyone is logged in.
@@ -5371,6 +5796,9 @@ type ServerInterface interface {
 	// GetThumbnail A thumbnail of an image or a recording's cover, made on the fly.
 	// (GET /api/v1/shares/{share}/thumbnail)
 	GetThumbnail(w http.ResponseWriter, r *http.Request, share ShareName, params GetThumbnailParams)
+	// ListVersions The previous versions of a file or a folder.
+	// (GET /api/v1/shares/{share}/versions)
+	ListVersions(w http.ResponseWriter, r *http.Request, share ShareName, params ListVersionsParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -5621,6 +6049,19 @@ func (siw *ServerInterfaceWrapper) GetContent(w http.ResponseWriter, r *http.Req
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetContentParams
 
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "disposition" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "disposition", r.URL.Query(), &params.Disposition, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -5836,6 +6277,19 @@ func (siw *ServerInterfaceWrapper) ListEntries(w http.ResponseWriter, r *http.Re
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListEntriesParams
 
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "path" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -5967,6 +6421,19 @@ func (siw *ServerInterfaceWrapper) GetMetadata(w http.ResponseWriter, r *http.Re
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "v"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "v", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
 		}
 		return
 	}
@@ -6122,6 +6589,19 @@ func (siw *ServerInterfaceWrapper) GetThumbnail(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "size" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "size", r.URL.Query(), &params.Size, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
@@ -6137,6 +6617,48 @@ func (siw *ServerInterfaceWrapper) GetThumbnail(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetThumbnail(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListVersions operation middleware
+func (siw *ServerInterfaceWrapper) ListVersions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListVersionsParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListVersions(w, r, share, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6278,6 +6800,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/shares/{share}/content", wrapper.PutContent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/metadata", wrapper.GetMetadata)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/thumbnail", wrapper.GetThumbnail)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/versions", wrapper.ListVersions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/archive", wrapper.CreateArchive)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/archive/{ticket}", wrapper.GetArchive)

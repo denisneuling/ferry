@@ -181,6 +181,8 @@ paths:
       operationId: listEntries
       tags: [files]
       summary: The entries of a folder.
+      parameters:
+        - $ref: "#/components/parameters/At"
       description: |
         The entries come unsorted, in the order the server lists them, and
         are written out as they are read, a few hundred at a time: a large
@@ -200,6 +202,8 @@ paths:
         A folder with more entries than the deployment shows
         (`FERRY_MAX_LISTING`) is `too_large`, with `limit` set to that
         number.
+
+        With `at`, the folder as the snapshot holds it (`At`).
       responses:
         "200":
           description: The folder's entries, unsorted.
@@ -259,7 +263,10 @@ paths:
         nosniff`. With `disposition=inline` the browser may show images,
         video, audio, PDF and plain text itself; anything else — HTML and SVG
         included — is sent as an attachment regardless.
+
+        With `at`, the file as the snapshot holds it (`At`).
       parameters:
+        - $ref: "#/components/parameters/At"
         - name: disposition
           in: query
           required: false
@@ -348,6 +355,7 @@ paths:
         - $ref: "#/components/parameters/ShareName"
         - $ref: "#/components/parameters/EntryPath"
         - $ref: "#/components/parameters/FileVersion"
+        - $ref: "#/components/parameters/At"
       responses:
         "200":
           description: What the file says.
@@ -388,6 +396,7 @@ paths:
         - $ref: "#/components/parameters/ShareName"
         - $ref: "#/components/parameters/EntryPath"
         - $ref: "#/components/parameters/FileVersion"
+        - $ref: "#/components/parameters/At"
         - name: size
           in: query
           required: false
@@ -421,6 +430,40 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/v1/shares/{share}/versions:
+    get:
+      operationId: listVersions
+      tags: [files]
+      summary: The previous versions of a file or a folder.
+      description: |
+        What the server's snapshots hold of the path — Samba's
+        `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
+        entry for each state that differs from the one after it and from
+        the path as it is now. Each comes with the `at` that reads it
+        (`At`). A path deleted since has versions all the same; a server or
+        share without snapshots has none, which is no error.
+
+        Looking costs one open on the share for each snapshot. When the
+        answer takes longer than ferry allows, or the snapshots are more
+        than it looks at, the newest found so far come with
+        `truncated: true`.
+
+        Only time and size are told: who changed a file is not.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+      responses:
+        "200":
+          description: The versions, newest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VersionList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
 
   /api/v1/shares/{share}/folders:
     post:
@@ -571,6 +614,22 @@ components:
         the listing — the answer is the current file's, revalidated as
         without `v`. Never an error.
       schema: { type: string, maxLength: 64 }
+    At:
+      name: at
+      in: query
+      required: false
+      description: |
+        A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+        in UTC and exactly so: the path is read as that snapshot holds it,
+        never written. Asked for under the person's own session, so the
+        server decides as for the path now. A time that is no snapshot of
+        the path is `404`; a request that would change something and
+        carries `at` is `400` (`version_read_only`). A time is never part of
+        the path.
+      schema:
+        type: string
+        pattern: '^@GMT-[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{2}\.[0-9]{2}\.[0-9]{2}$'
+        maxLength: 24
     FerryRequest:
       name: X-Ferry-Request
       in: header
@@ -580,7 +639,7 @@ components:
 
   responses:
     BadRequest:
-      description: The request is not valid (`invalid_request`, `invalid_path`, `missing_ferry_request`).
+      description: The request is not valid (`invalid_request`, `invalid_path`, `missing_ferry_request`, `version_read_only`).
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -646,7 +705,7 @@ components:
           type: string
           description: |
             Stable, machine-readable: `invalid_request`, `invalid_path`,
-            `missing_ferry_request`, `unauthenticated`, `login_failed`,
+            `missing_ferry_request`, `version_read_only`, `unauthenticated`, `login_failed`,
             `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
             `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
             `range_not_satisfiable`, `server_unreachable`, `session_lost`,
@@ -755,6 +814,30 @@ components:
             Changes whenever the file's size or modification time does. Opaque:
             pass it as `v` to the thumbnail and the details, so that the
             browser keeps them until the file changes.
+    Version:
+      type: object
+      required: [at, type, size, modified, version]
+      properties:
+        at:
+          type: string
+          description: The snapshot's time, to pass as `at`; UTC.
+          example: "@GMT-2026.11.23-15.00.09"
+        type: { $ref: "#/components/schemas/EntryType" }
+        size: { type: integer, format: int64, description: "Bytes; 0 for folders." }
+        modified: { type: string, format: date-time }
+        version:
+          type: string
+          description: As `Entry.version`, for `v` together with `at`.
+    VersionList:
+      type: object
+      required: [versions, truncated]
+      properties:
+        versions:
+          type: array
+          items: { $ref: "#/components/schemas/Version" }
+        truncated:
+          type: boolean
+          description: More snapshots than were looked at, in the time allowed or the bound.
     FileMetadata:
       type: object
       required: [kind]

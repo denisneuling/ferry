@@ -129,19 +129,23 @@ func (a *API) GetContent(w http.ResponseWriter, r *http.Request, share v1.ShareN
 	if !ok {
 		return
 	}
+	at, ok := atParam(w, params.At)
+	if !ok {
+		return
+	}
 	// Opening is bounded by the request timeout; the copy afterwards only by
 	// the stall timeout, since a large file legitimately takes long. One
 	// watchdog does both (watchdog.go).
 	wd := newWatchdog(r.Context(), a.cfg.RequestTimeout)
 	defer wd.stop()
-	f, err := conn.Open(wd.ctx, share, p)
+	f, err := openFile(wd.ctx, conn, share, p, at)
 	if err != nil {
 		a.fail(w, r, err)
 		return
 	}
 	defer func() { _ = f.Close() }()
 
-	tag := etag(f.Size, f.ModTime)
+	tag := atTag(etag(f.Size, f.ModTime), at)
 	name := path.Base("/" + p)
 	ctype, inline := contentType(name, params.Disposition != nil && *params.Disposition == v1.GetContentParamsDispositionInline)
 	kind := "attachment"
