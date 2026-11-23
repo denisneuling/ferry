@@ -141,6 +141,15 @@ is replaced only after asking. An upload that fails or is cancelled leaves
 nothing on the share: ferry writes to a temporary name and renames it only
 once the file is complete.
 
+**Folder** uploads a folder with everything in it, as does dropping a
+folder: its folders are made first — one that is there already is used as
+it is — then its files are uploaded into them. One upload takes as many
+files as a ZIP may hold (`FERRY_MAX_ARCHIVE`), 32 levels deep.
+
+Entries dragged within the page are moved where they are dropped: onto a
+folder, or onto a part of the path above the folder's title. Copies made
+by the server show in the same panel, with their progress.
+
 ## Previews
 
 Images, video, audio and PDF are shown by the browser itself, straight from

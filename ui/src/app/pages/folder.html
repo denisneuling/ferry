@@ -4,10 +4,28 @@
       <a routerLink="/" i18n="@@shares">Shares</a>
       @if (browser.path()) {
         <f-icon name="right" [size]="14" />
-        <button type="button" (click)="go('')">{{ browser.share() }}</button>
+        <button
+          type="button"
+          (click)="go('')"
+          (dragover)="dragOverPath('', $event)"
+          (dragleave)="dropTarget.set(null)"
+          (drop)="dropOnPath('', $event)"
+          [class.drop]="dropTarget() === ''"
+        >
+          {{ browser.share() }}
+        </button>
         @for (c of crumbs(); track c.path) {
           <f-icon name="right" [size]="14" />
-          <button type="button" (click)="go(c.path)">{{ c.name }}</button>
+          <button
+            type="button"
+            (click)="go(c.path)"
+            (dragover)="dragOverPath(c.path, $event)"
+            (dragleave)="dropTarget.set(null)"
+            (drop)="dropOnPath(c.path, $event)"
+            [class.drop]="dropTarget() === c.path"
+          >
+            {{ c.name }}
+          </button>
         }
       }
     </nav>
@@ -96,6 +114,16 @@
         <f-icon name="upload" [size]="17" /><ng-container i18n="@@upload">Upload</ng-container>
       </button>
       <input #picker type="file" multiple hidden (change)="picked(picker)" />
+      <button
+        class="btn"
+        type="button"
+        (click)="folderInput.click()"
+        title="Upload a folder with everything in it"
+        i18n-title="@@uploadFolder.title"
+      >
+        <f-icon name="folderPlus" [size]="17" /><ng-container i18n="@@uploadFolder">Folder</ng-container>
+      </button>
+      <input #folderInput type="file" webkitdirectory hidden (change)="pickedFolder(folderInput)" />
     }
   </div>
 </header>
@@ -240,6 +268,13 @@
             [attr.aria-pressed]="selecting() ? browser.selected().has(e.name) : null"
             (click)="click(e, $event)"
             (contextmenu)="contextMenu(e, $event)"
+            [attr.draggable]="snapshot.at() ? null : 'true'"
+            (dragstart)="dragStart(e, $event)"
+            (dragend)="dragEnd()"
+            (dragover)="dragOverPath(e, $event)"
+            (dragleave)="dropTarget.set(null)"
+            (drop)="dropOnPath(e, $event)"
+            [class.drop]="dropTarget() === e.path"
             (pointerdown)="pointerDown(e, $event)"
             (pointerup)="pointerEnd()"
             (pointercancel)="pointerEnd()"
@@ -273,6 +308,13 @@
             [attr.aria-pressed]="selecting() ? browser.selected().has(e.name) : null"
             (click)="click(e, $event)"
             (contextmenu)="contextMenu(e, $event)"
+            [attr.draggable]="snapshot.at() ? null : 'true'"
+            (dragstart)="dragStart(e, $event)"
+            (dragend)="dragEnd()"
+            (dragover)="dragOverPath(e, $event)"
+            (dragleave)="dropTarget.set(null)"
+            (drop)="dropOnPath(e, $event)"
+            [class.drop]="dropTarget() === e.path"
             (pointerdown)="pointerDown(e, $event)"
             (pointerup)="pointerEnd()"
             (pointercancel)="pointerEnd()"
@@ -354,6 +396,13 @@
             [class.is-sel]="browser.selected().has(e.name)"
             (click)="click(e, $event)"
             (contextmenu)="contextMenu(e, $event)"
+            [attr.draggable]="snapshot.at() ? null : 'true'"
+            (dragstart)="dragStart(e, $event)"
+            (dragend)="dragEnd()"
+            (dragover)="dragOverPath(e, $event)"
+            (dragleave)="dropTarget.set(null)"
+            (drop)="dropOnPath(e, $event)"
+            [class.drop]="dropTarget() === e.path"
             (dblclick)="open(e)"
             (pointerdown)="pointerDown(e, $event)"
             (pointerup)="pointerEnd()"

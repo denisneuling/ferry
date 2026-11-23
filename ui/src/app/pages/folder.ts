@@ -20,11 +20,40 @@ import { hasThumbnail, kindIcon, kindOf } from '../core/kinds';
 import { Prefs } from '../core/prefs';
 import { Search } from '../core/search';
 import { Snapshot, isToken, tokenTime } from '../core/snapshot';
-import { Transfers } from '../core/transfers';
+import { MAX_TREE_FILES, TreeFile, Transfers } from '../core/transfers';
+import { Session } from '../core/session';
 import { Icon } from '../ui/icon';
 import { Menu, MenuItem } from '../ui/menu';
 import { Space } from '../ui/space';
 import { Versions } from '../ui/versions';
+
+/** The type a drag within the page carries; a drag from the desktop has Files instead. */
+const DRAG_TYPE = 'application/x-ferry-entries';
+
+/**
+ * The files of what was dropped, folders walked, each with its path below
+ * the drop; more than max stops the walk, and the upload refuses it.
+ */
+async function walkDropped(entries: FileSystemEntry[], max: number): Promise<TreeFile[]> {
+  const out: TreeFile[] = [];
+  const walk = async (e: FileSystemEntry, rel: string, depth: number): Promise<void> => {
+    if (out.length > max || depth > 32) return;
+    if (e.isFile) {
+      const file = await new Promise<File>((ok, fail) => (e as FileSystemFileEntry).file(ok, fail));
+      out.push({ rel, file });
+      return;
+    }
+    const reader = (e as FileSystemDirectoryEntry).createReader();
+    for (;;) {
+      // readEntries answers in batches until it answers none.
+      const batch = await new Promise<FileSystemEntry[]>((ok, fail) => reader.readEntries(ok, fail));
+      if (!batch.length) return;
+      for (const child of batch) await walk(child, `${rel}/${child.name}`, depth + 1);
+    }
+  };
+  for (const e of entries) await walk(e, e.name, 0);
+  return out;
+}
 
 /** Entries rendered at once, and added each time the end comes near. */
 const PAGE = 600;
@@ -54,6 +83,7 @@ export class Folder {
   protected readonly actions = inject(Actions);
   private readonly api = inject(Api);
   private readonly transfers = inject(Transfers);
+  private readonly session = inject(Session);
   private readonly versions = inject(Versions);
   /** The search below this folder, while the field asks for one. */
   protected readonly finder = inject(Search);
@@ -74,6 +104,10 @@ export class Folder {
   private readonly search = viewChild<ElementRef<HTMLInputElement>>('search');
 
   protected readonly dragging = signal(false);
+  /** Entries dragged within the page, to be moved where they are dropped. */
+  private dragged: Entry[] | null = null;
+  /** The folder a drag hovers over, by path. */
+  protected readonly dropTarget = signal<string | null>(null);
   private dragDepth = 0;
   protected readonly menu = signal<{ x: number; y: number; items: MenuItem[] } | null>(null);
   /** Thumbnails the server could not make: shown as icons instead. */
@@ -264,6 +298,64 @@ export class Folder {
     input.value = '';
   }
 
+  /** A folder picked to upload, with everything in it. */
+  protected pickedFolder(input: HTMLInputElement): void {
+    const share = this.browser.share();
+    if (share && input.files?.length && !this.snapshot.at()) {
+      const items: TreeFile[] = Array.from(input.files).map((file) => ({
+        rel: file.webkitRelativePath || file.name,
+        file,
+      }));
+      void this.transfers.addTree(share, this.browser.path(), items, this.maxTree());
+    }
+    input.value = '';
+  }
+
+  private maxTree(): number {
+    return this.session.info()?.limits?.archive ?? MAX_TREE_FILES;
+  }
+
+  // ── Moving by dragging within the page ───────────────────────────────────
+
+  protected dragStart(e: Entry, ev: DragEvent): void {
+    if (this.snapshot.at() || !ev.dataTransfer) return;
+    if (!this.browser.selected().has(e.name)) this.browser.only(e.name);
+    this.dragged = this.browser.selection();
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData(DRAG_TYPE, this.dragged.map((d) => d.path).join('\n'));
+  }
+
+  protected dragEnd(): void {
+    this.dragged = null;
+    this.dropTarget.set(null);
+  }
+
+  /** Whether what is dragged may go into the folder at path: not into itself, nor below. */
+  private canDrop(path: string): boolean {
+    const d = this.dragged;
+    if (!d?.length || path === this.browser.path()) return false;
+    return !d.some((x) => x.path === path || path.startsWith(x.path + '/'));
+  }
+
+  protected dragOverPath(target: Entry | string, ev: DragEvent): void {
+    const path = typeof target === 'string' ? target : target.type === 'folder' ? target.path : null;
+    if (path === null || !this.canDrop(path)) return;
+    ev.preventDefault();
+    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+    this.dropTarget.set(path);
+  }
+
+  protected dropOnPath(target: Entry | string, ev: DragEvent): void {
+    const path = typeof target === 'string' ? target : target.type === 'folder' ? target.path : null;
+    this.dropTarget.set(null);
+    if (path === null || !this.canDrop(path)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const moving = this.dragged ?? [];
+    this.dragged = null;
+    void this.actions.moveTo(moving, path);
+  }
+
   private upload(files: FileList): void {
     const share = this.browser.share();
     if (share && !this.snapshot.at()) {
@@ -440,6 +532,21 @@ export class Folder {
     ev.preventDefault();
     this.dragDepth = 0;
     this.dragging.set(false);
-    if (ev.dataTransfer?.files.length) this.upload(ev.dataTransfer.files);
+    const dt = ev.dataTransfer;
+    if (!dt) return;
+    // Folders dropped come as entries to walk; plain files as files.
+    const entries = Array.from(dt.items ?? [])
+      .map((i) => (i.kind === 'file' ? i.webkitGetAsEntry?.() : null))
+      .filter((e): e is FileSystemEntry => !!e);
+    const share = this.browser.share();
+    if (share && entries.some((e) => e.isDirectory)) {
+      const max = this.maxTree();
+      void walkDropped(entries, max).then(
+        (items) => this.transfers.addTree(share, this.browser.path(), items, max),
+        () => undefined,
+      );
+    } else if (dt.files.length) {
+      this.upload(dt.files);
+    }
   }
 }

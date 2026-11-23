@@ -3,7 +3,7 @@ import { Format } from '../core/format';
 import { Job, Transfers } from '../core/transfers';
 import { Icon } from '../ui/icon';
 
-/** The uploads, bottom right: what runs, how far, what failed. */
+/** Uploads and copies, bottom right: what runs, how far, what failed. */
 @Component({
   selector: 'f-transfers',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -14,12 +14,12 @@ import { Icon } from '../ui/icon';
         <f-icon [name]="t.running() ? 'upload' : 'check'" />
         <span aria-live="polite">
           @if (t.running()) {
-            <ng-container i18n="@@tr.running">{t.running(), plural,
-              =1 {1 upload running}
-              other {{{ t.running() }} uploads running}
+            <ng-container i18n="@@tr.active">{t.running(), plural,
+              =1 {1 transfer running}
+              other {{{ t.running() }} transfers running}
             }</ng-container>
           } @else {
-            <ng-container i18n="@@tr.done">Uploads finished</ng-container>
+            <ng-container i18n="@@tr.finished">Transfers finished</ng-container>
           }
         </span>
         @if (!t.running()) {

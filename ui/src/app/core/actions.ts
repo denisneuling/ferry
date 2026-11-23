@@ -7,6 +7,7 @@ import { Session } from './session';
 import { Dialogs, checkName } from '../ui/dialog';
 import { Toasts } from '../ui/toast';
 import { FolderPicker } from '../ui/folder-picker';
+import { CopyJob, Transfers } from './transfers';
 
 /**
  * What can be done to entries of the open folder. Each action asks what it
@@ -20,6 +21,7 @@ export class Actions {
   private readonly dialogs = inject(Dialogs);
   private readonly toasts = inject(Toasts);
   private readonly picker = inject(FolderPicker);
+  private readonly transfers = inject(Transfers);
   private readonly session = inject(Session);
   private readonly format = inject(Format);
 
@@ -122,7 +124,14 @@ export class Actions {
       entries.filter((e) => e.type === 'folder').map((e) => e.path),
       entries.length,
     );
-    if (dest === null || dest === this.browser.path()) return;
+    if (dest === null) return;
+    await this.moveTo(entries, dest);
+  }
+
+  /** Moves entries into a folder: what the picker chose, or where they were dropped. */
+  async moveTo(entries: Entry[], dest: string): Promise<void> {
+    const share = this.browser.share();
+    if (share === null || !entries.length || dest === this.browser.path()) return;
     let moved = 0;
     const failures: string[] = [];
     for (const e of entries) {
@@ -198,17 +207,30 @@ export class Actions {
     at: string | null,
     name: string,
   ): Promise<boolean> {
-    this.toasts.show($localize`:@@copy.started:Copying ${name}:name:…`);
+    const dir = parent(to);
+    const where = dir ? dir.slice(dir.lastIndexOf('/') + 1) : share;
+    let job: CopyJob | null = null;
     try {
-      const r = await this.api.copy(share, from, to, { at }, () => undefined);
+      const r = await this.api.copy(share, from, to, { at }, (p) => {
+        job ??= this.transfers.trackCopy(share, dir, to.slice(to.lastIndexOf('/') + 1), where, p.totalBytes);
+        job.progress(p.bytes);
+      });
+      job ??= this.transfers.trackCopy(
+        share,
+        dir,
+        to.slice(to.lastIndexOf('/') + 1),
+        where,
+        r.progress.totalBytes,
+      );
       if (r.entry) {
+        job.finish();
         this.toasts.show($localize`:@@copy.done:Copied: ${r.entry.name}:name:`);
         return true;
       }
       const p = r.progress;
-      this.toasts.error(
-        $localize`:@@copy.partly:${name}:name: stopped after ${this.format.count(p.files)}:done: of ${this.format.count(p.totalFiles)}:total: items: ${describe(r.error)}:why:`,
-      );
+      const why = $localize`:@@copy.partly:${name}:name: stopped after ${this.format.count(p.files)}:done: of ${this.format.count(p.totalFiles)}:total: items: ${describe(r.error)}:why:`;
+      job.finish(why);
+      this.toasts.error(why);
     } catch (err) {
       this.toasts.error(`${name}: ${describe(err)}`);
     }

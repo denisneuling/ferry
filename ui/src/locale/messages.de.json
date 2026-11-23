@@ -145,8 +145,6 @@
     "menu": "Menü",
     "toast.loggedOut": "Abgemeldet. Die SMB-Sitzung ist beendet.",
     "tr.label": "Uploads",
-    "tr.running": "{VAR_PLURAL, plural, =1 {1 Upload läuft} other {{INTERPOLATION} Uploads laufen}}",
-    "tr.done": "Uploads fertig",
     "close": "Schließen",
     "tr.toggle": "Ein- oder ausblenden",
     "tr.skipped": "Übersprungen: Eine Datei mit diesem Namen ist schon da.",
@@ -219,7 +217,6 @@
     "search.noneText": "Kein Name hier oder darunter enthält „{$INTERPOLATION}“.",
     "copy.suffix": "Kopie",
     "restore.suffix": "Version {$when}",
-    "copy.started": "{$name} wird kopiert …",
     "copy.done": "Kopiert: {$name}",
     "copy.partly": "{$name} abgebrochen nach {$done} von {$total} Einträgen: {$why}",
     "act.copy": "Kopieren nach …",
@@ -227,6 +224,11 @@
     "picker.copyN": "{$INTERPOLATION} Einträge kopieren nach …",
     "picker.copyHere": "Hierher kopieren",
     "versions.restoreTitle": "Als Kopie daneben wiederherstellen",
-    "versions.restore": "Als Kopie wiederherstellen"
+    "versions.restore": "Als Kopie wiederherstellen",
+    "upload.treeTooMany": "{$n} Dateien sind mehr, als ein Hochladen annimmt ({$max}). Lade den Ordner in Teilen hoch.",
+    "uploadFolder.title": "Einen Ordner mit allem darin hochladen",
+    "uploadFolder": "Ordner",
+    "tr.active": "{VAR_PLURAL, plural, =1 {1 Übertragung läuft} other {{INTERPOLATION} Übertragungen laufen}}",
+    "tr.finished": "Übertragungen fertig"
   }
 }

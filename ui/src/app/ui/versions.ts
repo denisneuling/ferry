@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   Injectable,
+  LOCALE_ID,
   effect,
   inject,
   signal,
@@ -111,6 +112,7 @@ export class VersionsHost {
   private readonly api = inject(Api);
   private readonly router = inject(Router);
   private readonly actions = inject(Actions);
+  private readonly locale = inject(LOCALE_ID);
   protected readonly list = signal<Version[] | null>(null);
   protected readonly truncated = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -156,18 +158,7 @@ export class VersionsHost {
   protected restore(of: VersionsOf, v: Version): void {
     this.versions.close();
     const t = tokenTime(v.at);
-    const when = t
-      ? t
-          .toLocaleString(undefined, {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-          .replace(/[/:]/g, '.')
-          .replace(',', '')
-      : v.at;
+    const when = t ? fileTime(t, this.locale) : v.at;
     void this.actions.restore(of.share, of.path, v.at, when);
   }
 
@@ -178,4 +169,23 @@ export class VersionsHost {
     if (of.path) queryParams['path'] = of.path;
     void this.router.navigate(['/browse', of.share], { queryParams });
   }
+}
+
+/**
+ * A moment as part of a file name, in the interface's language and the
+ * person's clock, 24-hour, without characters a file name should not have:
+ * "21.11.2026 04.00" in German, "11.21.2026 04.00" in English.
+ */
+export function fileTime(t: Date, locale: string): string {
+  return t
+    .toLocaleString(locale, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+    .replace(/[/:]/g, '.')
+    .replace(',', '');
 }

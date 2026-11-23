@@ -1945,3 +1945,12 @@ a {
   white-space: nowrap;
   max-width: 45%;
 }
+
+/* A folder, or a crumb, that what is dragged would be moved into. */
+.folder.drop,
+.row.drop,
+.crumbs button.drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+  background: var(--accent-wash);
+}
