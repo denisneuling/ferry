@@ -259,6 +259,7 @@
     "zip.count": "{VAR_PLURAL, plural, =1 {1 Datei} other {{INTERPOLATION} Dateien}}",
     "zip.open": "Öffnen",
     "zip.download": "Herunterladen",
-    "zip.unreadable": "verschlüsselt oder so gepackt, dass ferry es nicht entpackt"
+    "zip.unreadable": "verschlüsselt oder so gepackt, dass ferry es nicht entpackt",
+    "pv.tableMore": "… Der Rest der Tabelle wird nicht gezeigt; lade sie herunter, um alles zu sehen."
   }
 }

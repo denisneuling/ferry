@@ -152,6 +152,7 @@
     "edit.open": "Edit",
     "pv.details": "Details (i)",
     "pv.close": "Close (Esc)",
+    "pv.tableMore": " … The rest of the table is not shown; download it to see it all. ",
     "zip.count": "{VAR_PLURAL, plural, =1 {1 file} other {{INTERPOLATION} files}}",
     "zip.open": "Open",
     "zip.download": "Download",

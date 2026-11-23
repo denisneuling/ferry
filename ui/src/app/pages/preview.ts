@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Api, Entry, ZipEntry } from '../core/api';
+import { parseTable } from '../core/csv';
 import { Actions } from '../core/actions';
 import { Browser } from '../core/browser';
 import { describe } from '../core/errors';
@@ -124,6 +125,28 @@ import { MAX_EDIT_BYTES } from '../core/text-file';
           }
           @case ('pdf') {
             <iframe [src]="frameUrl()" [title]="e.name"></iframe>
+          }
+          @case ('table') {
+            <div class="textview tableview" [class.loading]="text() === null">
+              @if (text() === null) {
+                <ng-container i18n="@@loading">Loading…</ng-container>
+              } @else if (table(); as tb) {
+                <table class="csv">
+                  @for (row of tb.rows; track $index) {
+                    <tr>
+                      @for (cell of row; track $index) {
+                        <td>{{ cell }}</td>
+                      }
+                    </tr>
+                  }
+                </table>
+                @if (tb.more || truncated()) {
+                  <p i18n="@@pv.tableMore">
+                    … The rest of the table is not shown; download it to see it all.
+                  </p>
+                }
+              }
+            </div>
           }
           @case ('archive') {
             <div class="textview zipview" [class.loading]="zipEntries() === null">
@@ -328,6 +351,12 @@ export class Preview {
     return this.api.thumbnailUrl(share, e.path, 640, e.version);
   });
   protected readonly text = signal<string | null>(null);
+  /** A CSV's or TSV's first rows, as cells: text, shown as text. */
+  protected readonly table = computed(() => {
+    const t = this.text();
+    const e = this.entry();
+    return t === null || !e ? null : parseTable(t, e.name.toLowerCase().endsWith('.tsv'));
+  });
   /** A ZIP's entries, for the preview; folders are left out, their files carry the path. */
   protected readonly zipEntries = signal<ZipEntry[] | null>(null);
   protected readonly zipError = signal<string | null>(null);
@@ -360,7 +389,7 @@ export class Preview {
           (err) => this.entry() === e && this.text.set(describe(err)),
         );
       }
-      if (e && share && previewKind(e.name) === 'text') {
+      if (e && share && (previewKind(e.name) === 'text' || previewKind(e.name) === 'table')) {
         this.api.text(share, e.path).then(
           (r) => {
             if (this.entry() === e) {

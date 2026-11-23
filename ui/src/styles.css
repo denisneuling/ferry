@@ -2082,3 +2082,23 @@ body.fx-playing .transfers {
 .zip-list .btn {
   text-decoration: none;
 }
+
+/* A CSV's or TSV's first rows in the preview. */
+.tableview {
+  white-space: normal;
+  overflow: auto;
+}
+table.csv {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+table.csv td {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  white-space: pre-wrap;
+  vertical-align: top;
+}
+table.csv tr:first-child td {
+  font-weight: 600;
+  background: var(--sunk);
+}

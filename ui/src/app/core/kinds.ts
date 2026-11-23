@@ -120,7 +120,7 @@ export function hasThumbnail(name: string): boolean {
  * Safari), shown as the server's 640-pixel thumbnail.
  */
 export type PreviewKind =
-  'image' | 'video' | 'audio' | 'pdf' | 'text' | 'document' | 'archive' | 'derived' | 'none';
+  'image' | 'video' | 'audio' | 'pdf' | 'text' | 'document' | 'archive' | 'table' | 'derived' | 'none';
 
 const browserImages = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif']);
 const browserVideo = new Set(['mp4', 'm4v', 'webm', 'mov', 'ogv']);
@@ -134,6 +134,8 @@ export function previewKind(name: string): PreviewKind {
   if (ext === 'pdf') return 'pdf';
   // A Word or OpenDocument text: its plain text, read by the server.
   if (ext === 'docx' || ext === 'odt') return 'document';
+  // CSV and TSV: a table of their first rows.
+  if (ext === 'csv' || ext === 'tsv') return 'table';
   // A ZIP: what it holds, each entry to open or download.
   if (ext === 'zip') return 'archive';
   if ((ext === 'heic' || ext === 'heif') && previewed().has(ext)) return 'derived';

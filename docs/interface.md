@@ -166,7 +166,9 @@ for it: OpenDocument files (`.odt`, `.ods`, `.odp`) nearly always, Office
 files (`.docx`, `.xlsx`, `.pptx`) when they were saved with one, an EPUB
 its cover; the rest an icon. A Word or OpenDocument text shows its plain
 text in the preview — the paragraphs, no formatting, nothing of the
-document that could run. A ZIP archive shows what it holds: each file
+document that could run. A CSV or TSV file shows as a table of its first
+1000 rows — commas, the semicolons a German spreadsheet writes, or tabs —
+its cells as text. A ZIP archive shows what it holds: each file
 with its size, to open in a new tab or to download on its own, unpacked
 as it is sent — nothing is unpacked onto the share. Entries that are
 encrypted, or packed otherwise than ZIP's usual way, are listed but not
