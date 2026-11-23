@@ -45,7 +45,10 @@ ship it, on with `make dev-nas DEV_NAS_ABSE=yes`.
   exposure and a lens; every third photo has a GPS position out on the
   Baltic Sea, where nobody lives.
 - **Documents:** valid multi-page PDFs with a title in their info
-  dictionary, Markdown, plain text, a CSV.
+  dictionary, laid out like a fictional firm's letter (a coloured
+  letterhead, text lines, a table with a total) so that their thumbnails
+  read as documents; the ones in `Scans` lie a little askew on a grey
+  scanner bed. Markdown, plain text, a CSV.
 - **Audio:** WAV files that play.
 - **Video:** `Urlaub am Meer 🌊 2025.mp4` is 1.5 GB of zeros
   (`MOCK_NAS_VIDEO_SIZE`) with a video's name: enough to stream, seek and

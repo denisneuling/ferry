@@ -166,7 +166,7 @@ func (g *gen) public() {
 func (g *gen) scans() {
 	for i := 0; i < 15; i++ {
 		d := epoch.AddDate(0, 0, -9*i)
-		g.write(fmt.Sprintf("Scans/%s Scan %02d.pdf", d.Format("2006-01-02"), i+1), pdf(fmt.Sprintf("Scan %d", i+1), 1+i%3))
+		g.write(fmt.Sprintf("Scans/%s Scan %02d.pdf", d.Format("2006-01-02"), i+1), scanPDF(fmt.Sprintf("Scan %d", i+1), 1+i%3))
 	}
 }
 
@@ -393,8 +393,30 @@ func (g *gen) screenshot(w, h int) []byte {
 	return buf.Bytes()
 }
 
-// pdf is a valid PDF with a page per page, each with its title and number.
+// pdf is a valid PDF with a page per page, laid out like a letter so that
+// its thumbnail reads as a document: a coloured letterhead, the title, text
+// lines, and on the first page a table with a total. Everything is drawn
+// with rectangles and Helvetica, and varies with the title only, so the
+// same title makes the same bytes.
 func pdf(title string, pages int) []byte {
+	return pdfDoc(title, pages, false)
+}
+
+// scanPDF is pdf on a greyish sheet, a little askew, as a scanner makes it.
+func scanPDF(title string, pages int) []byte {
+	return pdfDoc(title, pages, true)
+}
+
+// pdfAccents are the letterheads' colours, as RGB fractions.
+var pdfAccents = [][3]float64{{0.07, 0.36, 0.33}, {0.80, 0.45, 0.20}, {0.22, 0.30, 0.45}, {0.55, 0.20, 0.30}}
+
+func pdfDoc(title string, pages int, scan bool) []byte {
+	seed := int64(0)
+	for _, r := range title {
+		seed = seed*31 + int64(r)
+	}
+	rnd := rand.New(rand.NewSource(seed))
+	accent := pdfAccents[rnd.Intn(len(pdfAccents))]
 	var b bytes.Buffer
 	var offsets []int
 	obj := func(body string) {
@@ -404,16 +426,92 @@ func pdf(title string, pages int) []byte {
 	b.WriteString("%PDF-1.4\n")
 	kids := make([]string, pages)
 	for i := range kids {
-		kids[i] = fmt.Sprintf("%d 0 R", 4+2*i)
+		kids[i] = fmt.Sprintf("%d 0 R", 5+2*i)
 	}
 	obj("<< /Type /Catalog /Pages 2 0 R >>")
 	obj(fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", strings.Join(kids, " "), pages))
 	obj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+	obj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
 	for i := 0; i < pages; i++ {
-		text := fmt.Sprintf("BT /F1 28 Tf 72 720 Td (%s) Tj ET\nBT /F1 12 Tf 72 690 Td (Seite %d von %d - ein Beispieldokument des Mock-NAS) Tj ET",
-			latin1(title), i+1, pages)
-		obj(fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>", 5+2*i))
-		obj(fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(text), text))
+		var c strings.Builder
+		text := func(font string, size, x, y float64, s string) {
+			fmt.Fprintf(&c, "BT /%s %g Tf %g %g Td (%s) Tj ET\n", font, size, x, y, latin1(s))
+		}
+		rect := func(gray float64, x, y, w, h float64) {
+			fmt.Fprintf(&c, "%.2f g %g %g %g %g re f\n", gray, x, y, w, h)
+		}
+		lines := func(y float64, n int) float64 {
+			for j := 0; j < n; j++ {
+				w := 300 + rnd.Float64()*151
+				if j == n-1 {
+					w = 120 + rnd.Float64()*160
+				}
+				rect(0.78, 72, y, w, 5)
+				y -= 15
+			}
+			return y - 12
+		}
+		if scan {
+			// The sheet on the scanner's grey bed, a little smaller than
+			// the page and turned by up to a degree.
+			c.WriteString("0.86 g 0 0 595 842 re f\n")
+			a := (rnd.Float64() - 0.5) * 0.035
+			const k = 0.94
+			fmt.Fprintf(&c, "q %.4f %.4f %.4f %.4f %.1f %.1f cm\n", k*math.Cos(a), k*math.Sin(a), -k*math.Sin(a), k*math.Cos(a), 18+a*420, 25-a*300)
+			c.WriteString("0.99 g 0 0 595 842 re f\n")
+		}
+		fmt.Fprintf(&c, "%.2f %.2f %.2f rg 0 762 595 80 re f\n", accent[0], accent[1], accent[2])
+		c.WriteString("1 g\n")
+		text("F2", 15, 72, 795, "Muster & Partner")
+		text("F1", 9, 72, 780, "Hafenstraße 1 - 12345 Beispielstadt")
+		c.WriteString("0 g\n")
+		if i == 0 {
+			text("F1", 9, 72, 720, "Alex Beispiel - Am Kai 7 - 12345 Beispielstadt")
+			text("F2", 26, 72, 660, title)
+			text("F1", 10, 72, 640, fmt.Sprintf("Referenz %04d-%02d", 1000+rnd.Intn(9000), 1+rnd.Intn(12)))
+			y := lines(605, 3+rnd.Intn(3))
+			// The table: a header in the letterhead's colour, striped rows
+			// and a total.
+			fmt.Fprintf(&c, "%.2f %.2f %.2f rg 72 %g 451 20 re f\n", accent[0], accent[1], accent[2], y)
+			c.WriteString("1 g\n")
+			text("F2", 10, 80, y+6, "Position")
+			text("F2", 10, 460, y+6, "Betrag")
+			c.WriteString("0 g\n")
+			total := 0
+			rows := 3 + rnd.Intn(4)
+			for j := 0; j < rows; j++ {
+				y -= 20
+				if j%2 == 0 {
+					rect(0.94, 72, y, 451, 20)
+				}
+				c.WriteString("0 g\n")
+				amount := 500 + rnd.Intn(25000)
+				total += amount
+				rect(0.55, 80, y+7, 120+rnd.Float64()*120, 5)
+				c.WriteString("0 g\n")
+				text("F1", 10, 460, y+6, fmt.Sprintf("%d,%02d EUR", amount/100, amount%100))
+			}
+			y -= 26
+			rect(0.2, 300, y+20, 223, 1)
+			c.WriteString("0 g\n")
+			text("F2", 11, 380, y+6, "Summe")
+			text("F2", 11, 460, y+6, fmt.Sprintf("%d,%02d EUR", total/100, total%100))
+			lines(y-40, 2+rnd.Intn(3))
+		} else {
+			y := 700.0
+			for y > 140 {
+				y = lines(y, 3+rnd.Intn(5))
+			}
+		}
+		rect(0.8, 72, 60, 451, 0.7)
+		c.WriteString("0.4 g\n")
+		text("F1", 8, 72, 46, fmt.Sprintf("%s - Seite %d von %d - ein Beispieldokument des Mock-NAS", title, i+1, pages))
+		if scan {
+			c.WriteString("Q\n")
+		}
+		body := c.String()
+		obj(fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents %d 0 R >>", 6+2*i))
+		obj(fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(body), body))
 	}
 	obj(fmt.Sprintf("<< /Title (%s) /Producer (ferry mock NAS) >>", latin1(title)))
 	info := len(offsets)

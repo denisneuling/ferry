@@ -63,6 +63,11 @@ def start_ferry():
     # outlive a terminate.
     binary = ROOT / "bin" / "ferry-screenshots"
     subprocess.run(["go", "build", "-o", str(binary), "./cmd/ferry"], cwd=ROOT, check=True)
+    # The previews' compiled code, as the image ships it: without it PDF
+    # tiles would show an icon instead of their first page.
+    wasm = ROOT / "bin" / "ferry-screenshots-wasm"
+    subprocess.run([str(binary), "precompile", str(wasm)], cwd=ROOT, check=True)
+    env["FERRY_WASM_DIR"] = str(wasm)
     proc = subprocess.Popen([str(binary), "serve"], cwd=ROOT, env=env)
     for _ in range(240):
         try:
@@ -144,6 +149,17 @@ class Shooter:
         save(page.screenshot(animations="disabled", caret="hide"), name or f"folder-{lang}")
         ctx.close()
 
+    def scans(self, lang):
+        """A folder of PDFs, each tile showing the first page."""
+        ctx = self.context(lang)
+        page = ctx.new_page()
+        self.login(page, lang)
+        page.goto(f"{self.base}/{lang}/browse/Scans")
+        page.wait_for_selector(".tile img")
+        settled(page)
+        save(page.screenshot(animations="disabled", caret="hide"), f"scans-{lang}")
+        ctx.close()
+
     def lightbox(self, lang, phone=False, name=None):
         ctx = self.context(lang, PHONE if phone else DESKTOP, phone=phone)
         page = ctx.new_page()
@@ -176,6 +192,7 @@ def main():
             s.shares("en")
             s.folder("en")
             s.folder("de")
+            s.scans("en")
             s.lightbox("en")
             s.lightbox("de")
             s.folder("en", dark=True, name="folder-dark-en")

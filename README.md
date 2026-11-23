@@ -112,6 +112,8 @@ SMB2/3; TLS termination (the gateway in front does it).
 | The details of a file, read from the file itself | Sign in with the NAS account |
 | ![The same folder in the dark theme.](docs/images/folder-dark-en.webp) | ![The shares as cards, each with its free space.](docs/images/shares-en.webp) |
 | Dark | The shares, with their free space |
+| ![A folder of scanned PDFs, each tile showing the document's first page.](docs/images/scans-en.webp) | |
+| PDFs show their first page | |
 
 On a phone: <a href="docs/images/phone-folder-en.webp">a folder</a> and
 <a href="docs/images/phone-lightbox-en.webp">a photo</a>; in German:
