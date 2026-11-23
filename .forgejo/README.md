@@ -6,7 +6,7 @@ learned about this Forgejo instance in one repository applies to the others.
 
 | workflow | runs on | does |
 |---|---|---|
-| `ci.yml` | pull requests, and pushes to develop | secret scan, lint (with the generated API code and the OpenAPI spec), the interface's lint, i18n check, tests and build, chart lint, render and docs, tests with the race detector against a Samba the job starts |
+| `ci.yml` | pull requests, and pushes to develop | secret scan, lint (with the generated API code and the OpenAPI spec), the interface's lint, i18n check, tests and build, chart lint, render and docs, tests with the race detector against a Samba the job starts, every fuzz target for 45 s (`make fuzz`) |
 | `main.yml` | pushes to main | the checks again, the image from the commit, semantic-release |
 | `release.yml` | a `v*` tag, and `workflow_dispatch` | validate the tag, test, the tagged image, the Forgejo release, binaries with SHA256SUMS, the chart; nothing for `v0.0.0` |
 
@@ -19,7 +19,7 @@ follow are added with them, from websearch's workflows:
 A cheap check gates an expensive one:
 
     ci.yml       secret-scan ─┐
-                 lint ────────┴─> test, ui, helm
+                 lint ────────┴─> test, fuzz, ui, helm, release-notes
 
     main.yml     config, secret-scan, lint ─> verify ─┬─> image
                                                      └─> semantic-release

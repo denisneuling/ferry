@@ -7,7 +7,7 @@
 # The cheap checks gate the expensive ones:
 #
 #   secret-scan ─┐
-#   lint ────────┴─> test, ui, helm, release-notes `runs-on: docker` names a runner *label*, not an image.
+#   lint ────────┴─> test, fuzz, ui, helm, release-notes `runs-on: docker` names a runner *label*, not an image.
 name: ci
 
 # A ref is built once. Branch work is built through its pull request; develop
@@ -103,6 +103,22 @@ jobs:
             done
           done
       - run: go test -race -count=1 ./...
+
+  # Every fuzz target beyond its seeds, 45 seconds each. The parsers they
+  # drive read uploaded files inside the process, outside any sandbox: the
+  # HEIF boxes before the decoder, EXIF, audio covers, the image decoders.
+  # A find fails the job, and hack/fuzz.sh prints the input to commit as a
+  # seed. Without the race detector: it would slow the fuzzer several times.
+  fuzz:
+    needs: [secret-scan, lint]
+    runs-on: docker
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+      - uses: https://data.forgejo.org/actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - run: make fuzz FUZZTIME=45s
 
   # The interface is compiled into the binary, so an interface that does not
   # lint, test or build is a binary that cannot be released. Its API client

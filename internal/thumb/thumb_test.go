@@ -26,7 +26,7 @@ func halves(w, h int) *image.RGBA {
 	return img
 }
 
-func encodeJPEG(t *testing.T, img image.Image, orientation int) []byte {
+func encodeJPEG(t testing.TB, img image.Image, orientation int) []byte {
 	t.Helper()
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 95}); err != nil {

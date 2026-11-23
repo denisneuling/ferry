@@ -34,7 +34,7 @@ DEV_NAS_UBUNTU_IMAGE ?= docker.io/library/ubuntu:22.04
 RUN_LISTEN ?= :8095
 RUN_OPS_LISTEN ?= :8096
 
-.PHONY: build test test-samba lint clean build-all changelog release install-tools ci \
+.PHONY: build test fuzz test-samba lint clean build-all changelog release install-tools ci \
 	ui-install ui-build ui-lint ui-test ui-i18n ui-start screenshots helm-lint helm-docs helm-package \
 	run run-nas generate-api lint-api dev-samba dev-samba-stop dev-nas dev-nas-stop dev-nas-check secret-scan secret-scan-history $(addprefix build-,$(BINARIES))
 
@@ -49,6 +49,11 @@ build:
 # against the Samba from `make dev-samba`.
 test:
 	go test -v -count=1 ./...
+
+# Every fuzz target beyond its seeds, FUZZTIME each; CI runs it too.
+FUZZTIME ?= 30s
+fuzz:
+	FUZZTIME=$(FUZZTIME) sh hack/fuzz.sh
 
 test-samba:
 	FERRY_TEST_SMB_SERVER=$(FERRY_TEST_SMB_SERVER) \
