@@ -1832,3 +1832,65 @@ a {
 .strip button {
   background: #ffffff14;
 }
+
+/* Previous versions: the banner over a folder shown as a snapshot holds
+   it, and the list of versions in their dialog. */
+.past {
+  margin: 0 36px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent-wash);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 8px 8px 14px;
+}
+.past span {
+  margin-right: auto;
+}
+.fx-versions {
+  width: min(560px, calc(100vw - 32px));
+}
+.fx-versions-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.fx-versions-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.fx-versions-list .when {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+.fx-versions-list .what {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.fx-versions-list .fx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.lb-versions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+@media (max-width: 640px) {
+  .past {
+    margin: 0 16px 12px;
+  }
+  .fx-versions-list li {
+    flex-wrap: wrap;
+  }
+}

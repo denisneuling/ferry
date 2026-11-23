@@ -19,7 +19,7 @@ RUN go run ./hack/mock-nas/gen -out /seed
 
 FROM ${UBUNTU_IMAGE}
 RUN apt-get update -qq \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends samba >/dev/null \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends samba samba-vfs-modules >/dev/null \
  && rm -rf /var/lib/apt/lists/*
 # Two fictional people in one household. The passwords are demo values,
 # written in hack/mock-nas/README.md.
@@ -41,6 +41,9 @@ RUN chown -R alex:family /srv/alex && chmod -R u+rwX,go-rwx /srv/alex \
  && find /srv/family /srv/scans -type d -exec chmod 2775 {} + \
  && find /srv/family /srv/scans -type f -exec chmod 0664 {} + \
  && chown -R root:root /srv/public && chmod -R a+rX,go-w /srv/public
+# Previous versions of the Family share, as a ZFS NAS keeps them.
+COPY hack/mock-nas/snapshots.sh /usr/local/bin/mock-nas-snapshots
+RUN /usr/local/bin/mock-nas-snapshots
 # COPY keeps the files' times but gives folders the time of the build; each
 # folder gets the time of the newest thing in it again, depth first, so that
 # a folder's date belongs to the sample as the generator meant it.

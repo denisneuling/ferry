@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Session } from './session';
+import { Snapshot } from './snapshot';
 import type { components } from './schema';
 
 export type Info = components['schemas']['Info'];
@@ -11,6 +12,8 @@ export type ArchiveTicket = components['schemas']['ArchiveTicket'];
 export type Space = components['schemas']['Space'];
 export type FileMetadata = components['schemas']['FileMetadata'];
 export type Problem = components['schemas']['Problem'];
+export type Version = components['schemas']['Version'];
+export type VersionList = components['schemas']['VersionList'];
 
 /** An answer of the API that is not a success: its status and stable code. */
 export class ApiError extends Error {
@@ -40,6 +43,16 @@ const BASE = '/api/v1';
 @Injectable({ providedIn: 'root' })
 export class Api {
   private readonly session = inject(Session);
+  private readonly snapshot = inject(Snapshot);
+
+  /**
+   * The `at` parameter of a read: the given snapshot, or without one the
+   * snapshot the interface browses (Snapshot); nothing for the share now.
+   */
+  private at(at?: string | null): string {
+    const t = at === undefined ? this.snapshot.at() : at;
+    return t ? `&at=${encodeURIComponent(t)}` : '';
+  }
 
   info(): Promise<Info> {
     return this.json('GET', '/info');
@@ -62,7 +75,12 @@ export class Api {
   }
 
   entries(share: string, path: string): Promise<EntryList> {
-    return this.json('GET', `${shareBase(share)}/entries?path=${q(path)}`);
+    return this.json('GET', `${shareBase(share)}/entries?path=${q(path)}${this.at()}`);
+  }
+
+  /** What the server's snapshots hold of a file or a folder, newest first. */
+  versions(share: string, path: string): Promise<VersionList> {
+    return this.json('GET', `${shareBase(share)}/versions?path=${q(path)}`);
   }
 
   /**
@@ -79,7 +97,7 @@ export class Api {
   ): Promise<number> {
     const res = await this.fetch(
       'GET',
-      `${BASE}${shareBase(share)}/entries?path=${q(path)}`,
+      `${BASE}${shareBase(share)}/entries?path=${q(path)}${this.at()}`,
       undefined,
       { Accept: 'application/x-ndjson' },
       signal,
@@ -129,8 +147,8 @@ export class Api {
    * What a file says about itself, read by the server from its bytes. With
    * the entry's version the browser keeps the answer until the file changes.
    */
-  metadata(share: string, path: string, version?: string): Promise<FileMetadata> {
-    return this.json('GET', `${shareBase(share)}/metadata?path=${q(path)}${v(version)}`);
+  metadata(share: string, path: string, version?: string, at?: string | null): Promise<FileMetadata> {
+    return this.json('GET', `${shareBase(share)}/metadata?path=${q(path)}${v(version)}${this.at(at)}`);
   }
 
   mkdir(share: string, path: string): Promise<Entry> {
@@ -162,8 +180,8 @@ export class Api {
   }
 
   /** The URL a file is downloaded from, or shown inline from. */
-  contentUrl(share: string, path: string, inline = false): string {
-    return `${BASE}${shareBase(share)}/content?path=${q(path)}${inline ? '&disposition=inline' : ''}`;
+  contentUrl(share: string, path: string, inline = false, at?: string | null): string {
+    return `${BASE}${shareBase(share)}/content?path=${q(path)}${inline ? '&disposition=inline' : ''}${this.at(at)}`;
   }
 
   /**
@@ -171,8 +189,14 @@ export class Api {
    * thumbnail until the file changes, and coming back to a folder costs no
    * request at all.
    */
-  thumbnailUrl(share: string, path: string, size: 160 | 320 | 640 = 320, version?: string): string {
-    return `${BASE}${shareBase(share)}/thumbnail?size=${size}&path=${q(path)}${v(version)}`;
+  thumbnailUrl(
+    share: string,
+    path: string,
+    size: 160 | 320 | 640 = 320,
+    version?: string,
+    at?: string | null,
+  ): string {
+    return `${BASE}${shareBase(share)}/thumbnail?size=${size}&path=${q(path)}${v(version)}${this.at(at)}`;
   }
 
   /** The start of a text file, at most max bytes, as text. */

@@ -18,6 +18,8 @@ import { Preloader, neighbours } from '../core/preloader';
 import { hasThumbnail, kindIcon, kindLabel, kindOf, previewKind } from '../core/kinds';
 import { Icon } from '../ui/icon';
 import { FileDetails } from '../ui/file-details';
+import { Snapshot } from '../core/snapshot';
+import { Versions } from '../ui/versions';
 
 /**
  * The preview: a file of the folder over everything, with the files of the
@@ -56,9 +58,11 @@ import { FileDetails } from '../ui/file-details';
         >
           <f-icon name="download" [size]="20" />
         </button>
-        <button class="lb-btn" type="button" (click)="remove(e)" title="Delete" i18n-title="@@act.delete">
-          <f-icon name="trash" [size]="20" />
-        </button>
+        @if (!snapshot.at()) {
+          <button class="lb-btn" type="button" (click)="remove(e)" title="Delete" i18n-title="@@act.delete">
+            <f-icon name="trash" [size]="20" />
+          </button>
+        }
         <button
           class="lb-btn"
           type="button"
@@ -180,6 +184,15 @@ import { FileDetails } from '../ui/file-details';
             <dd>{{ where() }}</dd>
           </dl>
           @if (browser.share(); as share) {
+            @if (!snapshot.at()) {
+              <button
+                type="button"
+                class="btn lb-versions"
+                (click)="versions.show({ share, path: e.path, name: e.name, folder: false })"
+              >
+                <f-icon name="clock" [size]="16" /><span i18n="@@act.versions">Previous versions</span>
+              </button>
+            }
             <f-file-details [share]="share" [path]="e.path" [version]="e.version" />
           }
         </aside>
@@ -191,6 +204,8 @@ export class Preview {
   protected readonly browser = inject(Browser);
   protected readonly actions = inject(Actions);
   protected readonly format = inject(Format);
+  protected readonly snapshot = inject(Snapshot);
+  protected readonly versions = inject(Versions);
   private readonly api = inject(Api);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly preloader = inject(Preloader);
@@ -320,6 +335,7 @@ export class Preview {
   }
 
   protected async remove(e: Entry): Promise<void> {
+    if (this.snapshot.at()) return;
     if (await this.actions.remove([e])) {
       const n = this.files().length;
       if (!n) this.close();

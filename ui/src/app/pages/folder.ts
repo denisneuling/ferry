@@ -18,10 +18,12 @@ import { Browser, SortKey } from '../core/browser';
 import { Format } from '../core/format';
 import { hasThumbnail, kindIcon, kindOf } from '../core/kinds';
 import { Prefs } from '../core/prefs';
+import { Snapshot, isToken, tokenTime } from '../core/snapshot';
 import { Transfers } from '../core/transfers';
 import { Icon } from '../ui/icon';
 import { Menu, MenuItem } from '../ui/menu';
 import { Space } from '../ui/space';
+import { Versions } from '../ui/versions';
 
 /** Entries rendered at once, and added each time the end comes near. */
 const PAGE = 600;
@@ -51,6 +53,14 @@ export class Folder {
   protected readonly actions = inject(Actions);
   private readonly api = inject(Api);
   private readonly transfers = inject(Transfers);
+  private readonly versions = inject(Versions);
+  /** Set while the folder is shown as a snapshot holds it: then nothing changes. */
+  protected readonly snapshot = inject(Snapshot);
+  protected readonly pastWhen = computed(() => {
+    const at = this.snapshot.at();
+    const t = at ? tokenTime(at) : null;
+    return t ? this.format.dateTime(t.toISOString()) : '';
+  });
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly locale = inject(LOCALE_ID);
@@ -91,14 +101,15 @@ export class Folder {
   private readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   constructor() {
-    // The URL is the truth: /browse/<share>?path=<folder>.
+    // The URL is the truth: /browse/<share>?path=<folder>[&at=<snapshot>].
     effect(() => {
       const share = this.params()?.get('share');
       const path = this.query()?.get('path') ?? '';
+      const at = this.query()?.get('at');
       if (share) {
         untracked(() => {
           this.shown.set(PAGE);
-          void this.browser.open(share, path);
+          void this.browser.open(share, path, isToken(at) ? at : null);
         });
       }
     });
@@ -117,8 +128,27 @@ export class Folder {
     });
   }
 
-  protected link(path: string): { path: string } | Record<string, never> {
-    return path ? { path } : {};
+  /** A folder's query: its path, and the snapshot while one is browsed. */
+  protected link(path: string): Record<string, string> {
+    const q: Record<string, string> = {};
+    if (path) q['path'] = path;
+    const at = this.snapshot.at();
+    if (at) q['at'] = at;
+    return q;
+  }
+
+  /** Back to the folder as it is now. */
+  protected now(): void {
+    const p = this.browser.path();
+    void this.router.navigate(['/browse', this.browser.share()], { queryParams: p ? { path: p } : {} });
+  }
+
+  /** The previous versions of this folder, or of one entry in it. */
+  protected showVersions(e?: Entry): void {
+    const share = this.browser.share();
+    if (!share) return;
+    if (e) this.versions.show({ share, path: e.path, name: e.name, folder: e.type === 'folder' });
+    else this.versions.show({ share, path: this.browser.path(), name: this.browser.title(), folder: true });
   }
 
   protected go(path: string): void {
@@ -202,7 +232,7 @@ export class Folder {
 
   private upload(files: FileList): void {
     const share = this.browser.share();
-    if (share) {
+    if (share && !this.snapshot.at()) {
       this.transfers.add(share, this.browser.path(), this.browser.title(), Array.from(files));
     }
   }
@@ -226,6 +256,18 @@ export class Folder {
           : { icon: 'eye', label: $localize`:@@act.preview:Preview`, run: () => this.open(e) },
       );
     }
+    if (this.snapshot.at()) {
+      // A previous version is read-only, and a ZIP is not made of one:
+      // a single file downloads, and that is all.
+      if (one && e.type === 'file')
+        items.push({
+          icon: 'download',
+          label: $localize`:@@act.download:Download`,
+          run: () => this.actions.download(sel),
+        });
+      if (items.length) this.menu.set({ x, y, items });
+      return;
+    }
     items.push({
       icon: 'download',
       label: one
@@ -233,6 +275,12 @@ export class Folder {
         : $localize`:@@act.downloadN:Download ${sel.length}:n:`,
       run: () => this.actions.download(sel),
     });
+    if (one)
+      items.push({
+        icon: 'clock',
+        label: $localize`:@@act.versions:Previous versions`,
+        run: () => this.showVersions(e),
+      });
     if (one)
       items.push({
         icon: 'pencil',
@@ -300,9 +348,9 @@ export class Folder {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === 'a') {
       ev.preventDefault();
       this.browser.selectAll();
-    } else if (ev.key === 'Delete' && sel.length) {
+    } else if (ev.key === 'Delete' && sel.length && !this.snapshot.at()) {
       void this.actions.remove(sel);
-    } else if (ev.key === 'F2' && sel.length === 1) {
+    } else if (ev.key === 'F2' && sel.length === 1 && !this.snapshot.at()) {
       ev.preventDefault();
       void this.actions.rename(sel[0]);
     } else if (ev.key === 'Backspace' || (ev.altKey && ev.key === 'ArrowUp')) {
@@ -331,7 +379,7 @@ export class Folder {
   // ── Dropping files from the desktop ──────────────────────────────────────
 
   private hasFiles(ev: DragEvent): boolean {
-    return !!ev.dataTransfer && Array.from(ev.dataTransfer.types).includes('Files');
+    return !this.snapshot.at() && !!ev.dataTransfer && Array.from(ev.dataTransfer.types).includes('Files');
   }
 
   protected dragEnter(ev: DragEvent): void {

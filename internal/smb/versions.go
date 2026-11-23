@@ -35,6 +35,10 @@ const TokenLayout = "@GMT-2006.01.02-15.04.05"
 // MaxVersions bounds how many snapshots one listing of versions opens.
 const MaxVersions = 500
 
+// statHook, when tests set it, runs after each snapshot Versions looked at,
+// with the request's context and how many so far.
+var statHook func(ctx context.Context, n int)
+
 // ParseToken reads a snapshot token exactly as TokenLayout writes it, and
 // refuses anything else: another length, another form, a time that does
 // not write back to the same token.
@@ -61,10 +65,12 @@ type Version struct {
 }
 
 // Versions lists what the server's snapshots hold of a path, newest
-// first: one Version for each state that differs from the one after it
-// and from the path as it is now, at the newest snapshot holding that
-// state. Snapshots in which the path does not exist are left out. A server
-// without snapshots gives none.
+// first. Of a file, one Version for each state that differs from the one
+// after it and from the file as it is now, at the newest snapshot holding
+// that state. Of a folder, every snapshot that holds it: its size and time
+// say nothing of what is in it, and a file deleted from it is found by
+// looking into the snapshots. Snapshots in which the path does not exist
+// are left out. A server without snapshots gives none.
 //
 // Each snapshot costs an open on the share. At most max are looked at, the
 // newest; and when ctx's deadline passes, between two of them, the versions
@@ -100,7 +106,7 @@ func (s *Session) Versions(ctx context.Context, share, p string, max int) (_ []V
 	if nowErr == nil {
 		last = Version{Dir: now.Dir, Size: now.Size, ModTime: now.ModTime}
 	}
-	for _, tok := range tokens {
+	for i, tok := range tokens {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return out, true, nil
 		}
@@ -113,6 +119,9 @@ func (s *Session) Versions(ctx context.Context, share, p string, max int) (_ []V
 			continue // a token of a form ferry does not read: not offered
 		}
 		v, err := s.statAt(m, sp, at)
+		if statHook != nil {
+			statHook(ctx, i+1)
+		}
 		if KindOf(err) == KindNotFound {
 			last = Version{}
 			continue
@@ -120,7 +129,7 @@ func (s *Session) Versions(ctx context.Context, share, p string, max int) (_ []V
 		if err != nil {
 			return nil, false, err
 		}
-		if v.Dir == last.Dir && v.Size == last.Size && v.ModTime.Equal(last.ModTime) {
+		if !v.Dir && !last.Dir && v.Size == last.Size && v.ModTime.Equal(last.ModTime) {
 			continue
 		}
 		last = v

@@ -8,12 +8,13 @@ import { Shell } from './pages/shell';
 import { DialogHost } from './ui/dialog';
 import { FolderPickerHost } from './ui/folder-picker';
 import { ToastHost } from './ui/toast';
+import { VersionsHost } from './ui/versions';
 
 /** The interface: the login, or the shell once a session exists; dialogs and toasts over both. */
 @Component({
   selector: 'f-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Login, Shell, DialogHost, FolderPickerHost, ToastHost],
+  imports: [Login, Shell, DialogHost, FolderPickerHost, ToastHost, VersionsHost],
   template: `@switch (session.me()) {
       @case (undefined) {}
       @case (null) {
@@ -25,6 +26,7 @@ import { ToastHost } from './ui/toast';
     }
     <f-dialogs />
     <f-folder-picker />
+    <f-versions />
     <f-toasts />`,
 })
 export class App {

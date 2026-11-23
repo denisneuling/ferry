@@ -60,6 +60,18 @@ ship it, on with `make dev-nas DEV_NAS_ABSE=yes`.
 - **Names** with umlauts, spaces, `&` and emoji, folders five levels deep,
   an empty folder, modification times spread over two years.
 
+## Previous versions
+
+`Family` keeps snapshots as a ZFS NAS with sanoid does, offered through
+Samba's `vfs_shadow_copy2` (`snapshots.sh`, `smb.conf`): two of the share
+(`autosnap_2026-11-21_03:00:00_daily`, `autosnap_2026-11-22_15:00:09_hourly`)
+and one of `Fotos`, a nested dataset with its own
+(`autosnap_2026-11-01_00:00:01_monthly`). In them
+`Haushalt/Einkaufsliste.txt` has two earlier states, `Rezepte/Linsensuppe.md`
+and `Fotos/Geburtstag Oma/Foto 1 (verwackelt).jpg` were deleted since, and
+`Urlaubsplanung 2027.md` is new since. The snapshot folders are hidden from
+listings, as ZFS hides them.
+
 ## Samba settings
 
 `smb.conf` holds what ferry should expect from a real NAS: `map to guest =

@@ -117,3 +117,35 @@ func TestSampleFiles(t *testing.T) {
 		t.Errorf("Family's space: %+v, %v", sp, err)
 	}
 }
+
+func TestPreviousVersions(t *testing.T) {
+	ctx := context.Background()
+	alex := must(t, "alex", "alex-nas-demo")
+	for _, c := range []struct {
+		path string
+		want int
+	}{
+		{"Haushalt/Einkaufsliste.txt", 2},
+		{"Rezepte/Linsensuppe.md", 1},
+		{"Urlaubsplanung 2027.md", 0},
+		{"Fotos/Geburtstag Oma/Foto 1 (verwackelt).jpg", 1},
+		{"Fotos/Geburtstag Oma/Foto 1.jpg", 0},
+		// A folder in every snapshot of its dataset.
+		{"Rezepte", 2},
+		{"Fotos/Geburtstag Oma", 1},
+	} {
+		vs, _, err := alex.Versions(ctx, "Family", c.path, smb.MaxVersions)
+		if err != nil || len(vs) != c.want {
+			t.Errorf("%s: %d versions, %v; want %d", c.path, len(vs), err, c.want)
+		}
+	}
+	entries, err := alex.ReadDir(ctx, "Family", "", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name == ".zfs" {
+			t.Error("the snapshot folder is listed")
+		}
+	}
+}

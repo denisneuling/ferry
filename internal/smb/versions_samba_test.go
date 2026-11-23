@@ -34,9 +34,9 @@ func TestVersions(t *testing.T) {
 		{"Docs/gone.txt", []time.Time{at1300}},
 		// A nested dataset has snapshots of its own, and none of the share's.
 		{"Sub/Inner/inner.txt", []time.Time{atSub}},
-		// A folder is a version in each snapshot that holds it.
-		// (setup.sh gives the folder the same time in both snapshots.)
-		{"Docs", []time.Time{at1400}},
+		// A folder is a version in each snapshot that holds it, even with
+		// the same time in both (setup.sh) and as now.
+		{"Docs", []time.Time{at1400, at1300}},
 	}
 	for _, c := range cases {
 		vs, _, err := s.Versions(ctx, "Versions", c.path, MaxVersions)
@@ -187,5 +187,35 @@ func TestNoTokenInWrites(t *testing.T) {
 	ctx := context.Background()
 	if _, err := s.Upload(ctx, "Versions", "@GMT-2026.11.23-13.00.09/Docs/x.txt", nil, false, 1); KindOf(err) != KindInvalidPath {
 		t.Fatalf("an upload into a snapshot: %v", err)
+	}
+}
+
+// When the request's deadline passes between two snapshots, the versions
+// found so far are the answer, marked truncated, and no error: the hook
+// holds the first look until the deadline has passed, so no timing is left
+// to luck.
+func TestVersionsDeadline(t *testing.T) {
+	s := mustLogin(t, "alex", alexPassword)
+	statHook = func(ctx context.Context, n int) {
+		if n == 1 {
+			<-ctx.Done()
+		}
+	}
+	t.Cleanup(func() { statHook = nil })
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	vs, truncated, err := s.Versions(ctx, "Versions", "Docs/letter.txt", MaxVersions)
+	if err != nil || !truncated || len(vs) != 1 || !vs[0].At.Equal(at1400) {
+		t.Fatalf("after the deadline: %+v, truncated %v, %v", vs, truncated, err)
+	}
+	// A request that ended otherwise — the client left — is an error.
+	ctx, cancel = context.WithCancel(context.Background())
+	statHook = func(_ context.Context, n int) {
+		if n == 1 {
+			cancel()
+		}
+	}
+	if _, _, err := s.Versions(ctx, "Versions", "Docs/letter.txt", MaxVersions); KindOf(err) != KindCanceled {
+		t.Fatalf("a request that ended: %v", err)
 	}
 }

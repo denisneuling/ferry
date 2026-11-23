@@ -105,6 +105,18 @@ Only a bounded part of a file is read (4 MiB at most), and nothing is
 stored or written to a log. What the file says is shown as text: a camera
 name or a title is never markup.
 
+## Previous versions
+
+Where the server keeps snapshots ([samba.md](samba.md), *Previous
+versions*), **Previous versions** in a file's or folder's menu, the clock
+beside a folder's title and the button in a file's details list them,
+newest first, with the time and the size — not who changed anything. A
+file's version opens in a new tab or downloads; a folder's opens **as it
+was**: the folder view with a banner saying when, where a file deleted
+since can be found, opened and downloaded. Nothing can be changed there —
+no upload, rename, move or delete — and **Back to now** leaves it. A
+server or share without snapshots simply has none.
+
 ## Uploading
 
 **Upload**, or drop files anywhere on the folder. Uploads run two at a time

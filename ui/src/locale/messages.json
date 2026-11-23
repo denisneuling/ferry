@@ -72,8 +72,11 @@
     "view": "View",
     "view.grid": "Tiles",
     "view.list": "List",
+    "versions.folder": "Previous versions of this folder",
     "newFolder": "New folder",
     "upload": "Upload",
+    "past.text": "You are looking at this folder as it was on {$INTERPOLATION}. It cannot be changed.",
+    "past.now": "Back to now",
     "selection": "Selection",
     "selected": "{$INTERPOLATION} selected",
     "act.download": "Download",
@@ -103,6 +106,7 @@
     "act.open": "Open",
     "act.preview": "Preview",
     "act.downloadN": "Download {$n}",
+    "act.versions": "Previous versions",
     "home.sub": "What would you like to open?",
     "home.noShares": "The shares cannot be shown",
     "retry": "Try again",
@@ -196,6 +200,14 @@
     "picker.empty": "No folders in here.",
     "picker.here": "Move here",
     "space.free": "{$INTERPOLATION} free of {$INTERPOLATION_1}",
-    "space.used": "{$percent} % used"
+    "space.used": "{$percent} % used",
+    "versions.title": "Previous versions of {$INTERPOLATION}",
+    "versions.loading": "Looking through the snapshots…",
+    "versions.none": " The server keeps no earlier state of this, or none that differs from now. ",
+    "versions.browse": "Open as it was",
+    "versions.open": "Open",
+    "versions.download": "Download",
+    "versions.truncated": " Only the newest snapshots were looked through; there may be older versions. ",
+    "versions.close": "Close"
   }
 }

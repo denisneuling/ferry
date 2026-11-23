@@ -196,6 +196,18 @@
     "picker.empty": "Hier sind keine Ordner.",
     "picker.here": "Hierher verschieben",
     "space.free": "{$INTERPOLATION} frei von {$INTERPOLATION_1}",
-    "space.used": "{$percent} % belegt"
+    "space.used": "{$percent} % belegt",
+    "versions.folder": "Frühere Versionen dieses Ordners",
+    "past.text": "Du siehst diesen Ordner, wie er am {$INTERPOLATION} war. Er lässt sich nicht ändern.",
+    "past.now": "Zurück zu jetzt",
+    "act.versions": "Frühere Versionen",
+    "versions.title": "Frühere Versionen von {$INTERPOLATION}",
+    "versions.loading": "Die Snapshots werden durchgesehen …",
+    "versions.none": " Der Server hat keinen früheren Stand davon, oder keinen, der sich von jetzt unterscheidet. ",
+    "versions.browse": "So öffnen, wie er war",
+    "versions.open": "Öffnen",
+    "versions.download": "Herunterladen",
+    "versions.truncated": " Nur die neuesten Snapshots wurden durchgesehen; es kann ältere Versionen geben. ",
+    "versions.close": "Schließen"
   }
 }

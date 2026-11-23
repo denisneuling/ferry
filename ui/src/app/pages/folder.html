@@ -65,33 +65,62 @@
         <f-icon name="list" [size]="17" />
       </button>
     </div>
-    <button class="btn" type="button" (click)="actions.mkdir()">
-      <f-icon name="folderPlus" [size]="17" /><ng-container i18n="@@newFolder">New folder</ng-container>
-    </button>
-    <button class="btn primary" type="button" (click)="pick()">
-      <f-icon name="upload" [size]="17" /><ng-container i18n="@@upload">Upload</ng-container>
-    </button>
-    <input #picker type="file" multiple hidden (change)="picked(picker)" />
+    @if (!snapshot.at()) {
+      <button
+        class="btn"
+        type="button"
+        (click)="showVersions()"
+        title="Previous versions of this folder"
+        i18n-title="@@versions.folder"
+        aria-label="Previous versions of this folder"
+        i18n-aria-label="@@versions.folder"
+      >
+        <f-icon name="clock" [size]="17" />
+      </button>
+      <button class="btn" type="button" (click)="actions.mkdir()">
+        <f-icon name="folderPlus" [size]="17" /><ng-container i18n="@@newFolder">New folder</ng-container>
+      </button>
+      <button class="btn primary" type="button" (click)="pick()">
+        <f-icon name="upload" [size]="17" /><ng-container i18n="@@upload">Upload</ng-container>
+      </button>
+      <input #picker type="file" multiple hidden (change)="picked(picker)" />
+    }
   </div>
 </header>
+
+@if (snapshot.at()) {
+  <div class="past" role="status">
+    <f-icon name="clock" [size]="17" />
+    <span i18n="@@past.text"
+      >You are looking at this folder as it was on {{ pastWhen() }}. It cannot be changed.</span
+    >
+    <button type="button" class="btn" (click)="now()" i18n="@@past.now">Back to now</button>
+  </div>
+}
 
 @if (selecting()) {
   <div class="selbar" role="toolbar" aria-label="Selection" i18n-aria-label="@@selection">
     <b i18n="@@selected">{{ browser.selected().size }} selected</b>
-    <button type="button" (click)="actions.download(browser.selection())">
-      <f-icon name="download" [size]="17" /><span i18n="@@act.download">Download</span>
-    </button>
-    @if (browser.selected().size === 1) {
-      <button type="button" (click)="actions.rename(browser.selection()[0])">
-        <f-icon name="pencil" [size]="17" /><span i18n="@@act.rename">Rename</span>
+    @if (!snapshot.at()) {
+      <button type="button" (click)="actions.download(browser.selection())">
+        <f-icon name="download" [size]="17" /><span i18n="@@act.download">Download</span>
+      </button>
+      @if (browser.selected().size === 1) {
+        <button type="button" (click)="actions.rename(browser.selection()[0])">
+          <f-icon name="pencil" [size]="17" /><span i18n="@@act.rename">Rename</span>
+        </button>
+      }
+      <button type="button" (click)="actions.move(browser.selection())">
+        <f-icon name="move" [size]="17" /><span i18n="@@act.move">Move</span>
+      </button>
+      <button type="button" class="danger" (click)="actions.remove(browser.selection())">
+        <f-icon name="trash" [size]="17" /><span i18n="@@act.delete">Delete</span>
+      </button>
+    } @else if (browser.selected().size === 1 && browser.selection()[0].type === 'file') {
+      <button type="button" (click)="actions.download(browser.selection())">
+        <f-icon name="download" [size]="17" /><span i18n="@@act.download">Download</span>
       </button>
     }
-    <button type="button" (click)="actions.move(browser.selection())">
-      <f-icon name="move" [size]="17" /><span i18n="@@act.move">Move</span>
-    </button>
-    <button type="button" class="danger" (click)="actions.remove(browser.selection())">
-      <f-icon name="trash" [size]="17" /><span i18n="@@act.delete">Delete</span>
-    </button>
     <button
       type="button"
       (click)="browser.clear()"

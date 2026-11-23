@@ -3,6 +3,7 @@ import { Api, ApiError, Entry, Share } from './api';
 import { Format } from './format';
 import { describe } from './errors';
 import { Session } from './session';
+import { Snapshot } from './snapshot';
 
 export type SortKey = 'name' | 'modified' | 'size';
 
@@ -25,6 +26,7 @@ export const MEMORY_LARGEST = 20_000;
 export class Browser {
   private readonly api = inject(Api);
   private readonly format = inject(Format);
+  private readonly snapshot = inject(Snapshot);
 
   readonly shares = signal<Share[] | null>(null);
   readonly sharesError = signal<string | null>(null);
@@ -97,12 +99,16 @@ export class Browser {
     }
   }
 
-  /** Opens a folder; a different one clears the selection, the filter and the preview. */
-  async open(share: string, path: string): Promise<void> {
-    const same = share === this.share() && path === this.path();
+  /**
+   * Opens a folder, as it is now or, with at, as that snapshot holds it; a
+   * different one clears the selection, the filter and the preview.
+   */
+  async open(share: string, path: string, at: string | null = null): Promise<void> {
+    const same = share === this.share() && path === this.path() && at === this.snapshot.at();
     if (!same) {
       this.share.set(share);
       this.path.set(path);
+      this.snapshot.at.set(at);
       // A folder seen a moment ago shows as it was, and its new listing
       // replaces it when complete (stale while revalidating).
       this.entries.set(this.recall(share, path));
@@ -168,7 +174,7 @@ export class Browser {
         return;
       }
       this.entries.set(null);
-      this.drop(key(share, path));
+      this.drop(this.key(share, path));
       this.error.set(describe(e, 'list'));
       this.errorCode.set(e instanceof ApiError ? e.code : 'internal');
     } finally {
@@ -182,6 +188,7 @@ export class Browser {
     this.abort?.abort();
     this.loads++;
     this.loading.set(false);
+    this.snapshot.at.set(null);
     this.share.set(null);
     this.path.set('');
     this.entries.set(null);
@@ -197,7 +204,7 @@ export class Browser {
   }
 
   private recall(share: string, path: string): Entry[] | null {
-    const k = key(share, path);
+    const k = this.key(share, path);
     const got = this.memory.get(k);
     if (!got) return null;
     this.memory.delete(k); // to the end: the most recent
@@ -206,7 +213,7 @@ export class Browser {
   }
 
   private remember(share: string, path: string, entries: Entry[]): void {
-    const k = key(share, path);
+    const k = this.key(share, path);
     this.drop(k);
     if (entries.length > MEMORY_LARGEST) return;
     this.memory.set(k, entries);
@@ -216,6 +223,10 @@ export class Browser {
       if (this.memory.size <= MEMORY_FOLDERS && this.remembered <= MEMORY_ENTRIES) break;
       this.drop(old);
     }
+  }
+
+  private key(share: string, path: string): string {
+    return key(share, path, this.snapshot.at());
   }
 
   private drop(k: string): void {
@@ -268,6 +279,7 @@ export class Browser {
   }
 }
 
-function key(share: string, path: string): string {
-  return `${share}\u0000${path}`;
+/** A folder's place in memory: the share, the path, and the snapshot, if one. */
+function key(share: string, path: string, at: string | null): string {
+  return `${share}\u0000${path}\u0000${at ?? ''}`;
 }

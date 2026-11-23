@@ -1202,9 +1202,10 @@ type ClientInterface interface {
 	// ListVersions The previous versions of a file or a folder.
 	//
 	// What the server's snapshots hold of the path — Samba's
-	// `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
-	// entry for each state that differs from the one after it and from
-	// the path as it is now. Each comes with the `at` that reads it
+	// `vfs_shadow_copy2`, Windows' shadow copies — newest first. Of a
+	// file, one entry for each state that differs from the one after it
+	// and from the file as it is now; of a folder, every snapshot that
+	// holds it, since its size and time say nothing of its contents. Each comes with the `at` that reads it
 	// (`At`). A path deleted since has versions all the same; a server or
 	// share without snapshots has none, which is no error.
 	//
@@ -1644,9 +1645,10 @@ func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetT
 // ListVersions The previous versions of a file or a folder.
 //
 // What the server's snapshots hold of the path — Samba's
-// `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
-// entry for each state that differs from the one after it and from
-// the path as it is now. Each comes with the `at` that reads it
+// `vfs_shadow_copy2`, Windows' shadow copies — newest first. Of a
+// file, one entry for each state that differs from the one after it
+// and from the file as it is now; of a folder, every snapshot that
+// holds it, since its size and time say nothing of its contents. Each comes with the `at` that reads it
 // (`At`). A path deleted since has versions all the same; a server or
 // share without snapshots has none, which is no error.
 //
@@ -3018,9 +3020,10 @@ type ClientWithResponsesInterface interface {
 	// ListVersionsWithResponse The previous versions of a file or a folder.
 	//
 	// What the server's snapshots hold of the path — Samba's
-	// `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
-	// entry for each state that differs from the one after it and from
-	// the path as it is now. Each comes with the `at` that reads it
+	// `vfs_shadow_copy2`, Windows' shadow copies — newest first. Of a
+	// file, one entry for each state that differs from the one after it
+	// and from the file as it is now; of a folder, every snapshot that
+	// holds it, since its size and time say nothing of its contents. Each comes with the `at` that reads it
 	// (`At`). A path deleted since has versions all the same; a server or
 	// share without snapshots has none, which is no error.
 	//
@@ -4674,9 +4677,10 @@ func (c *ClientWithResponses) GetThumbnailWithResponse(ctx context.Context, shar
 // ListVersionsWithResponse The previous versions of a file or a folder.
 //
 // What the server's snapshots hold of the path — Samba's
-// `vfs_shadow_copy2`, Windows' shadow copies — newest first, one
-// entry for each state that differs from the one after it and from
-// the path as it is now. Each comes with the `at` that reads it
+// `vfs_shadow_copy2`, Windows' shadow copies — newest first. Of a
+// file, one entry for each state that differs from the one after it
+// and from the file as it is now; of a folder, every snapshot that
+// holds it, since its size and time say nothing of its contents. Each comes with the `at` that reads it
 // (`At`). A path deleted since has versions all the same; a server or
 // share without snapshots has none, which is no error.
 //
