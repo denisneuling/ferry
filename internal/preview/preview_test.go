@@ -131,9 +131,15 @@ func engine(t *testing.T, o Options) *Engine {
 	return e
 }
 
+// renderWait bounds a render in the tests. A cold one compiles pdfium's
+// module first, which under the race detector, on a CI runner shared with
+// the fuzz job, has taken over 30 s; the bound is a test's, not ferry's
+// (that one is FERRY_PREVIEW_TIMEOUT, tested in TestJobTimeout).
+const renderWait = 3 * time.Minute
+
 func render(t *testing.T, e *Engine, file []byte, box int) ([]byte, error) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), renderWait)
 	defer cancel()
 	return e.PDF(ctx, bytes.NewReader(file), int64(len(file)), box)
 }
