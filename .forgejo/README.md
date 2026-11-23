@@ -19,7 +19,7 @@ follow are added with them, from websearch's workflows:
 A cheap check gates an expensive one:
 
     ci.yml       secret-scan ─┐
-                 lint ────────┴─> test, fuzz, ui, helm, release-notes
+                 lint ────────┴─> test ─> fuzz; ui, helm, release-notes
 
     main.yml     config, secret-scan, lint ─> verify ─┬─> image
                                                      └─> semantic-release

@@ -7,7 +7,7 @@
 # The cheap checks gate the expensive ones:
 #
 #   secret-scan ─┐
-#   lint ────────┴─> test, fuzz, ui, helm, release-notes `runs-on: docker` names a runner *label*, not an image.
+#   lint ────────┴─> test ─> fuzz; ui, helm, release-notes `runs-on: docker` names a runner *label*, not an image.
 name: ci
 
 # A ref is built once. Branch work is built through its pull request; develop
@@ -117,8 +117,11 @@ jobs:
   # HEIF boxes before the decoder, EXIF, audio covers, the image decoders.
   # A find fails the job, and hack/fuzz.sh prints the input to commit as a
   # seed. Without the race detector: it would slow the fuzzer several times.
+  # After the tests, not beside them: the fuzzer takes all the CPU it gets,
+  # and the timing of the Samba and race tests suffered for it on a shared
+  # runner.
   fuzz:
-    needs: [secret-scan, lint]
+    needs: [test]
     runs-on: docker
     steps:
       - uses: https://data.forgejo.org/actions/checkout@v6
