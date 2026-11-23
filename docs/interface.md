@@ -161,7 +161,12 @@ is shown as the server's 640-pixel thumbnail, with the 320-pixel one in its
 place until it has come. So are TIFF images and a camera's raw photos
 (CR2, NEF, ARW, DNG, PEF, ORF, RW2, RAF), from the JPEG preview each
 camera writes into the raw file, turned as the raw file says; a raw file
-without one gets an icon. Videos get an icon rather than a thumbnail, as do
+without one gets an icon. Documents and books show the picture they carry
+for it: OpenDocument files (`.odt`, `.ods`, `.odp`) nearly always, Office
+files (`.docx`, `.xlsx`, `.pptx`) when they were saved with one, an EPUB
+its cover; the rest an icon. A Word or OpenDocument text shows its plain
+text in the preview — the paragraphs, no formatting, nothing of the
+document that could run. Videos get an icon rather than a thumbnail, as do
 recordings without a cover.
 
 While an image is shown, the next and the previous one load ahead, so that

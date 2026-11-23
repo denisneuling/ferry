@@ -10,11 +10,13 @@ import (
 
 	v1 "github.com/denisneuling/ferry/api/v1"
 	"github.com/denisneuling/ferry/internal/cache"
+	"github.com/denisneuling/ferry/internal/docs"
 	"github.com/denisneuling/ferry/internal/meta"
 	"github.com/denisneuling/ferry/internal/preview"
 	"github.com/denisneuling/ferry/internal/raw"
 	"github.com/denisneuling/ferry/internal/smb"
 	"github.com/denisneuling/ferry/internal/thumb"
+	"github.com/denisneuling/ferry/internal/zipread"
 )
 
 var probNotAnImage = problem{status: http.StatusUnsupportedMediaType, code: "not_an_image", title: "ferry cannot make a thumbnail of this file."}
@@ -119,6 +121,27 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 			a.fail(w, r, err)
 			return
 		}
+	}
+	// A document or a book: the picture it carries for its preview, read
+	// out of its ZIP without unpacking anything else.
+	if docs.IsZip(peek) {
+		e, err := docs.Thumbnail(f, f.Size)
+		var rd io.Reader
+		if err == nil {
+			rd, err = zipread.Open(f, f.Size, e, a.cfg.ThumbnailMaxBytes)
+		}
+		switch {
+		case errors.Is(err, zipread.ErrTooLarge):
+			a.thumbFailed(w, key, thumb.ErrTooLarge)
+			return
+		case isDocumentErr(err):
+			a.thumbFailed(w, key, thumb.ErrUnsupported)
+			return
+		case err != nil:
+			a.fail(w, r, err)
+			return
+		}
+		src, srcSize = chunked{rd}, e.Size
 	}
 	if meta.IsAudio(peek) {
 		at := &firstError{r: f}
@@ -391,4 +414,12 @@ func (c chunked) Read(p []byte) (int, error) {
 		p = p[:smb.StreamChunk]
 	}
 	return c.r.Read(p)
+}
+
+// isDocumentErr is an answer about the file itself from the document
+// readers: no ZIP, nothing to show, an entry damaged or not readable —
+// never a failure of the share, which is reported as it is.
+func isDocumentErr(err error) bool {
+	return errors.Is(err, docs.ErrNone) || errors.Is(err, zipread.ErrNotZip) ||
+		errors.Is(err, zipread.ErrUnsupported) || errors.Is(err, zipread.ErrCorrupt)
 }

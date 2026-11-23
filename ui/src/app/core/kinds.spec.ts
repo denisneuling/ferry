@@ -19,6 +19,12 @@ describe('kinds', () => {
     expect(previewKind('IMG_0001.CR2')).toBe('derived');
     expect(previewKind('DSCF1234.RAF')).toBe('derived');
     expect(previewKind('scan.tif')).toBe('derived');
+    expect(hasThumbnail('Brief.odt')).toBe(true);
+    expect(hasThumbnail('book.epub')).toBe(true);
+    expect(previewKind('Brief.docx')).toBe('document');
+    expect(previewKind('Brief.odt')).toBe('document');
+    expect(previewKind('book.epub')).toBe('none');
+    expect(previewKind('slides.pptx')).toBe('none');
     expect(hasThumbnail('a.svg')).toBe(false);
     expect(hasThumbnail('a.mp4')).toBe(false);
     // Recordings by their cover; the server answers 415 for one without.

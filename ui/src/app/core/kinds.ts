@@ -46,6 +46,7 @@ add('text', [
   'py',
   'sh',
 ]);
+add('text', ['docx', 'odt']); // shown as their text (previewKind 'document')
 add('sheet', ['csv', 'tsv', 'xlsx', 'xls', 'ods']);
 add('archive', ['zip', '7z', 'tar', 'gz', 'tgz', 'rar', 'iso']);
 
@@ -66,6 +67,15 @@ const thumbnailed = new Set([
   ...rawPhotos,
   'tif',
   'tiff',
+  // Documents and books, by the picture they carry: OpenDocument almost
+  // always, Office now and then, EPUB its cover. Without one, an icon.
+  'odt',
+  'ods',
+  'odp',
+  'docx',
+  'xlsx',
+  'pptx',
+  'epub',
   'jpg',
   'jpeg',
   'png',
@@ -104,7 +114,7 @@ export function hasThumbnail(name: string): boolean {
  * `derived` is a picture the browser cannot show itself (HEIC, TIFF and raw photos, outside
  * Safari), shown as the server's 640-pixel thumbnail.
  */
-export type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'derived' | 'none';
+export type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'document' | 'derived' | 'none';
 
 const browserImages = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif']);
 const browserVideo = new Set(['mp4', 'm4v', 'webm', 'mov', 'ogv']);
@@ -116,6 +126,8 @@ export function previewKind(name: string): PreviewKind {
   if (browserVideo.has(ext)) return 'video';
   if (browserAudio.has(ext)) return 'audio';
   if (ext === 'pdf') return 'pdf';
+  // A Word or OpenDocument text: its plain text, read by the server.
+  if (ext === 'docx' || ext === 'odt') return 'document';
   if ((ext === 'heic' || ext === 'heif') && previewed().has(ext)) return 'derived';
   // TIFF and raw photos: no browser but Safari shows TIFF, none a raw file.
   if (ext === 'tif' || ext === 'tiff' || rawPhotos.includes(ext)) return 'derived';

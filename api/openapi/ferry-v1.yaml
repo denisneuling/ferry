@@ -448,6 +448,40 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
 
+  /api/v1/shares/{share}/text:
+    get:
+      operationId: getDocumentText
+      tags: [files]
+      summary: The plain text of a Word or OpenDocument text.
+      description: |
+        The text of a `.docx` or an OpenDocument text (`.odt`), read out of
+        its XML: paragraphs as lines, tabs as tabs, nothing else — no
+        formatting, no pictures, no links, nothing of the document that
+        could run. At most 512 KB, `truncated` when there is more. A file
+        that is neither is `415` (`not_a_document`).
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: The text.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentText" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415":
+          description: Not a document ferry reads text from (`not_a_document`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/versions:
     get:
       operationId: listVersions
@@ -822,7 +856,7 @@ components:
             `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
             `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
             `range_not_satisfiable`, `changed`, `server_unreachable`, `session_lost`,
-            `too_many_sessions`, `not_an_image`, `preview_timeout`, `internal`.
+            `too_many_sessions`, `not_an_image`, `not_a_document`, `preview_timeout`, `internal`.
         limit:
           type: integer
           format: int64
@@ -941,6 +975,12 @@ components:
         version:
           type: string
           description: As `Entry.version`, for `v` together with `at`.
+    DocumentText:
+      type: object
+      required: [text, truncated]
+      properties:
+        text: { type: string, description: "Plain text: show it as text, never as markup." }
+        truncated: { type: boolean }
     VersionList:
       type: object
       required: [versions, truncated]

@@ -125,6 +125,18 @@ import { MAX_EDIT_BYTES } from '../core/text-file';
           @case ('pdf') {
             <iframe [src]="frameUrl()" [title]="e.name"></iframe>
           }
+          @case ('document') {
+            <div class="textview" [class.loading]="text() === null">
+              @if (text() === null) {
+                <ng-container i18n="@@loading">Loading…</ng-container>
+              } @else {
+                {{ text() }}
+                @if (truncated()) {
+                  <p i18n="@@pv.truncated">… The rest of the file is not shown; download it to see it all.</p>
+                }
+              }
+            </div>
+          }
           @case ('text') {
             @if (editing() && browser.share(); as share) {
               <f-text-editor [share]="share" [entry]="e" (done)="edited($event)" />
@@ -280,6 +292,17 @@ export class Preview {
       const share = this.browser.share();
       this.text.set(null);
       this.truncated.set(false);
+      if (e && share && previewKind(e.name) === 'document') {
+        this.api.documentText(share, e.path).then(
+          (r) => {
+            if (this.entry() === e) {
+              this.text.set(r.text);
+              this.truncated.set(r.truncated);
+            }
+          },
+          (err) => this.entry() === e && this.text.set(describe(err)),
+        );
+      }
       if (e && share && previewKind(e.name) === 'text') {
         this.api.text(share, e.path).then(
           (r) => {

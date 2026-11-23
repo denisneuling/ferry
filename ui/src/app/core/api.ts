@@ -258,6 +258,11 @@ export class Api {
     }
   }
 
+  /** The plain text of a Word or OpenDocument text, read by the server. */
+  documentText(share: string, path: string): Promise<{ text: string; truncated: boolean }> {
+    return this.json('GET', `${shareBase(share)}/text?path=${q(path)}${this.at()}`);
+  }
+
   /** The size and free space of the volume a folder is on, as the server reports them. */
   space(share: string, path: string): Promise<Space> {
     return this.json('GET', `${shareBase(share)}/space?path=${q(path)}`);

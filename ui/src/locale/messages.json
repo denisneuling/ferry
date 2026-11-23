@@ -152,7 +152,7 @@
     "edit.open": "Edit",
     "pv.details": "Details (i)",
     "pv.close": "Close (Esc)",
-    "pv.truncated": " … The rest of the file is not shown; download it to see it all. ",
+    "pv.truncated": "… The rest of the file is not shown; download it to see it all.",
     "pv.none": "No preview",
     "pv.prev": "Previous",
     "pv.next": "Next",
