@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  LOCALE_ID,
   computed,
   effect,
   inject,
@@ -312,6 +313,7 @@ export class Preview {
   protected readonly versions = inject(Versions);
   protected readonly api = inject(Api);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly locale = inject(LOCALE_ID);
   private readonly preloader = inject(Preloader);
   private readonly box = viewChild<ElementRef<HTMLElement>>('box');
 
@@ -424,7 +426,7 @@ export class Preview {
       const sizes = new Map(
         (this.browser.entries() ?? []).filter((f) => f.type === 'file').map((f) => [f.name, f.size]),
       );
-      const subs = subtitlesFor(e.name, [...sizes.keys()]).filter(
+      const subs = subtitlesFor(e.name, [...sizes.keys()], this.locale).filter(
         (s) => (sizes.get(s.name) ?? 0) <= MAX_SUBTITLE_BYTES,
       );
       const dir = e.path.slice(0, e.path.length - e.name.length);

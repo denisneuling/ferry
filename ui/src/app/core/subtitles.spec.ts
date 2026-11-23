@@ -13,9 +13,12 @@ describe('subtitles', () => {
     ];
     expect(subtitlesFor('Film.mkv', names)).toEqual([
       { name: 'Film.srt', lang: '', label: 'Film.srt' },
-      { name: 'Film.de.srt', lang: 'de', label: 'de' },
-      { name: 'film.EN.forced.vtt', lang: 'en', label: 'EN forced' },
+      { name: 'Film.de.srt', lang: 'de', label: 'German' },
+      { name: 'film.EN.forced.vtt', lang: 'en', label: 'English forced' },
     ]);
+    expect(subtitlesFor('Film.mkv', ['Film.de.srt'], 'de')[0].label).toBe('Deutsch');
+    // Three letters that are no language stay as they are.
+    expect(subtitlesFor('Film.mkv', ['Film.xyz.srt'])[0].label).toBe('xyz');
     expect(subtitlesFor('Clip.mp4', names)).toEqual([]);
   });
 

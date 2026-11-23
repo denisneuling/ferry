@@ -25,7 +25,7 @@ export const MAX_TRACKS = 8;
  * same name without its extension, then optionally a language and further
  * tags, then .srt or .vtt — case aside.
  */
-export function subtitlesFor(video: string, names: readonly string[]): SubtitleFile[] {
+export function subtitlesFor(video: string, names: readonly string[], locale = 'en'): SubtitleFile[] {
   const dot = video.lastIndexOf('.');
   const base = (dot > 0 ? video.slice(0, dot) : video).toLowerCase();
   const found: SubtitleFile[] = [];
@@ -37,7 +37,9 @@ export function subtitlesFor(video: string, names: readonly string[]): SubtitleF
     if (middle !== '' && !middle.startsWith('.')) continue; // Film2.srt is not Film's
     const tags = middle.split('.').filter((t) => t !== '');
     const lang = tags.find((t) => /^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i.test(t)) ?? '';
-    found.push({ name, lang: lang.toLowerCase(), label: tags.length ? tags.join(' ') : name });
+    // The language by its name in the interface's language, the other tags as they are.
+    const words = tags.map((t) => (t === lang ? languageName(t, locale) : t));
+    found.push({ name, lang: lang.toLowerCase(), label: words.length ? words.join(' ') : name });
     if (found.length === MAX_TRACKS) break;
   }
   return found;
@@ -73,5 +75,15 @@ export function decodeSubtitle(bytes: Uint8Array): string {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
     return new TextDecoder('windows-1252').decode(bytes);
+  }
+}
+
+/** A language code's name in locale's language: `de` → Deutsch; the code where it has none. */
+function languageName(code: string, locale: string): string {
+  try {
+    const n = new Intl.DisplayNames([locale], { type: 'language', fallback: 'none' }).of(code);
+    return n ?? code;
+  } catch {
+    return code;
   }
 }
