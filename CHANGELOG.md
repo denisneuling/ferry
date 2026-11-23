@@ -5,6 +5,14 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.8.0](https://github.com/denisneuling/ferry/compare/v0.7.0...v0.8.0) (2026-11-23)
+
+### Features
+
+* **api:** previous versions of files and folders ([e367cc4](https://github.com/denisneuling/ferry/commit/e367cc4625240b9808c4353b876e23af72f54c9e))
+* **smb:** read previous versions from the server's snapshots ([5493aa4](https://github.com/denisneuling/ferry/commit/5493aa4eeced57dbc33aeafc51b5fc9d035bf955))
+* **ui:** previous versions of files and folders ([9103f34](https://github.com/denisneuling/ferry/commit/9103f3475970128351df455f0a1c92f84c31f2cb))
+
 ## [0.7.0](https://github.com/denisneuling/ferry/compare/v0.6.0...v0.7.0) (2026-11-23)
 
 ### ⚠ BREAKING CHANGES
