@@ -12,6 +12,7 @@ import (
 	"github.com/denisneuling/ferry/internal/cache"
 	"github.com/denisneuling/ferry/internal/meta"
 	"github.com/denisneuling/ferry/internal/preview"
+	"github.com/denisneuling/ferry/internal/raw"
 	"github.com/denisneuling/ferry/internal/smb"
 	"github.com/denisneuling/ferry/internal/thumb"
 )
@@ -106,6 +107,19 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		a.heicThumbnail(ctx, w, r, f, key, size)
 		return
 	}
+	// A camera's raw photo: the JPEG preview it carries, turned as the raw
+	// file says. A TIFF without one is read as the image it is.
+	orientation := 0
+	if raw.Is(peek) {
+		p, err := raw.Find(f, f.Size)
+		switch {
+		case err == nil:
+			src, srcSize, orientation = chunked{io.NewSectionReader(f, p.Offset, p.Length)}, p.Length, p.Orientation
+		case !errors.Is(err, raw.ErrNoPreview):
+			a.fail(w, r, err)
+			return
+		}
+	}
 	if meta.IsAudio(peek) {
 		at := &firstError{r: f}
 		gate := func() error {
@@ -184,7 +198,7 @@ func (a *API) GetThumbnail(w http.ResponseWriter, r *http.Request, share v1.Shar
 		probUnreachable.write(w)
 		return
 	}
-	out, err := thumb.Make(buf.Bytes(), size, a.cfg.ThumbnailMaxPixels)
+	out, err := thumb.MakeOriented(buf.Bytes(), size, a.cfg.ThumbnailMaxPixels, orientation)
 	<-a.thumbs
 	if err != nil {
 		a.thumbFailed(w, key, err)

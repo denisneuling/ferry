@@ -158,7 +158,10 @@ HTML and SVG among them — are shown as text, the first 512 KB. Anything else
 offers a download. A recording shows its cover above the player when it
 carries one. A HEIC photo, which browsers other than Safari cannot show,
 is shown as the server's 640-pixel thumbnail, with the 320-pixel one in its
-place until it has come. Videos get an icon rather than a thumbnail, as do
+place until it has come. So are TIFF images and a camera's raw photos
+(CR2, NEF, ARW, DNG, PEF, ORF, RW2, RAF), from the JPEG preview each
+camera writes into the raw file, turned as the raw file says; a raw file
+without one gets an icon. Videos get an icon rather than a thumbnail, as do
 recordings without a cover.
 
 While an image is shown, the next and the previous one load ahead, so that

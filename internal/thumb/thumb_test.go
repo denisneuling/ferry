@@ -9,6 +9,8 @@ import (
 	"image/jpeg"
 	"image/png"
 	"testing"
+
+	"golang.org/x/image/tiff"
 )
 
 // halves is a w×h image, red on the left half and blue on the right.
@@ -170,5 +172,28 @@ func TestExifOrientationMalformed(t *testing.T) {
 	bad[2+4+6+4] = 0xFF // the IFD offset, now far beyond the segment
 	if o := exifOrientation(bad); o != 1 {
 		t.Fatalf("a broken offset gave %d", o)
+	}
+}
+
+// TIFF is read like the other images; a raw photo's preview is turned as
+// its container says, whatever the JPEG says itself.
+func TestTIFFAndOrientationFromOutside(t *testing.T) {
+	var buf bytes.Buffer
+	if err := tiff.Encode(&buf, halves(40, 20), nil); err != nil {
+		t.Fatal(err)
+	}
+	out, err := Make(buf.Bytes(), 16, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := decode(t, out).Bounds(); b.Dx() != 16 || b.Dy() != 8 {
+		t.Fatalf("TIFF thumbnail %v", b)
+	}
+	out, err = MakeOriented(encodeJPEG(t, halves(40, 20), 0), 16, 1<<20, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := decode(t, out).Bounds(); b.Dx() != 8 || b.Dy() != 16 {
+		t.Fatalf("turned from outside: %v", b)
 	}
 }

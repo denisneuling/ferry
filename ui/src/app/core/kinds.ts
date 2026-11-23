@@ -5,7 +5,23 @@ export type Kind = 'dir' | 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'sheet
 
 const byExtension: Record<string, Kind> = {};
 const add = (kind: Kind, exts: string[]) => exts.forEach((e) => (byExtension[e] = kind));
-add('image', ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'heic', 'heif', 'svg', 'tif', 'tiff']);
+/** A camera's raw photos, which the server shows by the JPEG preview they carry. */
+const rawPhotos = ['cr2', 'nef', 'nrw', 'arw', 'srf', 'sr2', 'dng', 'pef', 'orf', 'rw2', 'raf'];
+add('image', [
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'bmp',
+  'avif',
+  'heic',
+  'heif',
+  'svg',
+  'tif',
+  'tiff',
+  ...rawPhotos,
+]);
 add('video', ['mp4', 'm4v', 'mov', 'mkv', 'webm', 'avi', 'ogv']);
 add('audio', ['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'oga', 'opus']);
 add('pdf', ['pdf']);
@@ -47,6 +63,9 @@ export function kindOf(name: string, folder: boolean): Kind {
  * cover they carry — one without gets an icon, as do HEIC, SVG and video.
  */
 const thumbnailed = new Set([
+  ...rawPhotos,
+  'tif',
+  'tiff',
   'jpg',
   'jpeg',
   'png',
@@ -82,7 +101,7 @@ export function hasThumbnail(name: string): boolean {
 
 /**
  * How the preview shows a file: the browser's own viewers, or as text;
- * `derived` is a picture the browser cannot show itself (HEIC, outside
+ * `derived` is a picture the browser cannot show itself (HEIC, TIFF and raw photos, outside
  * Safari), shown as the server's 640-pixel thumbnail.
  */
 export type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'derived' | 'none';
@@ -98,6 +117,8 @@ export function previewKind(name: string): PreviewKind {
   if (browserAudio.has(ext)) return 'audio';
   if (ext === 'pdf') return 'pdf';
   if ((ext === 'heic' || ext === 'heif') && previewed().has(ext)) return 'derived';
+  // TIFF and raw photos: no browser but Safari shows TIFF, none a raw file.
+  if (ext === 'tif' || ext === 'tiff' || rawPhotos.includes(ext)) return 'derived';
   const k = byExtension[ext];
   if (k === 'text' || ext === 'csv' || ext === 'tsv' || ext === 'svg') return 'text';
   return 'none';

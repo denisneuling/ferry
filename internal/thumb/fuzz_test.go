@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"golang.org/x/image/bmp"
+	"golang.org/x/image/tiff"
 )
 
 // FuzzMake holds Make to its promises on any bytes, since every uploaded
@@ -36,6 +37,11 @@ func FuzzMake(f *testing.F) {
 	f.Add(append([]byte{}, buf.Bytes()...))
 	buf.Reset()
 	if err := bmp.Encode(&buf, halves(6, 3)); err != nil {
+		f.Fatal(err)
+	}
+	f.Add(append([]byte{}, buf.Bytes()...))
+	buf.Reset()
+	if err := tiff.Encode(&buf, halves(6, 4), nil); err != nil {
 		f.Fatal(err)
 	}
 	f.Add(append([]byte{}, buf.Bytes()...))

@@ -20,6 +20,7 @@ import (
 
 	_ "golang.org/x/image/bmp"
 	xdraw "golang.org/x/image/draw"
+	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
 )
 
@@ -77,6 +78,13 @@ func bytesPerPixel(m color.Model) int64 {
 // upright, never larger than the original. Images with transparency are put
 // on white.
 func Make(src []byte, size, maxPixels int) ([]byte, error) {
+	return MakeOriented(src, size, maxPixels, 0)
+}
+
+// MakeOriented is Make with the orientation given from outside the image —
+// a raw photo's container says how its embedded JPEG is turned, and the
+// JPEG often does not — or, as 0, from the image's own EXIF.
+func MakeOriented(src []byte, size, maxPixels, orientation int) ([]byte, error) {
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(src))
 	if err != nil {
 		return nil, ErrUnsupported
@@ -88,9 +96,11 @@ func Make(src []byte, size, maxPixels int) ([]byte, error) {
 	if err != nil {
 		return nil, ErrUnsupported
 	}
-	orientation := 1
-	if format == "jpeg" {
-		orientation = exifOrientation(src)
+	if orientation < 1 || orientation > 8 {
+		orientation = 1
+		if format == "jpeg" {
+			orientation = exifOrientation(src)
+		}
 	}
 	return FromImage(img, orientation, size)
 }
