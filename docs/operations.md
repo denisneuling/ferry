@@ -184,6 +184,19 @@ hold fails inside the module and gets an icon — at the default of 96 MiB
 that is above about 15 megapixels; a 24-megapixel photo needs 160Mi, and
 then `FERRY_THUMBNAIL_MEMORY` of at least 336 MB.
 
+### Time limit
+
+A PDF page or a HEIC photo may run `FERRY_PREVIEW_TIMEOUT` (30 s) once it
+has its slot — preparing the runtime, waiting for its share of the budget,
+decoding; the wait for the slot itself counts against the request's
+`FERRY_REQUEST_TIMEOUT`. Past the limit the instance is aborted, the slot
+is free for the next file, and the answer is `503` (`preview_timeout`):
+nothing is cached, so the file is tried again when it is asked for again.
+`ferry_preview_duration_seconds` shows what the CPU really takes; a photo
+of 12.6 MP took 7 s on a desktop CPU, and a small ARM board may take three
+or four times that. `FERRY_REQUEST_TIMEOUT` should stay above the limit,
+or the request ends first — ferry warns at startup when it does not.
+
 ## Cache
 
 Off by default. With `FERRY_CACHE_DIR` (in the chart, `cache.enabled`),
@@ -265,7 +278,10 @@ name or a path: routes are patterns, errors are kinds from a fixed list
 | `ferry_transfer_bytes_total` | counter | `direction` | file bytes `up` (uploads) and `down` (downloads and previews) |
 | `ferry_smb_errors_total` | counter | `kind` | SMB errors answered to a request: `access_denied`, `not_found`, `exists`, `busy`, `not_empty`, `not_dir`, `is_dir`, `invalid_path`, `limit`, `unreachable`, `session_lost`, `canceled`, `internal` |
 | `ferry_archives_total` | counter | `outcome` | ZIP downloads: `ok`, `failed` (broken off when a file failed), `canceled` (the client left); their bytes count in `ferry_transfer_bytes_total{direction="down"}` |
-| `ferry_thumbnails_total` | counter | `outcome` | `made`, `cached` (from the cache), `not_modified`, `unsupported`, `too_large`, `failed` |
+| `ferry_thumbnails_total` | counter | `outcome` | `made`, `cached` (from the cache), `not_modified`, `unsupported`, `too_large`, `timeout` (a PDF page or HEIC photo past `FERRY_PREVIEW_TIMEOUT`, answered `503`), `failed` |
+| `ferry_preview_jobs_total` | counter | `format`, `outcome` | PDF pages (`pdf`) and HEIC photos (`heic`) made in WebAssembly: `made`, `unsupported`, `blank`, `too_large`, `timeout`, `unavailable` (off, or no budget), `cancelled` (the request ended first), `failed` (reading the file failed) |
+| `ferry_preview_wait_seconds` | histogram | `format` | how long those jobs waited for one of the `FERRY_PREVIEW_CONCURRENCY` slots |
+| `ferry_preview_duration_seconds` | histogram | `format` | how long they ran once they had one: what this CPU takes for a page or a photo, in buckets fine between 5 and 30 s |
 | `ferry_cache_requests_total` | counter | `kind`, `outcome` | lookups in the cache by `kind` (`thumbnail`, `metadata`): `hit`, `miss`, `error` (the volume failed; failed writes count here too) |
 | `ferry_cache_bytes` | gauge | | what the cache's entries take, as last counted |
 | `ferry_cache_evictions_total` | counter | | entries removed to stay within `FERRY_CACHE_MAX_BYTES` |

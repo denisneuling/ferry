@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/metapatrol/ferry/internal/preview"
 	"github.com/metapatrol/ferry/internal/smb"
@@ -103,6 +104,48 @@ func TestPDFThumbnail(t *testing.T) {
 	if res.StatusCode != 415 || problemCode(t, res) != "not_an_image" {
 		t.Fatalf("an empty page: %d", res.StatusCode)
 	}
+	if used, _ := h.api.ThumbnailMemory(); used != 0 {
+		t.Fatalf("%d bytes still taken from the budget", used)
+	}
+}
+
+// A preview job past FERRY_PREVIEW_TIMEOUT is a 503 that says so: not the
+// 415 of a file that makes no preview, and not cached, so that the next
+// request tries again.
+func TestPreviewTimeout(t *testing.T) {
+	addr := os.Getenv("FERRY_TEST_SMB_SERVER")
+	if addr == "" {
+		t.Skip("FERRY_TEST_SMB_SERVER is not set (make dev-samba)")
+	}
+	cfg := testConfig()
+	cfg.SMBServer = addr
+	cfg.PreviewPDF = true
+	cfg.PreviewTimeout = time.Nanosecond // every job runs out
+	cfg.CacheDir = t.TempDir()
+	cfg.CacheKey = strings.Repeat("k", 32)
+	cfg.WASMDir = t.TempDir()
+	if err := preview.Precompile(cfg.WASMDir); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, cfg, smb.LoginGroup)
+	c := h.login(t, "alex", alexPassword)
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	name := "slow-" + hex.EncodeToString(b) + ".pdf"
+	h.do(t, "PUT", "/api/v1/shares/alex/content?path="+q(name), bytes.NewReader(onePagePDF(20)), ferryReq, c)
+	t.Cleanup(func() { h.do(t, "DELETE", "/api/v1/shares/alex/entries?path="+q(name), nil, ferryReq, c) })
+	for range 2 {
+		res := h.do(t, "GET", "/api/v1/shares/alex/thumbnail?path="+q(name), nil, nil, c)
+		if res.StatusCode != 503 || problemCode(t, res) != "preview_timeout" {
+			t.Fatalf("past the job's limit: %d", res.StatusCode)
+		}
+	}
+	_ = filepath.WalkDir(cfg.CacheDir, func(p string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			t.Errorf("cached after a timeout: %s", p)
+		}
+		return nil
+	})
 	if used, _ := h.api.ThumbnailMemory(); used != 0 {
 		t.Fatalf("%d bytes still taken from the budget", used)
 	}

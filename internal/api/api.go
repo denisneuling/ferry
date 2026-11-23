@@ -119,7 +119,7 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 	}
 	o := preview.Options{
 		PDF: cfg.PreviewPDF, CodeDir: cfg.WASMDir, Budget: a.budget, BudgetSize: cfg.ThumbnailMemory,
-		Concurrency: cfg.PreviewConcurrency, Log: log,
+		Concurrency: cfg.PreviewConcurrency, Timeout: cfg.PreviewTimeout, Observe: m.Preview, Log: log,
 		HEIC: cfg.PreviewHEIC, HEIFMemory: cfg.PreviewHEICMemory,
 	}
 	if cfg.PreviewHEIC && cfg.HEIFWASM != "" {
@@ -131,6 +131,12 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		} else {
 			o.HEIFModule = b
 		}
+	}
+	if (cfg.PreviewPDF || cfg.PreviewHEIC) && cfg.RequestTimeout <= cfg.PreviewTimeout {
+		// The request ends first: a slow job is cut off as a request that
+		// ran out, never as one that took too long.
+		log.Warn("FERRY_PREVIEW_TIMEOUT does not take effect: FERRY_REQUEST_TIMEOUT ends a thumbnail's request before",
+			"preview_timeout", cfg.PreviewTimeout.String(), "request_timeout", cfg.RequestTimeout.String())
 	}
 	a.preview = preview.New(o)
 	return a

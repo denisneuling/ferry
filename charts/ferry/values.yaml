@@ -72,6 +72,8 @@ previews:
   heicMemory: 96Mi
   # -- PDF pages and HEIC photos made at once (FERRY_PREVIEW_CONCURRENCY). Each takes up to 208 MB of `thumbnails.memory` while it runs (twice its limit and 16 MB); below that, the format is off.
   concurrency: 1
+  # -- How long one PDF page or HEIC photo may take once its turn has come (FERRY_PREVIEW_TIMEOUT); past it the job is aborted and answered 503. Keep it below `limits.requestTimeout`.
+  timeout: 30s
 
 cache:
   # -- Keep thumbnails and details on a volume, encrypted, across restarts and for everyone who may read the file (FERRY_CACHE_DIR). Off, ferry writes nothing anywhere. Needs a PersistentVolumeClaim; the Deployment then stops the old pod before it starts the new one (maxSurge 0), as the volume is ReadWriteOnce.

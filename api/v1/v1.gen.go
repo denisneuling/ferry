@@ -519,7 +519,7 @@ type Problem struct {
 	// `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
 	// `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
 	// `range_not_satisfiable`, `server_unreachable`, `session_lost`,
-	// `too_many_sessions`, `not_an_image`, `internal`.
+	// `too_many_sessions`, `not_an_image`, `preview_timeout`, `internal`.
 	Code   string  `json:"code"`
 	Detail *string `json:"detail,omitempty"`
 
@@ -1121,7 +1121,9 @@ type ClientInterface interface {
 	// is open for reading under the requesting session; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
 	// file is unchanged; with `v`, see `FileVersion`. Images beyond the
-	// deployment's bounds — bytes or pixels — are `413`.
+	// deployment's bounds — bytes or pixels — are `413`. A PDF page or a
+	// HEIC photo that takes longer than the deployment allows is `503`
+	// (`preview_timeout`): it may work when ferry is less busy.
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1528,7 +1530,9 @@ func (c *Client) GetSpace(ctx context.Context, share ShareName, params *GetSpace
 // is open for reading under the requesting session; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
 // file is unchanged; with `v`, see `FileVersion`. Images beyond the
-// deployment's bounds — bytes or pixels — are `413`.
+// deployment's bounds — bytes or pixels — are `413`. A PDF page or a
+// HEIC photo that takes longer than the deployment allows is `503`
+// (`preview_timeout`): it may work when ferry is less busy.
 //
 // Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2766,7 +2770,9 @@ type ClientWithResponsesInterface interface {
 	// is open for reading under the requesting session; `ETag` follows the file, so the
 	// browser revalidates with `If-None-Match` and gets `304` while the
 	// file is unchanged; with `v`, see `FileVersion`. Images beyond the
-	// deployment's bounds — bytes or pixels — are `413`.
+	// deployment's bounds — bytes or pixels — are `413`. A PDF page or a
+	// HEIC photo that takes longer than the deployment allows is `503`
+	// (`preview_timeout`): it may work when ferry is less busy.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -3884,6 +3890,8 @@ type GetThumbnailResponse struct {
 	ApplicationproblemJSON415 *Problem
 	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
 	ApplicationproblemJSON502 *BadGateway
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *Problem
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
@@ -3924,6 +3932,11 @@ func (r GetThumbnailResponse) GetApplicationproblemJSON415() *Problem {
 // GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
 func (r GetThumbnailResponse) GetApplicationproblemJSON502() *BadGateway {
 	return r.ApplicationproblemJSON502
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r GetThumbnailResponse) GetApplicationproblemJSON503() *Problem {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -4306,7 +4319,9 @@ func (c *ClientWithResponses) GetSpaceWithResponse(ctx context.Context, share Sh
 // is open for reading under the requesting session; `ETag` follows the file, so the
 // browser revalidates with `If-None-Match` and gets `304` while the
 // file is unchanged; with `v`, see `FileVersion`. Images beyond the
-// deployment's bounds — bytes or pixels — are `413`.
+// deployment's bounds — bytes or pixels — are `413`. A PDF page or a
+// HEIC photo that takes longer than the deployment allows is `503`
+// (`preview_timeout`): it may work when ferry is less busy.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -5293,6 +5308,13 @@ func ParseGetThumbnailResponse(rsp *http.Response) (*GetThumbnailResponse, error
 			return nil, err
 		}
 		response.ApplicationproblemJSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 

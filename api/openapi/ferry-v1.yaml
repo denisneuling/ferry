@@ -381,7 +381,9 @@ paths:
         is open for reading under the requesting session; `ETag` follows the file, so the
         browser revalidates with `If-None-Match` and gets `304` while the
         file is unchanged; with `v`, see `FileVersion`. Images beyond the
-        deployment's bounds — bytes or pixels — are `413`.
+        deployment's bounds — bytes or pixels — are `413`. A PDF page or a
+        HEIC photo that takes longer than the deployment allows is `503`
+        (`preview_timeout`): it may work when ferry is less busy.
       parameters:
         - $ref: "#/components/parameters/ShareName"
         - $ref: "#/components/parameters/EntryPath"
@@ -414,6 +416,11 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "502": { $ref: "#/components/responses/BadGateway" }
+        "503":
+          description: Making the preview took longer than the deployment allows (`preview_timeout`); try again later.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /api/v1/shares/{share}/folders:
     post:
@@ -643,7 +650,7 @@ components:
             `rate_limited`, `access_denied`, `not_found`, `exists`, `busy`,
             `not_empty`, `not_a_folder`, `is_a_folder`, `too_large`,
             `range_not_satisfiable`, `server_unreachable`, `session_lost`,
-            `too_many_sessions`, `not_an_image`, `internal`.
+            `too_many_sessions`, `not_an_image`, `preview_timeout`, `internal`.
         limit:
           type: integer
           format: int64

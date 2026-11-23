@@ -347,3 +347,27 @@ func TestHEIFHostileExtents(t *testing.T) {
 		t.Fatal("a box of 2^63 bytes in a file of 1000")
 	}
 }
+
+// A photo decoded past Options.Timeout is ErrTimeout and the next runs.
+func TestHEICTimeout(t *testing.T) {
+	sample := heicSample(t)
+	big := variant(t, sample, bigGrid(8, 6))
+	var obs observed
+	e := heicEngine(t, Options{Observe: obs.observe})
+	if _, err := heic(t, e, sample, 160); err != nil { // the runtime is ready
+		t.Fatal(err)
+	}
+	// Loading the runtime takes longer than this limit; decoding 12.6 MP
+	// takes seconds.
+	e.o.Timeout = 300 * time.Millisecond
+	if _, err := heic(t, e, big, 640); !errors.Is(err, ErrTimeout) {
+		t.Fatalf("12.6 MP past the job's limit: %v", err)
+	}
+	if got, _ := obs.last(); got != "heic/timeout" {
+		t.Errorf("observed %q", got)
+	}
+	e.o.Timeout = 0 // the sample alone takes longer than 300 ms
+	if _, err := heic(t, e, sample, 160); err != nil {
+		t.Fatalf("after the timeout: %v", err)
+	}
+}

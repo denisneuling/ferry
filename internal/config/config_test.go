@@ -36,8 +36,8 @@ func TestDefaults(t *testing.T) {
 	if !c.PreviewHEIC || c.PreviewHEICMemory != 96<<20 || c.HEIFWASM != "" {
 		t.Errorf("heic %v %d %q", c.PreviewHEIC, c.PreviewHEICMemory, c.HEIFWASM)
 	}
-	if !c.PreviewPDF || c.PreviewConcurrency != 1 || c.WASMDir != "/usr/lib/ferry/wasm" {
-		t.Errorf("previews %v %d %q", c.PreviewPDF, c.PreviewConcurrency, c.WASMDir)
+	if !c.PreviewPDF || c.PreviewConcurrency != 1 || c.PreviewTimeout != 30*time.Second || c.WASMDir != "/usr/lib/ferry/wasm" {
+		t.Errorf("previews %v %d %v %q", c.PreviewPDF, c.PreviewConcurrency, c.PreviewTimeout, c.WASMDir)
 	}
 	if c.CacheDir != "" || c.CacheMaxBytes != 1<<30 {
 		t.Errorf("cache %q %d", c.CacheDir, c.CacheMaxBytes)
@@ -104,6 +104,7 @@ func TestErrors(t *testing.T) {
 		"address or CIDR":       {"FERRY_SMB_SERVER": "nas", "FERRY_TRUSTED_PROXIES": "proxy"},
 		"auto, true or false":   {"FERRY_SMB_SERVER": "nas", "FERRY_COOKIE_SECURE": "yes"},
 		"shorter than":          {"FERRY_SMB_SERVER": "nas", "FERRY_SESSION_LIFETIME": "5m"},
+		"shorter than 1s":       {"FERRY_SMB_SERVER": "nas", "FERRY_PREVIEW_TIMEOUT": "500ms"},
 		"integer of at least 1": {"FERRY_SMB_SERVER": "nas", "FERRY_MAX_SESSIONS": "0"},
 		"FERRY_CACHE_KEY":       {"FERRY_SMB_SERVER": "nas", "FERRY_CACHE_DIR": "/c", "FERRY_CACHE_KEY": "short"},
 		"like 1Gi":              {"FERRY_SMB_SERVER": "nas", "FERRY_CACHE_MAX_BYTES": "1GB"},

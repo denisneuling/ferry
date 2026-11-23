@@ -60,6 +60,7 @@ var (
 	probRangeNotSatisfied = problem{status: http.StatusRequestedRangeNotSatisfiable, code: "range_not_satisfiable", title: "The range lies outside the file."}
 	probUnreachable       = problem{status: http.StatusBadGateway, code: "server_unreachable", title: "The file server cannot be reached."}
 	probSessionLost       = problem{status: http.StatusBadGateway, code: "session_lost", title: "The connection to the file server was lost; log in again."}
+	probPreviewTimeout    = problem{status: http.StatusServiceUnavailable, code: "preview_timeout", title: "Making this preview took too long; try again later."}
 	probTooManySessions   = problem{status: http.StatusServiceUnavailable, code: "too_many_sessions", title: "This ferry has as many sessions as it allows; try again later."}
 	probInternal          = problem{status: http.StatusInternalServerError, code: "internal", title: "Something went wrong in ferry."}
 	probIncomplete        = problem{status: http.StatusBadRequest, code: "invalid_request", title: "The request ended before it was complete."}

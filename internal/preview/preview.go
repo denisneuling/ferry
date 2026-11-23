@@ -56,6 +56,10 @@ var (
 	// out of memory on with a white one instead of an error, so such a
 	// result is not trusted: it gets no thumbnail and is not cached.
 	ErrBlank = errors.New("preview: the result is blank")
+	// ErrTimeout is a job that ran past Options.Timeout and was aborted.
+	// It says nothing about the file: under load the same file may make it
+	// next time.
+	ErrTimeout = errors.New("preview: the job took too long")
 )
 
 const (
@@ -102,7 +106,16 @@ type Options struct {
 	Concurrency int
 	// Idle closes a runtime after this long without a job (DefaultIdle).
 	Idle time.Duration
-	Log  *slog.Logger
+	// Timeout bounds a job from the moment it holds its slot: preparing
+	// the runtime, waiting for its share of the budget, decoding. The wait
+	// for the slot is not counted; the caller's context bounds that. 0 is
+	// no bound but the caller's.
+	Timeout time.Duration
+	// Observe, when set, is told of every job: its format ("pdf", "heic"),
+	// its outcome (see Outcome), how long it waited for a slot and how
+	// long it ran once it had one.
+	Observe func(format, outcome string, wait, run time.Duration)
+	Log     *slog.Logger
 }
 
 // Engine runs the jobs. Its methods are safe for concurrent use.
@@ -221,12 +234,12 @@ func (e *Engine) PDF(ctx context.Context, r io.ReadSeeker, size int64, box int) 
 	if e.pdf == nil {
 		return nil, ErrUnavailable
 	}
-	select {
-	case e.slots <- struct{}{}:
-		defer func() { <-e.slots }()
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return e.run(ctx, "pdf", func(ctx context.Context) ([]byte, error) {
+		return e.pdfJob(ctx, r, size, box)
+	})
+}
+
+func (e *Engine) pdfJob(ctx context.Context, r io.ReadSeeker, size int64, box int) ([]byte, error) {
 	// The runtime first, then the job's share: a compile charges the budget
 	// while it holds the slot's lock, and a job that held its share while
 	// waiting for that lock could leave the compile waiting for ever.
@@ -245,6 +258,63 @@ func (e *Engine) PDF(ctx context.Context, r io.ReadSeeker, size int64, box int) 
 	}
 	defer release()
 	return renderPDF(ctx, pool, r, size, box)
+}
+
+// run runs job in a slot, under the job's time limit, and reports it to
+// Observe. A job aborted by its own limit, not by the caller, is
+// ErrTimeout, whatever the job made of its context ending.
+func (e *Engine) run(ctx context.Context, format string, job func(context.Context) ([]byte, error)) (out []byte, err error) {
+	start := time.Now()
+	select {
+	case e.slots <- struct{}{}:
+		defer func() { <-e.slots }()
+	case <-ctx.Done():
+		e.observe(format, ctx.Err(), time.Since(start), 0)
+		return nil, ctx.Err()
+	}
+	wait := time.Since(start)
+	jctx := ctx
+	if e.o.Timeout > 0 {
+		var cancel context.CancelFunc
+		jctx, cancel = context.WithTimeout(ctx, e.o.Timeout)
+		defer cancel()
+	}
+	out, err = job(jctx)
+	if err != nil && ctx.Err() == nil && jctx.Err() != nil {
+		err = ErrTimeout
+	}
+	e.observe(format, err, wait, time.Since(start)-wait)
+	return out, err
+}
+
+func (e *Engine) observe(format string, err error, wait, run time.Duration) {
+	if e.o.Observe != nil {
+		e.o.Observe(format, Outcome(err), wait, run)
+	}
+}
+
+// Outcome names a job's result for metrics: made, timeout, cancelled (the
+// caller left), unavailable, blank, too_large, unsupported, or failed
+// (reading the file failed).
+func Outcome(err error) string {
+	switch {
+	case err == nil:
+		return "made"
+	case errors.Is(err, ErrTimeout):
+		return "timeout"
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return "cancelled"
+	case errors.Is(err, ErrUnavailable):
+		return "unavailable"
+	case errors.Is(err, ErrBlank):
+		return "blank"
+	case errors.Is(err, ErrTooLarge):
+		return "too_large"
+	case errors.Is(err, ErrUnsupported):
+		return "unsupported"
+	default:
+		return "failed"
+	}
 }
 
 // acquire returns the pool, preparing it first, and counts the job so that

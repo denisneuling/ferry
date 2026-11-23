@@ -87,12 +87,12 @@ func (e *Engine) HEIC(ctx context.Context, r io.ReaderAt, size int64, box int, m
 	if e.heic == nil {
 		return nil, ErrUnavailable
 	}
-	select {
-	case e.slots <- struct{}{}:
-		defer func() { <-e.slots }()
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return e.run(ctx, "heic", func(ctx context.Context) ([]byte, error) {
+		return e.heicJob(ctx, r, size, box, maxBytes, maxPixels)
+	})
+}
+
+func (e *Engine) heicJob(ctx context.Context, r io.ReaderAt, size int64, box int, maxBytes int64, maxPixels int) ([]byte, error) {
 	var data []byte
 	if box <= thumbItemBox {
 		// A file the parser does not follow may still be one libheif reads:

@@ -527,3 +527,81 @@ func TestCompiledCodeReadOnly(t *testing.T) {
 		})
 	}
 }
+
+// observed records what Options.Observe was told.
+type observed struct {
+	mu   sync.Mutex
+	jobs []string // format/outcome
+	runs []time.Duration
+}
+
+func (o *observed) observe(format, outcome string, _, run time.Duration) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.jobs = append(o.jobs, format+"/"+outcome)
+	o.runs = append(o.runs, run)
+}
+
+func (o *observed) last() (string, time.Duration) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.jobs[len(o.jobs)-1], o.runs[len(o.runs)-1]
+}
+
+// A job past Options.Timeout is ErrTimeout, not a file that cannot be
+// read, and the next job runs; a caller that leaves is its context's
+// error, not a timeout.
+func TestJobTimeout(t *testing.T) {
+	var obs observed
+	e := engine(t, Options{Observe: obs.observe})
+	if _, err := render(t, e, invoice(), 160); err != nil { // the runtime is ready
+		t.Fatal(err)
+	}
+	// Loading the runtime takes longer than this limit.
+	e.o.Timeout = 50 * time.Millisecond
+	if got, _ := obs.last(); got != "pdf/made" {
+		t.Errorf("observed %q", got)
+	}
+	big := scan(t, 5000, 4000)
+	start := time.Now()
+	_, err := render(t, e, big, 640)
+	if !errors.Is(err, ErrTimeout) || errors.Is(err, ErrUnsupported) {
+		t.Fatalf("past the job's limit: %v", err)
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Fatalf("aborted after %v", d)
+	}
+	if got, run := obs.last(); got != "pdf/timeout" || run < 50*time.Millisecond {
+		t.Errorf("observed %q after %v", got, run)
+	}
+	if _, err := render(t, e, invoice(), 160); err != nil {
+		t.Fatalf("after the timeout: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	defer cancel()
+	_, err = e.PDF(ctx, bytes.NewReader(big), int64(len(big)), 640)
+	if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrTimeout) {
+		t.Fatalf("the caller's deadline: %v", err)
+	}
+	if got, _ := obs.last(); got != "pdf/cancelled" {
+		t.Errorf("observed %q", got)
+	}
+}
+
+func TestOutcome(t *testing.T) {
+	for err, want := range map[error]string{
+		nil:              "made",
+		ErrTimeout:       "timeout",
+		context.Canceled: "cancelled",
+		ErrUnavailable:   "unavailable",
+		ErrBlank:         "blank",
+		ErrTooLarge:      "too_large",
+		jobError(context.Background(), errors.New("x")): "unsupported",
+		errors.New("the share failed"):                  "failed",
+	} {
+		if got := Outcome(err); got != want {
+			t.Errorf("%v: %q, want %q", err, got, want)
+		}
+	}
+}

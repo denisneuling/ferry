@@ -36,6 +36,9 @@ type Metrics struct {
 	cacheReqs   *prometheus.CounterVec
 	cacheBytes  prometheus.Gauge
 	cacheEvict  prometheus.Counter
+	previews    *prometheus.CounterVec
+	previewWait *prometheus.HistogramVec
+	previewRun  *prometheus.HistogramVec
 }
 
 // Gauges are read at every scrape from where they are kept.
@@ -64,7 +67,7 @@ func New(version, commit string, g Gauges) *Metrics {
 		}, []string{"kind"}),
 		thumbnails: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ferry_thumbnails_total",
-			Help: "Thumbnail requests by outcome: made, not_modified, unsupported, too_large, failed.",
+			Help: "Thumbnail requests by outcome: made, cached, not_modified, unsupported, too_large, timeout (a preview job ran past FERRY_PREVIEW_TIMEOUT), failed.",
 		}, []string{"outcome"}),
 		httpCount: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "ferry_http_requests_total",
@@ -107,9 +110,25 @@ func New(version, commit string, g Gauges) *Metrics {
 			Name: "ferry_cache_evictions_total",
 			Help: "Entries removed from the cache to keep it within FERRY_CACHE_MAX_BYTES, the least recently used first.",
 		}),
+		previews: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ferry_preview_jobs_total",
+			Help: "Preview jobs (PDF pages, HEIC photos) by format and outcome: made, unsupported, blank, too_large, timeout, unavailable, cancelled, failed.",
+		}, []string{"format", "outcome"}),
+		previewWait: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "ferry_preview_wait_seconds",
+			Help:    "How long a preview job waited for one of the FERRY_PREVIEW_CONCURRENCY slots, by format.",
+			Buckets: []float64{.01, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 60},
+		}, []string{"format"}),
+		previewRun: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name: "ferry_preview_duration_seconds",
+			Help: "How long a preview job ran once it had its slot, by format: what the CPU takes for a page or a photo.",
+			// Fine between 5 and 30 s, where a large photo lands on a slow
+			// CPU and FERRY_PREVIEW_TIMEOUT cuts it off.
+			Buckets: []float64{.05, .1, .25, .5, 1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 45, 60},
+		}, []string{"format"}),
 	}
 	reg.MustRegister(m.logins, m.bytes, m.smbErrors, m.thumbnails, m.httpCount, m.httpLatency, m.smbConns, m.smbLost, m.smbWait, m.archives,
-		m.cacheReqs, m.cacheBytes, m.cacheEvict)
+		m.cacheReqs, m.cacheBytes, m.cacheEvict, m.previews, m.previewWait, m.previewRun)
 	build := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:        "ferry_build_info",
 		Help:        "Always 1; the labels say which build runs.",
@@ -172,6 +191,19 @@ func (m *Metrics) SMBError(kind string) {
 func (m *Metrics) Thumbnail(outcome string) {
 	if m != nil {
 		m.thumbnails.WithLabelValues(outcome).Inc()
+	}
+}
+
+// Preview records a preview job: its format and outcome, its wait for a
+// slot and its run.
+func (m *Metrics) Preview(format, outcome string, wait, run time.Duration) {
+	if m == nil {
+		return
+	}
+	m.previews.WithLabelValues(format, outcome).Inc()
+	m.previewWait.WithLabelValues(format).Observe(wait.Seconds())
+	if outcome != "cancelled" || run > 0 {
+		m.previewRun.WithLabelValues(format).Observe(run.Seconds())
 	}
 }
 

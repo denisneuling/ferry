@@ -66,9 +66,11 @@ type Config struct {
 	CacheKey      string
 	// Previews of formats Go cannot decode, run as WebAssembly: PDF's first
 	// page (FERRY_PREVIEW_PDF), how many at once (FERRY_PREVIEW_CONCURRENCY),
-	// and where the compiled code is (FERRY_WASM_DIR; the image ships it).
+	// how long one may run (FERRY_PREVIEW_TIMEOUT), and where the compiled
+	// code is (FERRY_WASM_DIR; the image ships it).
 	PreviewPDF         bool
 	PreviewConcurrency int
+	PreviewTimeout     time.Duration
 	WASMDir            string
 	// HEIC photos (FERRY_PREVIEW_HEIC), the memory one may take
 	// (FERRY_PREVIEW_HEIC_MEMORY), and a module to use instead of the one
@@ -131,6 +133,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		PreviewHEIC:          true,
 		PreviewHEICMemory:    96 << 20,
 		PreviewConcurrency:   1,
+		PreviewTimeout:       30 * time.Second,
 		WASMDir:              "/usr/lib/ferry/wasm",
 		LoginRatePerAddress:  10,
 		LoginRatePerUser:     5,
@@ -166,6 +169,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		{"FERRY_LOGIN_TIMEOUT", &c.LoginTimeout},
 		{"FERRY_REQUEST_TIMEOUT", &c.RequestTimeout},
 		{"FERRY_STALL_TIMEOUT", &c.StallTimeout},
+		{"FERRY_PREVIEW_TIMEOUT", &c.PreviewTimeout},
 	}
 	for _, d := range durations {
 		if v := getenv(d.name); v != "" {
@@ -296,6 +300,10 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	case "json", "text":
 	default:
 		fail("FERRY_LOG_FORMAT", fmt.Errorf("%q is not json or text", c.LogFormat))
+	}
+	if c.PreviewTimeout < time.Second {
+		// Shorter, and a PDF would not get through opening its runtime.
+		fail("FERRY_PREVIEW_TIMEOUT", errors.New("is shorter than 1s"))
 	}
 	if c.SessionLifetime < c.IdleTimeout {
 		fail("FERRY_SESSION_LIFETIME", errors.New("is shorter than FERRY_IDLE_TIMEOUT"))

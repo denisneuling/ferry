@@ -121,6 +121,8 @@ spec:
               value: {{ .Values.previews.heicMemory | quote }}
             - name: FERRY_PREVIEW_CONCURRENCY
               value: {{ .Values.previews.concurrency | int | quote }}
+            - name: FERRY_PREVIEW_TIMEOUT
+              value: {{ .Values.previews.timeout | quote }}
             {{- if .Values.cache.enabled }}
             - name: FERRY_CACHE_DIR
               value: /var/cache/ferry

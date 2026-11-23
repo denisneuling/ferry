@@ -206,6 +206,8 @@ func (a *API) pdfThumbnail(ctx context.Context, w http.ResponseWriter, r *http.R
 		writeThumbnail(w, out)
 	case ctx.Err() != nil:
 		probUnreachable.write(w)
+	case errors.Is(err, preview.ErrTimeout):
+		a.previewTimeout(w)
 	case errors.Is(err, preview.ErrUnsupported), errors.Is(err, preview.ErrBlank), errors.Is(err, preview.ErrUnavailable):
 		// Off, unreadable, or white — perhaps for want of memory: an icon,
 		// and nothing cached.
@@ -232,6 +234,8 @@ func (a *API) heicThumbnail(ctx context.Context, w http.ResponseWriter, r *http.
 		writeThumbnail(w, out)
 	case ctx.Err() != nil:
 		probUnreachable.write(w)
+	case errors.Is(err, preview.ErrTimeout):
+		a.previewTimeout(w)
 	case errors.Is(err, preview.ErrTooLarge):
 		a.thumbProblem(w, thumb.ErrTooLarge)
 	default:
@@ -281,6 +285,14 @@ func (s *firstErrorSeeker) Seek(off int64, whence int) (int64, error) {
 		s.err = err
 	}
 	return n, err
+}
+
+// previewTimeout answers a preview job that ran past FERRY_PREVIEW_TIMEOUT.
+// It may well work when ferry is less busy: a 503, not the 415 of a file
+// that makes no preview, and nothing is cached.
+func (a *API) previewTimeout(w http.ResponseWriter) {
+	a.metrics.Thumbnail("timeout")
+	probPreviewTimeout.write(w)
 }
 
 func writeThumbnail(w http.ResponseWriter, out []byte) {
