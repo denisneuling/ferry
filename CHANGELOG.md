@@ -5,6 +5,14 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.9.0](https://github.com/denisneuling/ferry/compare/v0.8.0...v0.9.0) (2026-11-23)
+
+### Features
+
+* copy within a share, and restore a version as a copy ([586b33f](https://github.com/denisneuling/ferry/commit/586b33fcd10bb6cf7811a345cc8e5079b69e0c6b))
+* search for names below a folder ([72e6a79](https://github.com/denisneuling/ferry/commit/72e6a797841d0b499a5e65d9357c9cceea2877bd))
+* **ui:** move by dragging, upload folders, and copies in the panel ([fb56fde](https://github.com/denisneuling/ferry/commit/fb56fdec03fc68ba304067e7333577b7b98099b5))
+
 ## [0.8.0](https://github.com/denisneuling/ferry/compare/v0.7.0...v0.8.0) (2026-11-23)
 
 ### Features
