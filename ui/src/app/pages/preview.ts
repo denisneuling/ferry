@@ -369,7 +369,14 @@ export class Preview {
     const t = this.text();
     const e = this.entry();
     const sh = this.sheet();
-    if (sh) return { rows: sh.rows, more: sh.truncated };
+    // A sheet's rows end at their last value; a table needs them as wide as the widest.
+    if (sh) {
+      const width = Math.max(0, ...sh.rows.map((r) => r.length));
+      return {
+        rows: sh.rows.map((r) => [...r, ...Array<string>(width - r.length).fill('')]),
+        more: sh.truncated,
+      };
+    }
     return t === null || !e ? null : parseTable(t, e.name.toLowerCase().endsWith('.tsv'));
   });
   /** A ZIP's entries, for the preview; folders are left out, their files carry the path. */
