@@ -5,6 +5,20 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.12.0](https://github.com/denisneuling/ferry/compare/v0.11.0...v0.12.0) (2026-11-24)
+
+### Features
+
+* add up a folder's size on request ([eb24ed0](https://github.com/denisneuling/ferry/commit/eb24ed03df474954818a168d54d57b413fec484e))
+* **ui:** favourites and recently used folders and files ([9305a04](https://github.com/denisneuling/ferry/commit/9305a04ec05a6dbbc7d3e0e7fd4837429245cc9b))
+* **ui:** Markdown laid out, source code coloured, and new text files ([a604625](https://github.com/denisneuling/ferry/commit/a60462558cfc8f0a041c98b49e5ad005cedc3e7a))
+* **ui:** rename several entries by a pattern ([179312c](https://github.com/denisneuling/ferry/commit/179312c74e80f069c7c821a34b3eaab2a96ebd72))
+* **ui:** slideshow, full screen, turning and swiping pictures, and sorting by date taken ([0683fad](https://github.com/denisneuling/ferry/commit/0683fad91679789eca20f8a968ed9d91bfb6f9e8))
+
+### Bug Fixes
+
+* **ui:** keep a folder's star on the line of its title ([94373f1](https://github.com/denisneuling/ferry/commit/94373f1d91b284fe82ae9959e275fe997b4049fb))
+
 ## [0.11.0](https://github.com/denisneuling/ferry/compare/v0.10.0...v0.11.0) (2026-11-24)
 
 ### Features
