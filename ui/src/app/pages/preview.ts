@@ -25,6 +25,7 @@ import { Snapshot } from '../core/snapshot';
 import { Places } from '../core/places';
 import { Versions } from '../ui/versions';
 import { TextEditor } from '../ui/text-editor';
+import { TextView } from '../ui/text-view';
 import { Zoom } from '../ui/zoom';
 import { MAX_EDIT_BYTES } from '../core/text-file';
 import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../core/subtitles';
@@ -38,7 +39,7 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
 @Component({
   selector: 'f-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, FileDetails, TextEditor, Zoom],
+  imports: [Icon, FileDetails, TextEditor, TextView, Zoom],
   host: { '(document:keydown)': 'key($event)' },
   template: `@if (entry(); as e) {
     <div
@@ -238,7 +239,7 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
                 @if (text() === null) {
                   <ng-container i18n="@@loading">Loading…</ng-container>
                 } @else {
-                  {{ text() }}
+                  <f-text-view [text]="text() ?? ''" [name]="e.name" />
                   @if (truncated()) {
                     <p i18n="@@pv.truncated">
                       … The rest of the file is not shown; download it to see it all.
@@ -458,6 +459,14 @@ export class Preview {
           },
           (err) => this.entry() === e && this.text.set(describe(err)),
         );
+      }
+    });
+    // A text file just made opens in the editor.
+    effect(() => {
+      const e = this.entry();
+      if (e && this.browser.editNext) {
+        this.browser.editNext = false;
+        if (this.editable(e)) untracked(() => this.editing.set(true));
       }
     });
     // Subtitle files next to a video become its tracks. They are read at the

@@ -2182,3 +2182,139 @@ h1 .fav {
 .recent a:hover b {
   color: var(--accent);
 }
+
+/* Source code in the text preview, on its paper: quiet colours. */
+.textview .code {
+  font:
+    13.5px/1.6 ui-monospace,
+    'SFMono-Regular',
+    Menlo,
+    Consolas,
+    monospace;
+}
+.textview .tk-c {
+  color: #7b8784;
+  font-style: italic;
+}
+.textview .tk-s {
+  color: #8a5a12;
+}
+.textview .tk-n {
+  color: #a04a2a;
+}
+.textview .tk-k {
+  color: #0f5f5c;
+  font-weight: 600;
+}
+.textview .tk-t {
+  color: #2d5f9a;
+}
+
+/* Markdown, laid out; its source a click away. */
+.md-switch {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin: -18px -24px 12px 0;
+  white-space: normal;
+}
+.md-switch .btn {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+.md-switch .btn.on {
+  background: #0f5f5c14;
+  color: #0f5f5c;
+}
+.textview .md {
+  white-space: normal;
+}
+.textview .md > :first-child {
+  margin-top: 0;
+}
+.textview .md h1,
+.textview .md h2,
+.textview .md h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 1.4em 0 0.5em;
+}
+.textview .md h1 {
+  font-size: 1.8em;
+}
+.textview .md h2 {
+  font-size: 1.45em;
+}
+.textview .md h3 {
+  font-size: 1.2em;
+}
+.textview .md p,
+.textview .md ul,
+.textview .md ol,
+.textview .md blockquote,
+.textview .md pre,
+.textview .md table {
+  margin: 0 0 1em;
+}
+.textview .md p {
+  white-space: pre-line;
+}
+.textview .md ul,
+.textview .md ol {
+  padding-left: 1.5em;
+}
+.textview .md blockquote {
+  border-left: 3px solid #d3cabc;
+  padding-left: 1em;
+  color: #55625f;
+}
+.textview .md code {
+  font:
+    0.9em ui-monospace,
+    'SFMono-Regular',
+    Menlo,
+    Consolas,
+    monospace;
+  background: #efeae2;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.textview .md pre {
+  background: #efeae2;
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow: auto;
+  white-space: pre;
+}
+.textview .md pre code {
+  background: none;
+  padding: 0;
+}
+.textview .md a {
+  color: #0f5f5c;
+}
+.textview .md hr {
+  border: 0;
+  border-top: 1px solid #e4ddd2;
+  margin: 1.5em 0;
+}
+.textview .md table {
+  border-collapse: collapse;
+}
+.textview .md th,
+.textview .md td {
+  border: 1px solid #e4ddd2;
+  padding: 4px 10px;
+}
+.textview .md th {
+  background: #efeae2;
+}
+.textview .md-image {
+  color: #8a938f;
+  font-style: italic;
+}
+.textview .md-image::before {
+  content: '🖼 ';
+  font-style: normal;
+}

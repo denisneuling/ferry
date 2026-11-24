@@ -136,6 +136,15 @@
       <button class="btn" type="button" (click)="actions.mkdir()">
         <f-icon name="folderPlus" [size]="17" /><ng-container i18n="@@newFolder">New folder</ng-container>
       </button>
+      <button
+        class="btn"
+        type="button"
+        (click)="actions.newText()"
+        title="New text file"
+        i18n-title="@@newText.title"
+      >
+        <f-icon name="text" [size]="17" /><ng-container i18n="@@newText">Text file</ng-container>
+      </button>
       <button class="btn primary" type="button" (click)="pick()">
         <f-icon name="upload" [size]="17" /><ng-container i18n="@@upload">Upload</ng-container>
       </button>

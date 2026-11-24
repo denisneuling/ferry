@@ -267,6 +267,11 @@
     "fav.heading": "Favoriten",
     "recent.heading": "Zuletzt verwendet",
     "recent.clear": " Leeren ",
-    "recent.forget": "Aus dieser Liste entfernen"
+    "recent.forget": "Aus dieser Liste entfernen",
+    "newText.title": "Neue Textdatei",
+    "newText.value": "Notizen.txt",
+    "newText": "Textdatei",
+    "md.formatted": " Formatiert ",
+    "md.source": " Quelltext "
   }
 }

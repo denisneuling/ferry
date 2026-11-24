@@ -227,6 +227,19 @@ reports it: on a file system that keeps times coarsely (FAT, two seconds),
 two saves of the same length within that window look alike; ZFS, ext4 and
 NTFS keep them finely enough.
 
+**Text file** next to **New folder** makes an empty text file, `Notes.txt`
+unless named otherwise, and opens it in the editor; a file of that name is
+never replaced.
+
+Markdown (`.md`) is shown laid out — headings, lists and task lists,
+quotes, tables, code, links — with its source a click away. It is read by
+ferry's own small reader into a fixed set of elements and text: HTML in it
+shows as the text it is, pictures are not loaded but described, and a
+link is a link only to an `http` or `https` address, opened in a new tab
+without a referrer. Source code (JavaScript, TypeScript, Go, Python, Java,
+C, Rust, shell, SQL, JSON, YAML, HTML, CSS and more) is coloured:
+comments, strings, numbers and keywords.
+
 ## Playing music
 
 A folder with recordings has **Play**: its recordings play one after the

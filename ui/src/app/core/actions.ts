@@ -94,6 +94,36 @@ export class Actions {
     }
   }
 
+  /**
+   * A new, empty text file, opened in the editor. An existing file of that
+   * name is never replaced: the server answers exists, and that is said.
+   */
+  async newText(): Promise<void> {
+    const share = this.browser.share();
+    if (share === null) return;
+    const name = await this.dialogs.ask({
+      title: $localize`:@@newText.title:New text file`,
+      field: $localize`:@@mkdir.field:Name`,
+      value: $localize`:@@newText.value:Notes.txt`,
+      selectStem: true,
+      ok: $localize`:@@mkdir.ok:Create`,
+      check: checkName,
+    });
+    if (!name) return;
+    try {
+      await this.api.upload(share, join(this.browser.path(), name), new Blob([]), false, () => undefined)
+        .done;
+      await this.browser.reload();
+      const i = this.browser.files().findIndex((e) => e.name === name);
+      if (i >= 0) {
+        this.browser.editNext = true;
+        this.browser.preview.set(i);
+      }
+    } catch (e) {
+      this.toasts.error(describe(e));
+    }
+  }
+
   async rename(entry: Entry): Promise<void> {
     const share = this.browser.share();
     if (share === null) return;

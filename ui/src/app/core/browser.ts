@@ -53,6 +53,8 @@ export class Browser {
   readonly reveal = signal<string | null>(null);
   /** Whether the name revealed is a file to preview once it is there. */
   revealOpens = false;
+  /** Whether the next file previewed opens in the editor: one just made. */
+  editNext = false;
 
   private loads = 0;
   private abort: AbortController | null = null;
