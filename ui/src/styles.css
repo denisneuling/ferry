@@ -2318,3 +2318,31 @@ h1 .fav {
   content: '🖼 ';
   font-style: normal;
 }
+
+/* A button that reads as a word in its line: the details' "Show". */
+.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The pictures' capture times being read, in the sort button. */
+.taken-progress {
+  margin-left: 6px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+/* The slideshow's seconds, as a button in the preview's bar. */
+.lb-btn.lb-interval {
+  width: auto;
+  padding: 0 10px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.lightbox:fullscreen {
+  background: #000;
+}

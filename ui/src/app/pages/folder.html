@@ -110,6 +110,22 @@
         <f-icon name="list" [size]="17" />
       </button>
     </div>
+    @if (pictureCount() > 1) {
+      <button
+        class="btn"
+        type="button"
+        [class.on]="browser.sort() === 'taken'"
+        [attr.aria-pressed]="browser.sort() === 'taken'"
+        (click)="byTaken()"
+        title="Sort the pictures by when they were taken"
+        i18n-title="@@taken.title"
+      >
+        <f-icon name="image" [size]="17" /><ng-container i18n="@@taken.sort">By date taken</ng-container>
+        @if (browser.takenProgress(); as p) {
+          <small class="taken-progress">{{ p.done }}/{{ p.total }}</small>
+        }
+      </button>
+    }
     @if (recordings().length) {
       <button
         class="btn"

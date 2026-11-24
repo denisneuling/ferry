@@ -30,7 +30,7 @@ describe('FileDetails', () => {
     const el = f.nativeElement as HTMLElement;
     const dt = [...el.querySelectorAll('dt')].map((d) => d.textContent?.trim());
     const dd = [...el.querySelectorAll('dd')].map((d) => d.textContent?.trim());
-    return { el, map: Object.fromEntries(dt.map((k, i) => [k, dd[i]])) };
+    return { f, el, map: Object.fromEntries(dt.map((k, i) => [k, dd[i]])) };
   };
 
   it("labels a photo's details and keeps its words as text", async () => {
@@ -48,11 +48,17 @@ describe('FileDetails', () => {
       orientation: 6,
       location: { latitude: 54.611667, longitude: 11.349444 },
     });
-    const { el, map } = await rows();
+    const { f, el, map } = await rows();
     expect(map['Dimensions']).toBe('3,024 × 4,032 (12.2 MP)');
     expect(map['Exposure']).toBe('f/2.8 · 1/500 s · ISO 800 · 70 mm');
     expect(map['Orientation']).toBe('Turned 90° clockwise');
-    expect(map['GPS position']).toBe('54.611667, 11.349444');
+    // Where it was taken shows only when asked for.
+    expect(map['GPS position']).toBe('Show');
+    expect(el.textContent).not.toContain('54.6');
+    (el.querySelector('dd button') as HTMLButtonElement).click();
+    f.detectChanges();
+    await f.whenStable();
+    expect(el.textContent).toContain('54.611667, 11.349444');
     expect(map['Camera']).toBe('<b>Fictional</b> Optics');
     expect(map['Taken']).toBe('Jan 29, 2025, 5:47 PM'); // the camera's clock, not the viewer's zone
     expect(el.querySelector('b')).toBeNull();

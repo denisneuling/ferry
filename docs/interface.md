@@ -105,7 +105,18 @@ same folder, the copy is named "… (copy)".
 | Esc | clear the selection or the search, close the preview or a dialog |
 
 In the preview: ← → for the previous and next file, `i` for the details,
-`+` `-` `0` to zoom a picture in, out and back, Esc to close.
+`+` `-` `0` to zoom a picture in, out and back, `r` to turn it, Space for
+the slideshow, `f` for full screen, Esc to close. On a touch screen a
+swipe steps to the next or the previous file.
+
+A folder of pictures plays as a slideshow: the next picture once the one
+shown has loaded and its time — 3, 5 or 10 seconds — is up, other files
+passed over; any step of one's own ends it. A picture turned is turned
+only on the screen; nothing is written. **By date taken** sorts a folder's
+pictures by the time the camera wrote into them — read for at most 500 of
+them, four at a time, the order settling as they come — and the rest by
+their modification. Where a photo was taken is in its details, behind
+**Show**: it is the one detail that says where someone was.
 
 A picture the browser shows itself (JPEG, PNG, GIF, WebP, AVIF, BMP) zooms
 with the wheel or a pinch, at the pointer; a double click goes to its own

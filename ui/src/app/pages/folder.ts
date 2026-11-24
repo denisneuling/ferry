@@ -17,7 +17,7 @@ import { Api, Entry } from '../core/api';
 import { Actions } from '../core/actions';
 import { Browser, SortKey } from '../core/browser';
 import { Format } from '../core/format';
-import { hasThumbnail, kindIcon, kindOf } from '../core/kinds';
+import { hasThumbnail, kindIcon, kindOf, previewKind } from '../core/kinds';
 import { Prefs } from '../core/prefs';
 import { Search } from '../core/search';
 import { Snapshot, isToken, tokenTime } from '../core/snapshot';
@@ -197,6 +197,17 @@ export class Folder {
     const at = this.snapshot.at();
     if (at) q['at'] = at;
     return q;
+  }
+
+  /** How many of the folder's files are pictures: sorting them by date taken needs two. */
+  protected readonly pictureCount = computed(
+    () => this.browser.files().filter((e) => ['image', 'derived'].includes(previewKind(e.name))).length,
+  );
+
+  /** Sorts by date taken, or back by name. */
+  protected byTaken(): void {
+    if (this.browser.sort() === 'taken') this.browser.setSort('name');
+    else void this.browser.sortByTaken();
   }
 
   /** Plays the folder's recordings, from the one given or the first. */

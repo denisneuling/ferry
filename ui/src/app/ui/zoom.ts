@@ -30,9 +30,13 @@ export class Zoom {
   private readonly el = inject<ElementRef<HTMLImageElement>>(ElementRef).nativeElement;
   protected readonly view = signal<View>(FIT);
   protected readonly dragging = signal(false);
+  /** The turn the picture is shown at, in degrees: only shown, never saved. */
+  readonly rotation = signal(0);
   protected readonly transform = computed(() => {
     const v = this.view();
-    return v.s === 1 ? '' : `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
+    const r = this.rotation();
+    if (v.s === 1 && r === 0) return '';
+    return `translate(${v.x}px, ${v.y}px) rotate(${r}deg) scale(${v.s * this.turnFit(r)})`;
   });
   /** Whether the picture is zoomed in. */
   readonly zoomed = computed(() => this.view().s > 1);
@@ -40,8 +44,29 @@ export class Zoom {
 
   reset(): void {
     this.view.set(FIT);
+    this.rotation.set(0);
     this.pointers.clear();
     this.dragging.set(false);
+  }
+
+  /** Turns the picture a quarter to the right, fitted anew. */
+  rotate(): void {
+    this.rotation.update((r) => (r + 90) % 360);
+    this.view.set(FIT);
+  }
+
+  /**
+   * How much a picture turned sideways is scaled to fit the stage again: its
+   * laid-out box is still upright, so a turned one would stick out — or,
+   * a portrait on a wide stage, stay small. Never beyond its own pixels.
+   */
+  private turnFit(r: number): number {
+    const w = this.el.clientWidth;
+    const h = this.el.clientHeight;
+    const stage = this.el.parentElement;
+    if (r % 180 === 0 || !w || !h || !stage) return 1;
+    const own = this.el.naturalWidth / w;
+    return Math.min(stage.clientWidth / h, stage.clientHeight / w, Math.max(own, 1));
   }
 
   /** Zooms by a factor around the stage's centre, for the keyboard. */
@@ -103,7 +128,7 @@ export class Zoom {
     const top = maxScale(this.el.naturalWidth, this.el.clientWidth);
     const scale = Math.min(Math.max(s, 1), top);
     if (scale === 1) {
-      this.view.set(FIT);
+      this.view.set(FIT); // the turn stays
       return;
     }
     this.view.set(this.clamped(zoomAt(this.view(), scale, cx, cy)));
@@ -112,7 +137,13 @@ export class Zoom {
   private clamped(v: View): View {
     const stage = this.el.parentElement;
     if (!stage) return v;
-    return clampView(v, this.el.clientWidth, this.el.clientHeight, stage.clientWidth, stage.clientHeight);
+    // Turned sideways, the picture's width on the screen is its height.
+    const k = this.turnFit(this.rotation());
+    const [w, h] =
+      this.rotation() % 180 === 0
+        ? [this.el.clientWidth, this.el.clientHeight]
+        : [this.el.clientHeight * k, this.el.clientWidth * k];
+    return clampView(v, w, h, stage.clientWidth, stage.clientHeight);
   }
 
   /** A point on the screen, relative to the centre of the picture's stage. */

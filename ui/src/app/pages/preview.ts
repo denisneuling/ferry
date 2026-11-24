@@ -69,6 +69,49 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
             <f-icon name="pencil" [size]="20" />
           </button>
         }
+        @if (pictures().length > 1) {
+          <button
+            class="lb-btn"
+            type="button"
+            (click)="toggleShow()"
+            [attr.aria-pressed]="showing()"
+            title="Slideshow (Space)"
+            i18n-title="@@show.title"
+          >
+            <f-icon [name]="showing() ? 'pause' : 'play'" [size]="20" />
+          </button>
+          @if (showing()) {
+            <button
+              class="lb-btn lb-interval"
+              type="button"
+              (click)="nextInterval()"
+              title="Seconds per picture"
+              i18n-title="@@show.interval"
+            >
+              {{ interval() }} s
+            </button>
+          }
+        }
+        @if (kind() === 'image') {
+          <button
+            class="lb-btn"
+            type="button"
+            (click)="zoom()?.rotate()"
+            title="Turn (r)"
+            i18n-title="@@pv.rotate"
+          >
+            <f-icon name="rotate" [size]="20" />
+          </button>
+        }
+        <button
+          class="lb-btn"
+          type="button"
+          (click)="fullscreen()"
+          title="Full screen (f)"
+          i18n-title="@@pv.fullscreen"
+        >
+          <f-icon name="expand" [size]="20" />
+        </button>
         <button
           class="lb-btn"
           type="button"
@@ -110,7 +153,12 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
           <f-icon name="x" [size]="22" />
         </button>
       </div>
-      <div class="lb-stage">
+      <div
+        class="lb-stage"
+        (pointerdown)="swipeStart($event)"
+        (pointerup)="swipeEnd($event)"
+        (pointercancel)="swipe = null"
+      >
         @switch (kind()) {
           @case ('image') {
             <img fZoom [src]="url()" [alt]="e.name" (load)="shown.set(url())" (error)="shown.set(url())" />
@@ -469,6 +517,17 @@ export class Preview {
         if (this.editable(e)) untracked(() => this.editing.set(true));
       }
     });
+    // The slideshow: the next picture once the one shown has come and its
+    // time is up. It stops at the end of the preview and on any step taken.
+    effect((onCleanup) => {
+      if (!this.showing()) return;
+      const e = this.entry();
+      const loaded =
+        this.kind() === 'image' ? this.shown() === this.url() : this.derivedShown() === this.derivedLarge();
+      if (!e || !this.isPicture(e) || !loaded) return;
+      const t = setTimeout(() => untracked(() => this.advance()), this.interval() * 1000);
+      onCleanup(() => clearTimeout(t));
+    });
     // Subtitle files next to a video become its tracks. They are read at the
     // snapshot the video is (Api.head), and only the browser's cue renderer
     // ever sees their text.
@@ -571,6 +630,62 @@ export class Preview {
     this.broken.update((s) => new Set(s).add(e.path));
   }
 
+  /** The folder's pictures, for the slideshow: what is shown as a picture. */
+  protected readonly pictures = computed(() => this.files().filter((f) => this.isPicture(f)));
+  /** Whether the slideshow runs, and how long each picture stays. */
+  protected readonly showing = signal(false);
+  protected readonly interval = signal<3 | 5 | 10>(5);
+
+  protected isPicture(e: Entry | null): boolean {
+    const k = e ? previewKind(e.name) : 'none';
+    return k === 'image' || k === 'derived';
+  }
+
+  protected toggleShow(): void {
+    this.showing.update((v) => !v);
+  }
+
+  protected nextInterval(): void {
+    this.interval.update((i) => (i === 3 ? 5 : i === 5 ? 10 : 3));
+  }
+
+  /** The next picture after the one shown, the folder's other files passed over. */
+  private advance(): void {
+    const files = this.files();
+    const n = files.length;
+    for (let d = 1; d <= n; d++) {
+      const i = (this.index() + d) % n;
+      if (this.isPicture(files[i])) {
+        this.browser.preview.set(i);
+        return;
+      }
+    }
+  }
+
+  /** The preview over the whole screen, and back. */
+  protected fullscreen(): void {
+    const el = this.box()?.nativeElement;
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    else void el?.requestFullscreen?.().catch(() => undefined);
+  }
+
+  /** A swipe on a touch screen steps, as the arrows do — unless zoomed, when it moves the picture. */
+  protected swipe: { x: number; y: number; id: number } | null = null;
+
+  protected swipeStart(ev: PointerEvent): void {
+    if (ev.pointerType !== 'touch' || !ev.isPrimary) return;
+    this.swipe = { x: ev.clientX, y: ev.clientY, id: ev.pointerId };
+  }
+
+  protected swipeEnd(ev: PointerEvent): void {
+    const s = this.swipe;
+    this.swipe = null;
+    if (!s || s.id !== ev.pointerId || this.zoom()?.zoomed() || this.editing()) return;
+    const dx = ev.clientX - s.x;
+    const dy = ev.clientY - s.y;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) void this.step(dx < 0 ? 1 : -1);
+  }
+
   /** Whether the file can be edited here: text, small enough, the share as it is now. */
   protected editable(e: Entry): boolean {
     return previewKind(e.name) === 'text' && e.size <= MAX_EDIT_BYTES && !this.snapshot.at();
@@ -589,6 +704,7 @@ export class Preview {
   }
 
   protected async step(d: number): Promise<void> {
+    this.showing.set(false); // a step of one's own ends the show
     if (!(await this.leaveEditor())) return;
     this.editing.set(false);
     const n = this.files().length;
@@ -596,6 +712,8 @@ export class Preview {
   }
 
   protected async close(): Promise<void> {
+    this.showing.set(false);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     if (!(await this.leaveEditor())) return;
     this.editing.set(false);
     this.browser.preview.set(null);
@@ -618,8 +736,13 @@ export class Preview {
     const typing = this.editing() && (document.activeElement as HTMLElement | null)?.tagName === 'TEXTAREA';
     if (ev.key === 'Escape' && !typing) void this.close();
     else if (typing) return;
-    else if (ev.key === 'ArrowRight' && !media) void this.step(1);
+    else if (ev.key === ' ' && !media && this.pictures().length > 1 && this.isPicture(this.entry())) {
+      ev.preventDefault();
+      this.toggleShow();
+    } else if (ev.key === 'ArrowRight' && !media) void this.step(1);
     else if (ev.key === 'ArrowLeft' && !media) void this.step(-1);
+    else if (ev.key === 'r' && this.zoom()) this.zoom()!.rotate();
+    else if (ev.key === 'f') this.fullscreen();
     else if (ev.key === 'i') this.info.update((v) => !v);
     else if ((ev.key === '+' || ev.key === '=') && this.zoom()) this.zoom()!.by(1.25);
     else if (ev.key === '-' && this.zoom()) this.zoom()!.by(0.8);

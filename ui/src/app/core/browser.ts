@@ -5,8 +5,12 @@ import { describe } from './errors';
 import { Session } from './session';
 import { Snapshot } from './snapshot';
 import { Places } from './places';
+import { previewKind } from './kinds';
 
-export type SortKey = 'name' | 'modified' | 'size';
+export type SortKey = 'name' | 'modified' | 'size' | 'taken';
+
+/** At most this many pictures are asked for their capture time; the rest sort by modification. */
+export const MAX_TAKEN = 500;
 
 /**
  * The folders kept in memory for going back to them without waiting: the
@@ -81,9 +85,14 @@ export class Browser {
     const shown = f ? list.filter((e) => e.name.toLowerCase().includes(f)) : list;
     const key = this.sort();
     const dir = this.desc() ? -1 : 1;
+    const taken = this.taken();
+    // A picture's capture time where it is known, its modification otherwise:
+    // both ISO 8601, so they compare as text to the second.
+    const when = (e: Entry) => (taken.get(e.name) ?? e.modified).slice(0, 19);
     const cmp = (a: Entry, b: Entry): number => {
       if (key === 'size' && a.size !== b.size) return (a.size - b.size) * dir;
       if (key === 'modified' && a.modified !== b.modified) return (a.modified < b.modified ? -1 : 1) * dir;
+      if (key === 'taken' && when(a) !== when(b)) return (when(a) < when(b) ? -1 : 1) * dir;
       return this.format.compare(a.name, b.name) * (key === 'name' ? dir : 1);
     };
     return [...shown].sort((a, b) => (a.type !== b.type ? (a.type === 'folder' ? -1 : 1) : cmp(a, b)));
@@ -120,6 +129,9 @@ export class Browser {
       // A folder seen a moment ago shows as it was, and its new listing
       // replaces it when complete (stale while revalidating).
       this.entries.set(this.recall(share, path));
+      this.stopTaken();
+      this.taken.set(new Map());
+      if (this.sort() === 'taken') this.sort.set('name');
       this.filter.set('');
       this.clear();
       this.preview.set(null);
@@ -260,7 +272,63 @@ export class Browser {
     this.remembered = 0;
   }
 
+  /** The capture times read for this folder's pictures, by name. */
+  readonly taken = signal<ReadonlyMap<string, string>>(new Map());
+  /** How far reading them has come, while it runs. */
+  readonly takenProgress = signal<{ done: number; total: number } | null>(null);
+  private takenRun = 0;
+
+  /**
+   * Sorts by when the pictures were taken: their metadata is read, four at
+   * a time and at most MAX_TAKEN of them, the order updating as it comes.
+   * Opening another folder, or choosing another order, stops it.
+   */
+  async sortByTaken(): Promise<void> {
+    const share = this.share();
+    if (!share) return;
+    this.stopTaken();
+    this.sort.set('taken');
+    this.desc.set(false);
+    const run = this.takenRun;
+    const at = this.snapshot.at();
+    const known = this.taken();
+    const todo = (this.entries() ?? [])
+      .filter((e) => e.type === 'file' && isPicture(e.name) && !known.has(e.name))
+      .slice(0, MAX_TAKEN);
+    if (!todo.length) return;
+    let done = 0;
+    this.takenProgress.set({ done, total: todo.length });
+    const found = new Map(known);
+    let next = 0;
+    const worker = async () => {
+      while (next < todo.length && run === this.takenRun) {
+        const e = todo[next++];
+        try {
+          const m = await this.api.metadata(share, e.path, e.version, at);
+          if (m.taken) found.set(e.name, m.taken);
+        } catch {
+          // No capture time: it sorts by its modification.
+        }
+        done++;
+        if (run !== this.takenRun) return;
+        this.takenProgress.set({ done, total: todo.length });
+        if (done % 20 === 0 || done === todo.length) this.taken.set(new Map(found));
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    if (run === this.takenRun) {
+      this.taken.set(found);
+      this.takenProgress.set(null);
+    }
+  }
+
+  stopTaken(): void {
+    this.takenRun++;
+    this.takenProgress.set(null);
+  }
+
   setSort(key: SortKey): void {
+    this.stopTaken();
     if (this.sort() === key) {
       this.desc.update((d) => !d);
     } else {
@@ -303,4 +371,10 @@ export class Browser {
 /** A folder's place in memory: the share, the path, and the snapshot, if one. */
 function key(share: string, path: string, at: string | null): string {
   return `${share}\u0000${path}\u0000${at ?? ''}`;
+}
+
+/** A file shown as a picture, whose capture time the camera may have written. */
+function isPicture(name: string): boolean {
+  const k = previewKind(name);
+  return k === 'image' || k === 'derived';
 }

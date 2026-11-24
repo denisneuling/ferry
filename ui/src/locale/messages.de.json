@@ -272,6 +272,13 @@
     "newText.value": "Notizen.txt",
     "newText": "Textdatei",
     "md.formatted": " Formatiert ",
-    "md.source": " Quelltext "
+    "md.source": " Quelltext ",
+    "show.title": "Diashow (Leertaste)",
+    "show.interval": "Sekunden pro Bild",
+    "pv.rotate": "Drehen (r)",
+    "pv.fullscreen": "Vollbild (f)",
+    "taken.title": "Die Bilder nach Aufnahmedatum sortieren",
+    "taken.sort": "Nach Aufnahmedatum",
+    "meta.gpsShow": "Anzeigen"
   }
 }

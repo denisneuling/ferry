@@ -52,6 +52,21 @@ describe('Browser', () => {
     expect(names().slice(2)).toEqual(['b.txt', 'C.jpg', 'a.txt']);
   });
 
+  it('sorts pictures by when they were taken, the rest by modification', async () => {
+    const api = TestBed.inject(Api) as unknown as { metadata: (s: string, p: string) => Promise<unknown> };
+    const asked: string[] = [];
+    api.metadata = async (_s, p) => {
+      asked.push(p);
+      return p === 'C.jpg' ? { kind: 'image', taken: '2025-06-01T12:00:00+02:00' } : { kind: 'image' };
+    };
+    b.entries.set([...b.entries()!, entry('D.NEF', 'file', 5, '2026-04-01T00:00:00Z')]);
+    b.share.set('alex');
+    await b.sortByTaken();
+    expect(asked.sort()).toEqual(['C.jpg', 'D.NEF']); // pictures only
+    expect(names().slice(2)).toEqual(['C.jpg', 'a.txt', 'b.txt', 'D.NEF']);
+    expect(b.takenProgress()).toBeNull();
+  });
+
   it('filters by name, case aside', () => {
     b.filter.set('A');
     expect(names()).toEqual(['alpha', 'Zeta', 'a.txt']);

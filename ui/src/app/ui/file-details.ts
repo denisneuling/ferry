@@ -33,6 +33,16 @@ interface Row {
         <dt>{{ r.label }}</dt>
         <dd>{{ r.value }}</dd>
       }
+      @if (place(); as p) {
+        <dt i18n="@@meta.gps">GPS position</dt>
+        <dd>
+          @if (gps()) {
+            {{ p }}
+          } @else {
+            <button type="button" class="linkish" (click)="gps.set(true)" i18n="@@meta.gpsShow">Show</button>
+          }
+        </dd>
+      }
     </dl>
   }`,
 })
@@ -44,6 +54,17 @@ export class FileDetails {
   private readonly api = inject(Api);
   private readonly locale = inject(LOCALE_ID);
   private readonly meta = signal<FileMetadata | null>(null);
+  /**
+   * Whether the position a photo was taken at is shown: only once asked
+   * for, as it is the one thing here that says where someone was.
+   */
+  protected readonly gps = signal(false);
+  protected readonly place = computed(() => {
+    const l = this.meta()?.location;
+    if (!l) return null;
+    const num = (n: number) => n.toLocaleString(this.locale, { maximumFractionDigits: 6 });
+    return `${num(l.latitude)}, ${num(l.longitude)}`;
+  });
   private asked = 0;
 
   constructor() {
@@ -53,6 +74,7 @@ export class FileDetails {
       const version = this.version();
       const n = ++this.asked;
       this.meta.set(null);
+      this.gps.set(false);
       this.api.metadata(share, path, version).then(
         (m) => n === this.asked && this.meta.set(m),
         () => undefined,
@@ -89,12 +111,6 @@ export class FileDetails {
     if (exposure.length) add($localize`:@@meta.exposure:Exposure`, exposure.join(' · '));
     if (m.orientation && m.orientation !== 1)
       add($localize`:@@meta.orientation:Orientation`, this.orientation(m.orientation));
-    if (m.location) {
-      add(
-        $localize`:@@meta.gps:GPS position`,
-        `${num(m.location.latitude, 6)}, ${num(m.location.longitude, 6)}`,
-      );
-    }
     if (m.pages) add($localize`:@@meta.pages:Pages`, num(m.pages));
     add($localize`:@@meta.docTitle:Title`, m.title);
     add(m.kind === 'pdf' ? $localize`:@@meta.author:Author` : $localize`:@@meta.artist:Artist`, m.author);
