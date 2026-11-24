@@ -6,6 +6,7 @@ import { Browser } from '../core/browser';
 import { shareIcon } from '../core/kinds';
 import { Language } from '../core/lang';
 import { Prefs } from '../core/prefs';
+import { Place, Places, openPlace, placeName, placeWhere } from '../core/places';
 import { Session } from '../core/session';
 import { Transfers } from '../core/transfers';
 import { Icon } from '../ui/icon';
@@ -44,6 +45,16 @@ import { TransfersPanel } from './transfers-panel';
             </a>
           }
         </nav>
+        @if (places.favourites().length) {
+          <h3 i18n="@@fav.heading">Favourites</h3>
+          <nav class="shares-nav favs">
+            @for (p of places.favourites(); track p.share + '/' + p.path + p.folder) {
+              <a class="nav" href="" (click)="go(p, $event)" [title]="where(p)">
+                <f-icon [name]="p.folder ? 'folder' : 'file'" [size]="19" />{{ name(p) }}
+              </a>
+            }
+          </nav>
+        }
         <div class="grow"></div>
         <button
           class="nav"
@@ -103,6 +114,9 @@ export class Shell {
   private readonly transfers = inject(Transfers);
   private readonly toasts = inject(Toasts);
   private readonly router = inject(Router);
+  protected readonly places = inject(Places);
+  protected readonly name = placeName;
+  protected readonly where = placeWhere;
 
   protected readonly drawer = signal(false);
   protected readonly initial = computed(() => (this.session.me()?.username ?? '?').slice(0, 1).toUpperCase());
@@ -114,6 +128,12 @@ export class Shell {
         this.drawer.set(false);
       }
     });
+  }
+
+  protected go(p: Place, ev: Event): void {
+    ev.preventDefault();
+    this.drawer.set(false);
+    openPlace(p, this.router, this.browser);
   }
 
   protected icon(name: string): string {

@@ -7,6 +7,7 @@ import {
   effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -21,6 +22,7 @@ import { hasThumbnail, isWorkbook, kindIcon, kindLabel, kindOf, previewKind } fr
 import { Icon } from '../ui/icon';
 import { FileDetails } from '../ui/file-details';
 import { Snapshot } from '../core/snapshot';
+import { Places } from '../core/places';
 import { Versions } from '../ui/versions';
 import { TextEditor } from '../ui/text-editor';
 import { Zoom } from '../ui/zoom';
@@ -90,6 +92,19 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
         >
           <f-icon name="info" [size]="20" />
         </button>
+        @if (place(); as pl) {
+          <button
+            class="lb-btn fav"
+            type="button"
+            [class.on]="places.isFavourite(pl)"
+            [attr.aria-pressed]="places.isFavourite(pl)"
+            (click)="places.toggleFavourite(pl)"
+            title="Favourite"
+            i18n-title="@@fav.title"
+          >
+            <f-icon name="star" [size]="20" />
+          </button>
+        }
         <button class="lb-btn" type="button" (click)="close()" title="Close (Esc)" i18n-title="@@pv.close">
           <f-icon name="x" [size]="22" />
         </button>
@@ -317,6 +332,13 @@ export class Preview {
   protected readonly versions = inject(Versions);
   protected readonly api = inject(Api);
   private readonly sanitizer = inject(DomSanitizer);
+  protected readonly places = inject(Places);
+  /** The file shown, as a place to keep; none in a snapshot. */
+  protected readonly place = computed(() => {
+    const e = this.entry();
+    const share = this.browser.share();
+    return e && share && !this.snapshot.at() ? { share, path: e.path, folder: false } : null;
+  });
   private readonly locale = inject(LOCALE_ID);
   private readonly preloader = inject(Preloader);
   private readonly box = viewChild<ElementRef<HTMLElement>>('box');
@@ -478,6 +500,14 @@ export class Preview {
           });
         this.tracks.set(tracks);
       });
+    });
+    // A file looked at for a few seconds is one used; stepping through a
+    // folder of photos does not push everything else out of the list.
+    effect((onCleanup) => {
+      const p = this.place();
+      if (!p) return;
+      const t = setTimeout(() => untracked(() => this.places.used(p)), 3000);
+      onCleanup(() => clearTimeout(t));
     });
     // The next and the previous image load ahead — after the one shown, so
     // that they do not hold it up; the preview closed, they are let go.

@@ -29,7 +29,22 @@
         }
       }
     </nav>
-    <h1>{{ browser.title() }}</h1>
+    <h1>
+      {{ browser.title() }}
+      @if (here(); as h) {
+        <button
+          type="button"
+          class="icon-btn fav"
+          [class.on]="places.isFavourite(h)"
+          [attr.aria-pressed]="places.isFavourite(h)"
+          (click)="places.toggleFavourite(h)"
+          title="Favourite"
+          i18n-title="@@fav.title"
+        >
+          <f-icon name="star" [size]="20" />
+        </button>
+      }
+    </h1>
     <div class="meta">
       @if (browser.entries()) {
         <ng-container i18n="@@count">{count(), plural,

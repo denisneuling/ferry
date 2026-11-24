@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { Places } from '../core/places';
 import { Api, Entry } from '../core/api';
 import { Actions } from '../core/actions';
 import { Browser, SortKey } from '../core/browser';
@@ -101,6 +102,12 @@ export class Folder {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly locale = inject(LOCALE_ID);
+  protected readonly places = inject(Places);
+  /** This folder as a place, for its star; none in a snapshot. */
+  protected readonly here = computed(() => {
+    const share = this.browser.share();
+    return share && !this.snapshot.at() ? { share, path: this.browser.path(), folder: true } : null;
+  });
 
   private readonly params = toSignal(this.route.paramMap);
   private readonly query = toSignal(this.route.queryParamMap);
@@ -395,6 +402,17 @@ export class Folder {
           ? { icon: 'folder', label: $localize`:@@act.open:Open`, run: () => this.open(e) }
           : { icon: 'eye', label: $localize`:@@act.preview:Preview`, run: () => this.open(e) },
       );
+    }
+    const share = this.browser.share();
+    if (one && share && !this.snapshot.at()) {
+      const place = { share, path: e.path, folder: e.type === 'folder' };
+      items.push({
+        icon: 'star',
+        label: this.places.isFavourite(place)
+          ? $localize`:@@fav.remove:Remove from favourites`
+          : $localize`:@@fav.add:Add to favourites`,
+        run: () => this.places.toggleFavourite(place),
+      });
     }
     if (this.snapshot.at()) {
       // A previous version is read-only, and a ZIP is not made of one:

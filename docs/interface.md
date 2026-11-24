@@ -71,6 +71,17 @@ and sign out.
   entries than the deployment shows (`FERRY_MAX_LISTING`, 200000 by default)
   says how many that is.
 
+## Favourites and recently used
+
+The star next to a folder's title, in an entry's menu and in the preview
+keeps a folder or a file among the favourites, listed in the sidebar. The
+start page lists what was used last: the folders opened and the files
+looked at for a few seconds, twenty at most, each to remove or all to
+clear. Both live in this browser only, per server and user — ferry keeps
+nothing of them — and are not checked against the share: something moved
+or deleted since shows as missing when it is opened. A previous version is
+never remembered.
+
 ## Selecting and acting
 
 Click an entry to open it; with Shift, Ctrl or ⌘ — or once a selection is

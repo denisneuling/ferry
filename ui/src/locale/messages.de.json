@@ -260,6 +260,13 @@
     "zip.open": "Öffnen",
     "zip.download": "Herunterladen",
     "zip.unreadable": "verschlüsselt oder so gepackt, dass ferry es nicht entpackt",
-    "pv.tableMore": "… Der Rest der Tabelle wird nicht gezeigt; lade sie herunter, um alles zu sehen."
+    "pv.tableMore": "… Der Rest der Tabelle wird nicht gezeigt; lade sie herunter, um alles zu sehen.",
+    "fav.remove": "Aus den Favoriten entfernen",
+    "fav.add": "Zu den Favoriten",
+    "fav.title": "Favorit",
+    "fav.heading": "Favoriten",
+    "recent.heading": "Zuletzt verwendet",
+    "recent.clear": " Leeren ",
+    "recent.forget": "Aus dieser Liste entfernen"
   }
 }

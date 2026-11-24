@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { Place, Places, openPlace, placeName, placeWhere } from '../core/places';
 import { Browser } from '../core/browser';
 import { shareIcon } from '../core/kinds';
 import { Session } from '../core/session';
@@ -48,11 +49,50 @@ import { Space } from '../ui/space';
       } @else {
         <p class="loading" i18n="@@loading">Loading…</p>
       }
+      @if (places.recent().length) {
+        <div class="recent-head">
+          <h2 i18n="@@recent.heading">Recently used</h2>
+          <button class="btn" type="button" (click)="places.clearRecent()" i18n="@@recent.clear">
+            Clear
+          </button>
+        </div>
+        <ul class="recent">
+          @for (p of places.recent(); track p.share + '/' + p.path + p.folder) {
+            <li>
+              <a href="" (click)="go(p, $event)">
+                <f-icon [name]="p.folder ? 'folder' : 'file'" [size]="19" />
+                <span
+                  ><b>{{ name(p) }}</b
+                  ><small>{{ where(p) }}</small></span
+                >
+              </a>
+              <button
+                class="icon-btn"
+                type="button"
+                (click)="places.forget(p)"
+                title="Remove from this list"
+                i18n-title="@@recent.forget"
+              >
+                <f-icon name="x" [size]="16" />
+              </button>
+            </li>
+          }
+        </ul>
+      }
     </section>`,
 })
 export class Home {
   protected readonly browser = inject(Browser);
   private readonly session = inject(Session);
+  private readonly router = inject(Router);
+  protected readonly places = inject(Places);
+  protected readonly name = placeName;
+  protected readonly where = placeWhere;
+
+  protected go(p: Place, ev: Event): void {
+    ev.preventDefault();
+    openPlace(p, this.router, this.browser);
+  }
 
   constructor() {
     this.browser.leave();

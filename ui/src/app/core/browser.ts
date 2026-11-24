@@ -4,6 +4,7 @@ import { Format } from './format';
 import { describe } from './errors';
 import { Session } from './session';
 import { Snapshot } from './snapshot';
+import { Places } from './places';
 
 export type SortKey = 'name' | 'modified' | 'size';
 
@@ -27,6 +28,7 @@ export class Browser {
   private readonly api = inject(Api);
   private readonly format = inject(Format);
   private readonly snapshot = inject(Snapshot);
+  private readonly places = inject(Places);
 
   readonly shares = signal<Share[] | null>(null);
   readonly sharesError = signal<string | null>(null);
@@ -49,6 +51,8 @@ export class Browser {
   readonly preview = signal<number | null>(null);
   /** A name to select once the folder opening has listed it: a search's hit. */
   readonly reveal = signal<string | null>(null);
+  /** Whether the name revealed is a file to preview once it is there. */
+  revealOpens = false;
 
   private loads = 0;
   private abort: AbortController | null = null;
@@ -171,10 +175,18 @@ export class Browser {
       this.error.set(null);
       this.errorCode.set(null);
       this.selected.update((s) => new Set([...s].filter((x) => names.has(x))));
+      if (!this.snapshot.at()) this.places.used({ share, path, folder: true });
       const r = this.reveal();
       if (r !== null) {
         this.reveal.set(null);
-        if (names.has(r)) this.only(r);
+        if (names.has(r)) {
+          this.only(r);
+          if (this.revealOpens) {
+            const i = this.files().findIndex((e) => e.name === r);
+            if (i >= 0) this.preview.set(i);
+          }
+        }
+        this.revealOpens = false;
       }
     } catch (e) {
       if (n !== this.loads) {
