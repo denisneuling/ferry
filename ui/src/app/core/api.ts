@@ -493,6 +493,98 @@ export class Api {
     return { done, abort: () => xhr.abort() };
   }
 
+  /**
+   * A large file uploaded in pieces (the server's uploads in pieces): one
+   * piece after the other, each retried after a broken connection from
+   * where the server says the upload has come to. Where an upload stands is
+   * kept in this browser under the target and the file's name, size and
+   * time, so that the same file uploaded to the same place again — after a
+   * reload — goes on where it stopped. Aborted, it is given up and its
+   * partial file removed.
+   */
+  uploadInPieces(
+    share: string,
+    path: string,
+    file: File,
+    overwrite: boolean,
+    progress: (p: Progress) => void,
+  ): { done: Promise<Entry>; abort: () => void } {
+    let aborted = false;
+    let xhr: XMLHttpRequest | null = null;
+    let id: string | null = null;
+    const key = resumeKey(share, path, file);
+    const base = `${BASE}${shareBase(share)}/uploads`;
+    const at = (i: string) => `${base}/${i}?path=${q(path)}`;
+    const piece = (offset: number, blob: Blob) =>
+      new Promise<number>((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        xhr = x;
+        x.open('PUT', `${at(id!)}&offset=${offset}`);
+        x.setRequestHeader('X-Ferry-Request', '1');
+        x.setRequestHeader('Content-Type', 'application/octet-stream');
+        x.upload.onprogress = (e) => progress({ loaded: offset + e.loaded, total: file.size });
+        x.onload = () =>
+          x.status === 200
+            ? resolve((JSON.parse(x.responseText) as { size: number }).size)
+            : reject(this.problem(x.status, x.responseText));
+        x.onerror = () => reject(new ApiError(0, 'network'));
+        x.onabort = () => reject(new ApiError(0, 'aborted'));
+        x.send(blob);
+      });
+    const done = (async () => {
+      id = readResume(key);
+      let offset = 0;
+      if (id) {
+        try {
+          offset = (await this.json<{ size: number }>('GET', at(id).slice(BASE.length))).size;
+        } catch {
+          id = null; // gone, or not ours to go on with: begin anew
+        }
+      }
+      if (!id || offset > file.size) {
+        const begun = await this.json<{ id: string }>(
+          'POST',
+          `${shareBase(share)}/uploads?path=${q(path)}${overwrite ? '&overwrite=true' : ''}`,
+        );
+        id = begun.id;
+        offset = 0;
+        writeResume(key, id);
+      }
+      let tries = 0;
+      while (offset < file.size) {
+        if (aborted) throw new ApiError(0, 'aborted');
+        try {
+          offset = await piece(offset, file.slice(offset, offset + PIECE));
+          tries = 0;
+        } catch (e) {
+          if (aborted || !(e instanceof ApiError)) throw e;
+          const again = e.status === 0 || e.code === 'upload_offset' || e.status === 502 || e.status === 503;
+          if (!again || ++tries > RETRIES) throw e;
+          // Wait a moment, then ask where the upload has come to: the piece
+          // may have arrived in part, or whole with its answer lost.
+          await new Promise((r) => setTimeout(r, 1000 * 2 ** (tries - 1)));
+          offset = (await this.json<{ size: number }>('GET', at(id).slice(BASE.length))).size;
+        }
+      }
+      const e = await this.json<Entry>(
+        'POST',
+        `${shareBase(share)}/uploads/${id}/finish?path=${q(path)}&size=${file.size}${overwrite ? '&overwrite=true' : ''}`,
+      );
+      forgetResume(key);
+      return e;
+    })();
+    return {
+      done,
+      abort: () => {
+        aborted = true;
+        (xhr as XMLHttpRequest | null)?.abort();
+        forgetResume(key);
+        const i = id;
+        if (i) void this.json('DELETE', at(i).slice(BASE.length)).catch(() => undefined);
+      },
+    };
+  }
+
   private async json<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await this.fetch(method, BASE + path, body);
     if (res.status === 204) {
@@ -578,4 +670,55 @@ export function join(dir: string, name: string): string {
 export function parent(path: string): string {
   const i = path.lastIndexOf('/');
   return i < 0 ? '' : path.slice(0, i);
+}
+
+/** Files from this size on are uploaded in pieces, and can go on after a break. */
+export const PIECES_FROM = 16 * 1024 * 1024;
+/** One piece: large enough to keep the line busy, small enough to lose little. */
+const PIECE = 8 * 1024 * 1024;
+/** Times a piece is tried again after a broken connection, waiting 1, 2, 4… seconds. */
+const RETRIES = 6;
+/** Uploads remembered for going on; the oldest go first. */
+const MAX_RESUMES = 50;
+const RESUME_KEY = 'ferry.uploads';
+
+function resumeKey(share: string, path: string, f: File): string {
+  return [share, path, f.name, f.size, f.lastModified].join('\u0000');
+}
+
+function resumes(): [string, string][] {
+  try {
+    const v = JSON.parse(localStorage.getItem(RESUME_KEY) ?? '[]') as unknown;
+    return Array.isArray(v)
+      ? v.filter(
+          (x): x is [string, string] =>
+            Array.isArray(x) &&
+            typeof x[0] === 'string' &&
+            typeof x[1] === 'string' &&
+            /^[0-9a-f]{32}$/.test(x[1]),
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveResumes(list: [string, string][]): void {
+  try {
+    localStorage.setItem(RESUME_KEY, JSON.stringify(list.slice(-MAX_RESUMES)));
+  } catch {
+    // Storage blocked: an upload goes on after a break, not after a reload.
+  }
+}
+
+function readResume(key: string): string | null {
+  return resumes().find(([k]) => k === key)?.[1] ?? null;
+}
+
+function writeResume(key: string, id: string): void {
+  saveResumes([...resumes().filter(([k]) => k !== key), [key, id]]);
+}
+
+function forgetResume(key: string): void {
+  saveResumes(resumes().filter(([k]) => k !== key));
 }

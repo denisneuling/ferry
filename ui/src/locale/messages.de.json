@@ -300,6 +300,10 @@
     "batch.more": "… und {$INTERPOLATION} weitere.",
     "batch.running": "Benenne um… {$INTERPOLATION} von {$INTERPOLATION_1}",
     "batch.done": "{$n} Einträge umbenannt.",
-    "batch.help": " {$INTERPOLATION}name{$INTERPOLATION_1} alter Name · {$INTERPOLATION}ext{$INTERPOLATION_1} Endung · {$INTERPOLATION}n{$INTERPOLATION_1} Zähler · {$INTERPOLATION}date{$INTERPOLATION_1} Tag der Änderung · {$INTERPOLATION}taken{$INTERPOLATION_1} Tag der Aufnahme "
+    "batch.help": " {$INTERPOLATION}name{$INTERPOLATION_1} alter Name · {$INTERPOLATION}ext{$INTERPOLATION_1} Endung · {$INTERPOLATION}n{$INTERPOLATION_1} Zähler · {$INTERPOLATION}date{$INTERPOLATION_1} Tag der Änderung · {$INTERPOLATION}taken{$INTERPOLATION_1} Tag der Aufnahme ",
+    "partials.title": "Unfertige Uploads entfernen?",
+    "partials.text": "{$n} Uploads wurden hier vor mehr als einem Tag begonnen und nicht beendet. Entfernen gibt ihren Platz frei; danach lassen sie sich nicht mehr fortsetzen.",
+    "partials.remove": "Entfernen",
+    "partials.notice": "{$INTERPOLATION} unfertige Uploads ({$INTERPOLATION_1}) wurden hier vor mehr als einem Tag begonnen."
   }
 }

@@ -32,6 +32,7 @@ const (
 	KindLimit                    // a bound of ferry's own was reached
 	KindCanceled                 // the request's context ended
 	KindChanged                  // the file is not the version the request was made for
+	KindOffset                   // an upload's piece does not start where the upload has come to
 )
 
 var kindNames = map[Kind]string{
@@ -51,6 +52,7 @@ var kindNames = map[Kind]string{
 	KindLimit:        "limit",
 	KindCanceled:     "canceled",
 	KindChanged:      "changed",
+	KindOffset:       "offset",
 }
 
 // String is the kind's name, fit for a metric label.

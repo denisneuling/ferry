@@ -362,6 +362,66 @@ func (e GetThumbnailParamsSize) Valid() bool {
 	}
 }
 
+// Defines values for BeginUploadParamsXFerryRequest.
+const (
+	BeginUploadParamsXFerryRequestN1 BeginUploadParamsXFerryRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the BeginUploadParamsXFerryRequest enum.
+func (e BeginUploadParamsXFerryRequest) Valid() bool {
+	switch e {
+	case BeginUploadParamsXFerryRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiscardUploadParamsXFerryRequest.
+const (
+	DiscardUploadParamsXFerryRequestN1 DiscardUploadParamsXFerryRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the DiscardUploadParamsXFerryRequest enum.
+func (e DiscardUploadParamsXFerryRequest) Valid() bool {
+	switch e {
+	case DiscardUploadParamsXFerryRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PutUploadPieceParamsXFerryRequest.
+const (
+	PutUploadPieceParamsXFerryRequestN1 PutUploadPieceParamsXFerryRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the PutUploadPieceParamsXFerryRequest enum.
+func (e PutUploadPieceParamsXFerryRequest) Valid() bool {
+	switch e {
+	case PutUploadPieceParamsXFerryRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FinishUploadParamsXFerryRequest.
+const (
+	FinishUploadParamsXFerryRequestN1 FinishUploadParamsXFerryRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the FinishUploadParamsXFerryRequest enum.
+func (e FinishUploadParamsXFerryRequest) Valid() bool {
+	switch e {
+	case FinishUploadParamsXFerryRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetZipEntryParamsDisposition.
 const (
 	GetZipEntryParamsDispositionAttachment GetZipEntryParamsDisposition = "attachment"
@@ -743,6 +803,18 @@ type Space struct {
 	Total int64 `json:"total"`
 }
 
+// UploadBegun defines model for UploadBegun.
+type UploadBegun struct {
+	// Id The upload's id: 32 hex digits.
+	Id string `json:"id"`
+}
+
+// UploadState defines model for UploadState.
+type UploadState struct {
+	// Size The bytes written so far.
+	Size int64 `json:"size"`
+}
+
 // Usage defines model for Usage.
 type Usage struct {
 	// Bytes The files' sizes added up, as the server lists them.
@@ -840,6 +912,9 @@ type FileVersion = string
 
 // ShareName defines model for ShareName.
 type ShareName = string
+
+// UploadId defines model for UploadId.
+type UploadId = string
 
 // BadGateway RFC 9457 problem details.
 type BadGateway = Problem
@@ -1097,6 +1172,69 @@ type GetThumbnailParams struct {
 
 // GetThumbnailParamsSize defines parameters for GetThumbnail.
 type GetThumbnailParamsSize int
+
+// BeginUploadParams defines parameters for BeginUpload.
+type BeginUploadParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// Overwrite Replace a file of the same name when finished.
+	Overwrite *bool `form:"overwrite,omitempty" json:"overwrite,omitempty"`
+
+	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
+	XFerryRequest BeginUploadParamsXFerryRequest `json:"X-Ferry-Request"`
+}
+
+// BeginUploadParamsXFerryRequest defines parameters for BeginUpload.
+type BeginUploadParamsXFerryRequest string
+
+// DiscardUploadParams defines parameters for DiscardUpload.
+type DiscardUploadParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
+	XFerryRequest DiscardUploadParamsXFerryRequest `json:"X-Ferry-Request"`
+}
+
+// DiscardUploadParamsXFerryRequest defines parameters for DiscardUpload.
+type DiscardUploadParamsXFerryRequest string
+
+// GetUploadParams defines parameters for GetUpload.
+type GetUploadParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+}
+
+// PutUploadPieceParams defines parameters for PutUploadPiece.
+type PutUploadPieceParams struct {
+	Offset int64 `form:"offset" json:"offset"`
+
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
+	XFerryRequest PutUploadPieceParamsXFerryRequest `json:"X-Ferry-Request"`
+}
+
+// PutUploadPieceParamsXFerryRequest defines parameters for PutUploadPiece.
+type PutUploadPieceParamsXFerryRequest string
+
+// FinishUploadParams defines parameters for FinishUpload.
+type FinishUploadParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// Size The file's whole size, as the client has it.
+	Size      int64 `form:"size" json:"size"`
+	Overwrite *bool `form:"overwrite,omitempty" json:"overwrite,omitempty"`
+
+	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
+	XFerryRequest FinishUploadParamsXFerryRequest `json:"X-Ferry-Request"`
+}
+
+// FinishUploadParamsXFerryRequest defines parameters for FinishUpload.
+type FinishUploadParamsXFerryRequest string
 
 // GetUsageParams defines parameters for GetUsage.
 type GetUsageParams struct {
@@ -1938,6 +2076,53 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// BeginUpload Begin an upload in pieces.
+	//
+	// An upload that can go on after a broken connection or a reload: its
+	// pieces are written into a partial file beside the target,
+	// `.ferry-partial-<id>`, which becomes the target only when
+	// `finishUpload` says it is complete. The id is made here, 128 random
+	// bits, and only the client that began the upload knows it; ferry keeps
+	// nothing about it — where it has come to is the partial's size. The
+	// same check as for a whole upload is made first: an existing file is
+	// replaced only with `overwrite=true`, otherwise `409`.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/uploads (the `BeginUpload` operationId).
+	BeginUpload(ctx context.Context, share ShareName, params *BeginUploadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DiscardUpload Give an upload up, removing its partial file.
+	//
+	// Corresponds with DELETE /api/v1/shares/{share}/uploads/{id} (the `DiscardUpload` operationId).
+	DiscardUpload(ctx context.Context, share ShareName, id UploadId, params *DiscardUploadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUpload How far an upload in pieces has come.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/uploads/{id} (the `GetUpload` operationId).
+	GetUpload(ctx context.Context, share ShareName, id UploadId, params *GetUploadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutUploadPieceWithBody Write the next piece of an upload.
+	//
+	// Writes the body at `offset`, which must be where the upload has come
+	// to — the partial's size; otherwise `409` (`upload_offset`) and
+	// nothing is written, and the client asks `getUpload` where to go on.
+	// Pieces are written one after another: one cut off part-way keeps the
+	// bytes that arrived. At most 64 MiB a piece; the deployment's upload
+	// limit applies to the whole (`413`).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/shares/{share}/uploads/{id} (the `PutUploadPiece` operationId).
+	PutUploadPieceWithBody(ctx context.Context, share ShareName, id UploadId, params *PutUploadPieceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FinishUpload Make a complete upload the file.
+	//
+	// Renames the partial file to the target, only when it holds exactly
+	// `size` bytes (`409`, `upload_offset`, otherwise) and after the same
+	// check as at the beginning, made again.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/uploads/{id}/finish (the `FinishUpload` operationId).
+	FinishUpload(ctx context.Context, share ShareName, id UploadId, params *FinishUploadParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetUsage Add up what a folder holds.
 	//
 	// Counts the files below the folder `path` and adds up their sizes, as
@@ -2585,6 +2770,103 @@ func (c *Client) GetDocumentText(ctx context.Context, share ShareName, params *G
 // Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetThumbnailRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginUpload Begin an upload in pieces.
+//
+// An upload that can go on after a broken connection or a reload: its
+// pieces are written into a partial file beside the target,
+// `.ferry-partial-<id>`, which becomes the target only when
+// `finishUpload` says it is complete. The id is made here, 128 random
+// bits, and only the client that began the upload knows it; ferry keeps
+// nothing about it — where it has come to is the partial's size. The
+// same check as for a whole upload is made first: an existing file is
+// replaced only with `overwrite=true`, otherwise `409`.
+//
+// Corresponds with POST /api/v1/shares/{share}/uploads (the `BeginUpload` operationId).
+func (c *Client) BeginUpload(ctx context.Context, share ShareName, params *BeginUploadParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginUploadRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DiscardUpload Give an upload up, removing its partial file.
+//
+// Corresponds with DELETE /api/v1/shares/{share}/uploads/{id} (the `DiscardUpload` operationId).
+func (c *Client) DiscardUpload(ctx context.Context, share ShareName, id UploadId, params *DiscardUploadParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDiscardUploadRequest(c.Server, share, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetUpload How far an upload in pieces has come.
+//
+// Corresponds with GET /api/v1/shares/{share}/uploads/{id} (the `GetUpload` operationId).
+func (c *Client) GetUpload(ctx context.Context, share ShareName, id UploadId, params *GetUploadParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUploadRequest(c.Server, share, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutUploadPieceWithBody Write the next piece of an upload.
+//
+// Writes the body at `offset`, which must be where the upload has come
+// to — the partial's size; otherwise `409` (`upload_offset`) and
+// nothing is written, and the client asks `getUpload` where to go on.
+// Pieces are written one after another: one cut off part-way keeps the
+// bytes that arrived. At most 64 MiB a piece; the deployment's upload
+// limit applies to the whole (`413`).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/shares/{share}/uploads/{id} (the `PutUploadPiece` operationId).
+func (c *Client) PutUploadPieceWithBody(ctx context.Context, share ShareName, id UploadId, params *PutUploadPieceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutUploadPieceRequestWithBody(c.Server, share, id, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// FinishUpload Make a complete upload the file.
+//
+// Renames the partial file to the target, only when it holds exactly
+// `size` bytes (`409`, `upload_offset`, otherwise) and after the same
+// check as at the beginning, made again.
+//
+// Corresponds with POST /api/v1/shares/{share}/uploads/{id}/finish (the `FinishUpload` operationId).
+func (c *Client) FinishUpload(ctx context.Context, share ShareName, id UploadId, params *FinishUploadParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFinishUploadRequest(c.Server, share, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3987,6 +4269,433 @@ func NewGetThumbnailRequest(server string, share ShareName, params *GetThumbnail
 	return req, nil
 }
 
+// NewBeginUploadRequest constructs an http.Request for the BeginUpload method
+func NewBeginUploadRequest(server string, share ShareName, params *BeginUploadParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/uploads"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Overwrite != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "overwrite", *params.Overwrite, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Ferry-Request", params.XFerryRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Ferry-Request", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewDiscardUploadRequest constructs an http.Request for the DiscardUpload method
+func NewDiscardUploadRequest(server string, share ShareName, id UploadId, params *DiscardUploadParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/uploads/" + pathParam1
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Ferry-Request", params.XFerryRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Ferry-Request", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewGetUploadRequest constructs an http.Request for the GetUpload method
+func NewGetUploadRequest(server string, share ShareName, id UploadId, params *GetUploadParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/uploads/" + pathParam1
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutUploadPieceRequestWithBody constructs an http.Request for the PutUploadPiece method, with any body, and a specified content type
+func NewPutUploadPieceRequestWithBody(server string, share ShareName, id UploadId, params *PutUploadPieceParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/uploads/" + pathParam1
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Ferry-Request", params.XFerryRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Ferry-Request", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewFinishUploadRequest constructs an http.Request for the FinishUpload method
+func NewFinishUploadRequest(server string, share ShareName, id UploadId, params *FinishUploadParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/uploads/" + pathParam1 + "/finish"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "size", params.Size, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Overwrite != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "overwrite", *params.Overwrite, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Ferry-Request", params.XFerryRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Ferry-Request", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewGetUsageRequest constructs an http.Request for the GetUsage method
 func NewGetUsageRequest(server string, share ShareName, params *GetUsageParams) (*http.Request, error) {
 	var err error
@@ -4706,6 +5415,61 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnailWithResponse(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*GetThumbnailResponse, error)
+
+	// BeginUploadWithResponse Begin an upload in pieces.
+	//
+	// An upload that can go on after a broken connection or a reload: its
+	// pieces are written into a partial file beside the target,
+	// `.ferry-partial-<id>`, which becomes the target only when
+	// `finishUpload` says it is complete. The id is made here, 128 random
+	// bits, and only the client that began the upload knows it; ferry keeps
+	// nothing about it — where it has come to is the partial's size. The
+	// same check as for a whole upload is made first: an existing file is
+	// replaced only with `overwrite=true`, otherwise `409`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/uploads (the `BeginUpload` operationId).
+	BeginUploadWithResponse(ctx context.Context, share ShareName, params *BeginUploadParams, reqEditors ...RequestEditorFn) (*BeginUploadResponse, error)
+
+	// DiscardUploadWithResponse Give an upload up, removing its partial file.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/shares/{share}/uploads/{id} (the `DiscardUpload` operationId).
+	DiscardUploadWithResponse(ctx context.Context, share ShareName, id UploadId, params *DiscardUploadParams, reqEditors ...RequestEditorFn) (*DiscardUploadResponse, error)
+
+	// GetUploadWithResponse How far an upload in pieces has come.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/uploads/{id} (the `GetUpload` operationId).
+	GetUploadWithResponse(ctx context.Context, share ShareName, id UploadId, params *GetUploadParams, reqEditors ...RequestEditorFn) (*GetUploadResponse, error)
+
+	// PutUploadPieceWithBodyWithResponse Write the next piece of an upload.
+	//
+	// Writes the body at `offset`, which must be where the upload has come
+	// to — the partial's size; otherwise `409` (`upload_offset`) and
+	// nothing is written, and the client asks `getUpload` where to go on.
+	// Pieces are written one after another: one cut off part-way keeps the
+	// bytes that arrived. At most 64 MiB a piece; the deployment's upload
+	// limit applies to the whole (`413`).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/shares/{share}/uploads/{id} (the `PutUploadPiece` operationId).
+	PutUploadPieceWithBodyWithResponse(ctx context.Context, share ShareName, id UploadId, params *PutUploadPieceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutUploadPieceResponse, error)
+
+	// FinishUploadWithResponse Make a complete upload the file.
+	//
+	// Renames the partial file to the target, only when it holds exactly
+	// `size` bytes (`409`, `upload_offset`, otherwise) and after the same
+	// check as at the beginning, made again.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/uploads/{id}/finish (the `FinishUpload` operationId).
+	FinishUploadWithResponse(ctx context.Context, share ShareName, id UploadId, params *FinishUploadParams, reqEditors ...RequestEditorFn) (*FinishUploadResponse, error)
 
 	// GetUsageWithResponse Add up what a folder holds.
 	//
@@ -6334,7 +7098,90 @@ func (r GetThumbnailResponse) ContentType() string {
 	return ""
 }
 
-type GetUsageResponse struct {
+type BeginUploadResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *UploadBegun
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r BeginUploadResponse) GetJSON201() *UploadBegun {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r BeginUploadResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r BeginUploadResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r BeginUploadResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r BeginUploadResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r BeginUploadResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r BeginUploadResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r BeginUploadResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r BeginUploadResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r BeginUploadResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r BeginUploadResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DiscardUploadResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
@@ -6350,28 +7197,311 @@ type GetUsageResponse struct {
 }
 
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r GetUsageResponse) GetApplicationproblemJSON400() *BadRequest {
+func (r DiscardUploadResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r GetUsageResponse) GetApplicationproblemJSON401() *Unauthorized {
+func (r DiscardUploadResponse) GetApplicationproblemJSON401() *Unauthorized {
 	return r.ApplicationproblemJSON401
 }
 
 // GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r GetUsageResponse) GetApplicationproblemJSON403() *Forbidden {
+func (r DiscardUploadResponse) GetApplicationproblemJSON403() *Forbidden {
 	return r.ApplicationproblemJSON403
 }
 
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r GetUsageResponse) GetApplicationproblemJSON404() *NotFound {
+func (r DiscardUploadResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
 }
 
 // GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
-func (r GetUsageResponse) GetApplicationproblemJSON502() *BadGateway {
+func (r DiscardUploadResponse) GetApplicationproblemJSON502() *BadGateway {
 	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r DiscardUploadResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DiscardUploadResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DiscardUploadResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DiscardUploadResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetUploadResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UploadState
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetUploadResponse) GetJSON200() *UploadState {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetUploadResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetUploadResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetUploadResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetUploadResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetUploadResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetUploadResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUploadResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUploadResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetUploadResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutUploadPieceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UploadState
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutUploadPieceResponse) GetJSON200() *UploadState {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r PutUploadPieceResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r PutUploadPieceResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PutUploadPieceResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PutUploadPieceResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r PutUploadPieceResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r PutUploadPieceResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r PutUploadPieceResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r PutUploadPieceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutUploadPieceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutUploadPieceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutUploadPieceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type FinishUploadResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Entry
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r FinishUploadResponse) GetJSON201() *Entry {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r FinishUploadResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r FinishUploadResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r FinishUploadResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r FinishUploadResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r FinishUploadResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r FinishUploadResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r FinishUploadResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r FinishUploadResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FinishUploadResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r FinishUploadResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetUsageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
 }
 
 // GetBody returns the raw response body bytes
@@ -7170,6 +8300,91 @@ func (c *ClientWithResponses) GetThumbnailWithResponse(ctx context.Context, shar
 		return nil, err
 	}
 	return ParseGetThumbnailResponse(rsp)
+}
+
+// BeginUploadWithResponse Begin an upload in pieces.
+//
+// An upload that can go on after a broken connection or a reload: its
+// pieces are written into a partial file beside the target,
+// `.ferry-partial-<id>`, which becomes the target only when
+// `finishUpload` says it is complete. The id is made here, 128 random
+// bits, and only the client that began the upload knows it; ferry keeps
+// nothing about it — where it has come to is the partial's size. The
+// same check as for a whole upload is made first: an existing file is
+// replaced only with `overwrite=true`, otherwise `409`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/uploads (the `BeginUpload` operationId).
+func (c *ClientWithResponses) BeginUploadWithResponse(ctx context.Context, share ShareName, params *BeginUploadParams, reqEditors ...RequestEditorFn) (*BeginUploadResponse, error) {
+	rsp, err := c.BeginUpload(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBeginUploadResponse(rsp)
+}
+
+// DiscardUploadWithResponse Give an upload up, removing its partial file.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/shares/{share}/uploads/{id} (the `DiscardUpload` operationId).
+func (c *ClientWithResponses) DiscardUploadWithResponse(ctx context.Context, share ShareName, id UploadId, params *DiscardUploadParams, reqEditors ...RequestEditorFn) (*DiscardUploadResponse, error) {
+	rsp, err := c.DiscardUpload(ctx, share, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDiscardUploadResponse(rsp)
+}
+
+// GetUploadWithResponse How far an upload in pieces has come.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/uploads/{id} (the `GetUpload` operationId).
+func (c *ClientWithResponses) GetUploadWithResponse(ctx context.Context, share ShareName, id UploadId, params *GetUploadParams, reqEditors ...RequestEditorFn) (*GetUploadResponse, error) {
+	rsp, err := c.GetUpload(ctx, share, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUploadResponse(rsp)
+}
+
+// PutUploadPieceWithBodyWithResponse Write the next piece of an upload.
+//
+// Writes the body at `offset`, which must be where the upload has come
+// to — the partial's size; otherwise `409` (`upload_offset`) and
+// nothing is written, and the client asks `getUpload` where to go on.
+// Pieces are written one after another: one cut off part-way keeps the
+// bytes that arrived. At most 64 MiB a piece; the deployment's upload
+// limit applies to the whole (`413`).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/shares/{share}/uploads/{id} (the `PutUploadPiece` operationId).
+func (c *ClientWithResponses) PutUploadPieceWithBodyWithResponse(ctx context.Context, share ShareName, id UploadId, params *PutUploadPieceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutUploadPieceResponse, error) {
+	rsp, err := c.PutUploadPieceWithBody(ctx, share, id, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutUploadPieceResponse(rsp)
+}
+
+// FinishUploadWithResponse Make a complete upload the file.
+//
+// Renames the partial file to the target, only when it holds exactly
+// `size` bytes (`409`, `upload_offset`, otherwise) and after the same
+// check as at the beginning, made again.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/uploads/{id}/finish (the `FinishUpload` operationId).
+func (c *ClientWithResponses) FinishUploadWithResponse(ctx context.Context, share ShareName, id UploadId, params *FinishUploadParams, reqEditors ...RequestEditorFn) (*FinishUploadResponse, error) {
+	rsp, err := c.FinishUpload(ctx, share, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFinishUploadResponse(rsp)
 }
 
 // GetUsageWithResponse Add up what a folder holds.
@@ -8561,20 +9776,91 @@ func ParseGetThumbnailResponse(rsp *http.Response) (*GetThumbnailResponse, error
 	return response, nil
 }
 
-// ParseGetUsageResponse parses an HTTP response from a GetUsageWithResponse call
-func ParseGetUsageResponse(rsp *http.Response) (*GetUsageResponse, error) {
+// ParseBeginUploadResponse parses an HTTP response from a BeginUploadWithResponse call
+func ParseBeginUploadResponse(rsp *http.Response) (*BeginUploadResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetUsageResponse{
+	response := &BeginUploadResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest UploadBegun
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDiscardUploadResponse parses an HTTP response from a DiscardUploadWithResponse call
+func ParseDiscardUploadResponse(rsp *http.Response) (*DiscardUploadResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DiscardUploadResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest BadRequest
 		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
@@ -8610,6 +9896,226 @@ func ParseGetUsageResponse(rsp *http.Response) (*GetUsageResponse, error) {
 		}
 		response.ApplicationproblemJSON502 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseGetUploadResponse parses an HTTP response from a GetUploadWithResponse call
+func ParseGetUploadResponse(rsp *http.Response) (*GetUploadResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUploadResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UploadState
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutUploadPieceResponse parses an HTTP response from a PutUploadPieceWithResponse call
+func ParsePutUploadPieceResponse(rsp *http.Response) (*PutUploadPieceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutUploadPieceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UploadState
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFinishUploadResponse parses an HTTP response from a FinishUploadWithResponse call
+func ParseFinishUploadResponse(rsp *http.Response) (*FinishUploadResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FinishUploadResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Entry
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetUsageResponse parses an HTTP response from a GetUsageWithResponse call
+func ParseGetUsageResponse(rsp *http.Response) (*GetUsageResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUsageResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil
@@ -8881,6 +10387,21 @@ type ServerInterface interface {
 	// GetThumbnail A thumbnail of an image or a recording's cover, made on the fly.
 	// (GET /api/v1/shares/{share}/thumbnail)
 	GetThumbnail(w http.ResponseWriter, r *http.Request, share ShareName, params GetThumbnailParams)
+	// BeginUpload Begin an upload in pieces.
+	// (POST /api/v1/shares/{share}/uploads)
+	BeginUpload(w http.ResponseWriter, r *http.Request, share ShareName, params BeginUploadParams)
+	// DiscardUpload Give an upload up, removing its partial file.
+	// (DELETE /api/v1/shares/{share}/uploads/{id})
+	DiscardUpload(w http.ResponseWriter, r *http.Request, share ShareName, id UploadId, params DiscardUploadParams)
+	// GetUpload How far an upload in pieces has come.
+	// (GET /api/v1/shares/{share}/uploads/{id})
+	GetUpload(w http.ResponseWriter, r *http.Request, share ShareName, id UploadId, params GetUploadParams)
+	// PutUploadPiece Write the next piece of an upload.
+	// (PUT /api/v1/shares/{share}/uploads/{id})
+	PutUploadPiece(w http.ResponseWriter, r *http.Request, share ShareName, id UploadId, params PutUploadPieceParams)
+	// FinishUpload Make a complete upload the file.
+	// (POST /api/v1/shares/{share}/uploads/{id}/finish)
+	FinishUpload(w http.ResponseWriter, r *http.Request, share ShareName, id UploadId, params FinishUploadParams)
 	// GetUsage Add up what a folder holds.
 	// (GET /api/v1/shares/{share}/usage)
 	GetUsage(w http.ResponseWriter, r *http.Request, share ShareName, params GetUsageParams)
@@ -9971,6 +11492,404 @@ func (siw *ServerInterfaceWrapper) GetThumbnail(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// BeginUpload operation middleware
+func (siw *ServerInterfaceWrapper) BeginUpload(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BeginUploadParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "overwrite" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "overwrite", r.URL.Query(), &params.Overwrite, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "overwrite"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "overwrite", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Ferry-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Ferry-Request")]; found {
+		var XFerryRequest BeginUploadParamsXFerryRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Ferry-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Ferry-Request", valueList[0], &XFerryRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Ferry-Request", Err: err})
+			return
+		}
+
+		params.XFerryRequest = XFerryRequest
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BeginUpload(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DiscardUpload operation middleware
+func (siw *ServerInterfaceWrapper) DiscardUpload(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id UploadId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DiscardUploadParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Ferry-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Ferry-Request")]; found {
+		var XFerryRequest DiscardUploadParamsXFerryRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Ferry-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Ferry-Request", valueList[0], &XFerryRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Ferry-Request", Err: err})
+			return
+		}
+
+		params.XFerryRequest = XFerryRequest
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscardUpload(w, r, share, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUpload operation middleware
+func (siw *ServerInterfaceWrapper) GetUpload(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id UploadId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetUploadParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUpload(w, r, share, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutUploadPiece operation middleware
+func (siw *ServerInterfaceWrapper) PutUploadPiece(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id UploadId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutUploadPieceParams
+
+	// ------------- Required query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Ferry-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Ferry-Request")]; found {
+		var XFerryRequest PutUploadPieceParamsXFerryRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Ferry-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Ferry-Request", valueList[0], &XFerryRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Ferry-Request", Err: err})
+			return
+		}
+
+		params.XFerryRequest = XFerryRequest
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutUploadPiece(w, r, share, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FinishUpload operation middleware
+func (siw *ServerInterfaceWrapper) FinishUpload(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id UploadId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params FinishUploadParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "size", r.URL.Query(), &params.Size, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "overwrite" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "overwrite", r.URL.Query(), &params.Overwrite, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "overwrite"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "overwrite", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Ferry-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Ferry-Request")]; found {
+		var XFerryRequest FinishUploadParamsXFerryRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Ferry-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Ferry-Request", valueList[0], &XFerryRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Ferry-Request", Err: err})
+			return
+		}
+
+		params.XFerryRequest = XFerryRequest
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FinishUpload(w, r, share, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetUsage operation middleware
 func (siw *ServerInterfaceWrapper) GetUsage(w http.ResponseWriter, r *http.Request) {
 
@@ -10343,6 +12262,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/versions", wrapper.ListVersions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/search", wrapper.Search)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/usage", wrapper.GetUsage)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/uploads", wrapper.BeginUpload)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/shares/{share}/uploads/{id}", wrapper.DiscardUpload)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/uploads/{id}", wrapper.GetUpload)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/shares/{share}/uploads/{id}", wrapper.PutUploadPiece)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/uploads/{id}/finish", wrapper.FinishUpload)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/archive", wrapper.CreateArchive)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/archive/{ticket}", wrapper.GetArchive)

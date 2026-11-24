@@ -715,10 +715,145 @@ paths:
           content:
             application/x-ndjson:
               schema: { $ref: "#/components/schemas/UsageStreamLine" }
+  /api/v1/shares/{share}/uploads:
+    post:
+      operationId: beginUpload
+      tags: [files]
+      summary: Begin an upload in pieces.
+      description: |
+        An upload that can go on after a broken connection or a reload: its
+        pieces are written into a partial file beside the target,
+        `.ferry-partial-<id>`, which becomes the target only when
+        `finishUpload` says it is complete. The id is made here, 128 random
+        bits, and only the client that began the upload knows it; ferry keeps
+        nothing about it — where it has come to is the partial's size. The
+        same check as for a whole upload is made first: an existing file is
+        replaced only with `overwrite=true`, otherwise `409`.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/FerryRequest"
+        - name: overwrite
+          in: query
+          required: false
+          description: Replace a file of the same name when finished.
+          schema: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Begun.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadBegun" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/uploads/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ShareName"
+      - $ref: "#/components/parameters/UploadId"
+      - $ref: "#/components/parameters/EntryPath"
+    get:
+      operationId: getUpload
+      tags: [files]
+      summary: How far an upload in pieces has come.
+      responses:
+        "200":
+          description: The bytes written so far.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadState" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    put:
+      operationId: putUploadPiece
+      tags: [files]
+      summary: Write the next piece of an upload.
+      description: |
+        Writes the body at `offset`, which must be where the upload has come
+        to — the partial's size; otherwise `409` (`upload_offset`) and
+        nothing is written, and the client asks `getUpload` where to go on.
+        Pieces are written one after another: one cut off part-way keeps the
+        bytes that arrived. At most 64 MiB a piece; the deployment's upload
+        limit applies to the whole (`413`).
+      parameters:
+        - $ref: "#/components/parameters/FerryRequest"
+        - name: offset
+          in: query
+          required: true
+          schema: { type: integer, format: int64, minimum: 0 }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Written; where the upload has come to.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadState" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+    delete:
+      operationId: discardUpload
+      tags: [files]
+      summary: Give an upload up, removing its partial file.
+      parameters:
+        - $ref: "#/components/parameters/FerryRequest"
+      responses:
+        "204": { description: Removed. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/uploads/{id}/finish:
+    post:
+      operationId: finishUpload
+      tags: [files]
+      summary: Make a complete upload the file.
+      description: |
+        Renames the partial file to the target, only when it holds exactly
+        `size` bytes (`409`, `upload_offset`, otherwise) and after the same
+        check as at the beginning, made again.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/UploadId"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/FerryRequest"
+        - name: size
+          in: query
+          required: true
+          description: The file's whole size, as the client has it.
+          schema: { type: integer, format: int64, minimum: 0 }
+        - name: overwrite
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        "201":
+          description: The file.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
   /api/v1/shares/{share}/folders:
@@ -935,6 +1070,12 @@ components:
         type: string
         pattern: '^@GMT-[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{2}\.[0-9]{2}\.[0-9]{2}$'
         maxLength: 24
+    UploadId:
+      name: id
+      in: path
+      required: true
+      description: The id `beginUpload` gave.
+      schema: { type: string, pattern: "^[0-9a-f]{32}$" }
     FerryRequest:
       name: X-Ferry-Request
       in: header
@@ -1162,6 +1303,16 @@ components:
             type: array
             items: { type: string }
         truncated: { type: boolean }
+    UploadBegun:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, description: "The upload's id: 32 hex digits." }
+    UploadState:
+      type: object
+      required: [size]
+      properties:
+        size: { type: integer, format: int64, description: "The bytes written so far." }
     DocumentText:
       type: object
       required: [text, truncated]

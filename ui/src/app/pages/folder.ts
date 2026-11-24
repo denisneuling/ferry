@@ -15,6 +15,9 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Places } from '../core/places';
 import { FolderSize } from '../core/folder-size';
 import { BatchRename } from '../ui/batch-rename';
+import { Dialogs } from '../ui/dialog';
+import { Toasts } from '../ui/toast';
+import { describe } from '../core/errors';
 import { Api, Entry } from '../core/api';
 import { Actions } from '../core/actions';
 import { Browser, SortKey } from '../core/browser';
@@ -86,6 +89,8 @@ export class Folder {
   protected readonly format = inject(Format);
   protected readonly actions = inject(Actions);
   private readonly api = inject(Api);
+  private readonly dialogs = inject(Dialogs);
+  private readonly toasts = inject(Toasts);
   private readonly transfers = inject(Transfers);
   private readonly session = inject(Session);
   private readonly player = inject(Player);
@@ -224,6 +229,39 @@ export class Folder {
       return;
     }
     this.batch.show({ share, dir: this.browser.path(), chosen: sel, folder: this.browser.entries() ?? [] });
+  }
+
+  /**
+   * Uploads in pieces left here more than a day ago: never removed by
+   * themselves — one may be someone else's, going on tomorrow — but shown,
+   * with their size, for whoever may remove them to do so.
+   */
+  protected readonly stale = computed(() => {
+    const day = Date.now() - 24 * 3600 * 1000;
+    const old = this.browser.partials().filter((e) => Date.parse(e.modified) < day);
+    return old.length ? { n: old.length, size: old.reduce((a, e) => a + e.size, 0), entries: old } : null;
+  });
+
+  protected async removeStale(): Promise<void> {
+    const s = this.stale();
+    const share = this.browser.share();
+    if (!s || !share) return;
+    const ok = await this.dialogs.confirm({
+      title: $localize`:@@partials.title:Remove unfinished uploads?`,
+      text: $localize`:@@partials.text:${s.n}:n: uploads were begun here more than a day ago and not finished. Removing them frees their space; they cannot be finished afterwards.`,
+      ok: $localize`:@@partials.remove:Remove`,
+      danger: true,
+    });
+    if (!ok) return;
+    for (const e of s.entries) {
+      try {
+        await this.api.remove(share, e.path);
+      } catch (err) {
+        this.toasts.error(describe(err));
+        break;
+      }
+    }
+    void this.browser.reload();
   }
 
   /** Plays the folder's recordings, from the one given or the first. */

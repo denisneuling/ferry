@@ -45,6 +45,7 @@ func (p problem) write(w http.ResponseWriter) {
 var (
 	probInvalidRequest    = problem{status: http.StatusBadRequest, code: "invalid_request", title: "The request is not valid."}
 	probInvalidPath       = problem{status: http.StatusBadRequest, code: "invalid_path", title: "The path is not valid."}
+	probOffset            = problem{status: http.StatusConflict, code: "upload_offset", title: "The upload has come to another point; ask where, and go on from there."}
 	probChanged           = problem{status: http.StatusPreconditionFailed, code: "changed", title: "The file changed since it was opened."}
 	probNotAnArchive      = problem{status: http.StatusUnsupportedMediaType, code: "not_an_archive", title: "This is no archive ferry can read, or the entry cannot be unpacked."}
 	probNotADocument      = problem{status: http.StatusUnsupportedMediaType, code: "not_a_document", title: "This is no document ferry can read text from."}
@@ -105,6 +106,8 @@ func smbProblem(err error) problem {
 		return probIncomplete
 	case smb.KindChanged:
 		return probChanged
+	case smb.KindOffset:
+		return probOffset
 	}
 	return probInternal
 }

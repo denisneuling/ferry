@@ -188,6 +188,16 @@
   </div>
 </header>
 
+@if (stale(); as s) {
+  <div class="past" role="status">
+    <f-icon name="upload" [size]="17" />
+    <span i18n="@@partials.notice"
+      >{{ s.n }} unfinished uploads ({{ format.size(s.size) }}) were begun here more than a day ago.</span
+    >
+    <button type="button" class="btn" (click)="removeStale()" i18n="@@partials.remove">Remove</button>
+  </div>
+}
+
 @if (snapshot.at()) {
   <div class="past" role="status">
     <f-icon name="clock" [size]="17" />

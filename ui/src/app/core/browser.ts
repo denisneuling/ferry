@@ -41,6 +41,8 @@ export class Browser {
   /** The folder, slash-separated, '' for the share's root. */
   readonly path = signal('');
   readonly entries = signal<Entry[] | null>(null);
+  /** Partial files of uploads in pieces in this folder, left out of entries. */
+  readonly partials = signal<Entry[]>([]);
   /** Whether a listing is still arriving: entries() may be its first part. */
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -136,6 +138,7 @@ export class Browser {
       this.stopTaken();
       this.taken.set(new Map());
       if (this.sort() === 'taken') this.sort.set('name');
+      this.partials.set([]);
       this.filter.set('');
       this.clear();
       this.preview.set(null);
@@ -161,6 +164,7 @@ export class Browser {
     // sorts the whole folder again.
     const progressive = this.entries() === null;
     const got: Entry[] = [];
+    const partials: Entry[] = [];
     // A server may list a name twice when the folder changes under the
     // listing; the interface keys entries by name, so the first one counts.
     const names = new Set<string>();
@@ -174,6 +178,12 @@ export class Browser {
           if (n !== this.loads) return;
           for (const e of batch) {
             if (names.has(e.name)) continue;
+            // An upload in pieces under way is not a file yet: not shown,
+            // but kept aside, so that one left long since can be removed.
+            if (e.name.startsWith(PARTIAL_PREFIX)) {
+              partials.push(e);
+              continue;
+            }
             names.add(e.name);
             got.push(e);
           }
@@ -189,6 +199,7 @@ export class Browser {
         return; // A newer load is on its way.
       }
       this.entries.set(got);
+      this.partials.set(partials);
       this.remember(share, path, got);
       this.error.set(null);
       this.errorCode.set(null);
@@ -382,3 +393,5 @@ function isPicture(name: string): boolean {
   const k = previewKind(name);
   return k === 'image' || k === 'derived';
 }
+/** The name an upload in pieces writes to until it is complete. */
+export const PARTIAL_PREFIX = '.ferry-partial-';

@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Api, ApiError, join, parent } from './api';
+import { Api, ApiError, PIECES_FROM, join, parent } from './api';
 import { Browser } from './browser';
 import { Dialogs } from '../ui/dialog';
 import { Toasts } from '../ui/toast';
@@ -187,7 +187,11 @@ export class Transfers {
     if (!file) {
       return;
     }
-    const up = this.api.upload(job.share, join(job.dir, job.name), file, overwrite, (p) =>
+    // A large file goes in pieces: a broken connection costs a piece, not
+    // the whole, and a reload can go on with it.
+    const send =
+      file.size >= PIECES_FROM ? this.api.uploadInPieces.bind(this.api) : this.api.upload.bind(this.api);
+    const up = send(job.share, join(job.dir, job.name), file, overwrite, (p) =>
       this.set(job.id, { loaded: p.loaded }),
     );
     this.aborts.set(job.id, up.abort);

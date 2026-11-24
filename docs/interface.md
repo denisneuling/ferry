@@ -197,6 +197,17 @@ is replaced only after asking. An upload that fails or is cancelled leaves
 nothing on the share: ferry writes to a temporary name and renames it only
 once the file is complete.
 
+A file of 16 MB or more is uploaded in pieces of 8 MB. A broken
+connection costs a piece: it is tried again, waiting a little longer each
+time, from where the server says the upload has come to. After a reload,
+or in another tab, the same file uploaded to the same place again goes on
+where it stopped — the browser remembers which upload it was, by the
+target and the file's name, size and time. Until it is complete the file
+is a hidden `.ferry-partial-…` beside the target, which the folder view
+leaves out; cancelling removes it. One begun more than a day ago and never
+finished is not removed by itself — it may be someone else's, going on
+tomorrow — but the folder says so, with its size, and offers to remove it.
+
 **Folder** uploads a folder with everything in it, as does dropping a
 folder: its folders are made first — one that is there already is used as
 it is — then its files are uploaded into them. One upload takes as many
