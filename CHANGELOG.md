@@ -5,6 +5,21 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.13.0](https://github.com/denisneuling/ferry/compare/v0.12.0...v0.13.0) (2026-11-24)
+
+### Features
+
+* every sheet of a workbook, chosen by tabs above the table ([10b81a9](https://github.com/denisneuling/ferry/commit/10b81a9eae712d5259f2c4498c885bfdd585e0cb))
+* read EPUB books in the preview, chapter by chapter ([12caa79](https://github.com/denisneuling/ferry/commit/12caa79579ab6fb6e7aff83dd8409d587e9471bc))
+* the text of PowerPoint and OpenDocument presentations ([36c37af](https://github.com/denisneuling/ferry/commit/36c37af8264906af967e1ba00fe803bb196e7dc1))
+* unpack ZIP files on the share, and save a selection as one ([cb36ce8](https://github.com/denisneuling/ferry/commit/cb36ce8102eb1f8fb45b71dccb67e21f31cf8502))
+* uploads in pieces that go on after a broken connection or a reload ([7a962b9](https://github.com/denisneuling/ferry/commit/7a962b98debc084b39096533a06aaaca16744b93))
+
+### Bug Fixes
+
+* one step at a time per upload in pieces ([6c775ea](https://github.com/denisneuling/ferry/commit/6c775ea0aa3bc243cd1b91227347d8e5b6067e56))
+* unpack archives from Windows that write backslashes as separators ([bcb3155](https://github.com/denisneuling/ferry/commit/bcb315562354a95f53a6c03e89ce5d0e93749384))
+
 ## [0.12.0](https://github.com/denisneuling/ferry/compare/v0.11.0...v0.12.0) (2026-11-24)
 
 ### Features

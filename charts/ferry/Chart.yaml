@@ -2,8 +2,8 @@ apiVersion: v2
 name: ferry
 description: ferry — SMB shares in the browser; log in with your Samba account and see exactly what Samba lets you see, with no users and no database
 type: application
-version: 0.12.0
-appVersion: "0.12.0"
+version: 0.13.0
+appVersion: "0.13.0"
 keywords:
   - smb
   - samba
