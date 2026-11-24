@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/cloudsoda/go-smb2"
 )
@@ -39,6 +40,33 @@ func partialPath(sp, id string) string {
 		return sp[:i+1] + name
 	}
 	return name
+}
+
+// uploading holds the uploads in pieces with a step under way in this
+// process, by share and partial path. Checking the partial's size and
+// writing at it are two calls: two requests for the same upload — two tabs,
+// two devices — could both find the same size and both write. Each step
+// therefore holds its upload for itself, and a second one at the same time
+// is KindBusy, to be tried again. ferry runs as one replica (the chart's
+// rule: sessions live in memory), so a lock in the process is enough.
+var uploading = struct {
+	sync.Mutex
+	busy map[string]bool
+}{busy: map[string]bool{}}
+
+// hold takes upload key for one step, or says it is taken.
+func hold(key string) (func(), error) {
+	uploading.Lock()
+	defer uploading.Unlock()
+	if uploading.busy[key] {
+		return nil, &Error{Kind: KindBusy}
+	}
+	uploading.busy[key] = true
+	return func() {
+		uploading.Lock()
+		delete(uploading.busy, key)
+		uploading.Unlock()
+	}, nil
 }
 
 // partial checks an upload's target and id and opens its share.
@@ -113,6 +141,11 @@ func (s *Session) PartialAppend(ctx context.Context, share, p, id string, offset
 	if err != nil {
 		return 0, err
 	}
+	release, err := hold(share + "\x00" + strings.ToLower(pp))
+	if err != nil {
+		return 0, err
+	}
+	defer release()
 	fctx, fcancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer fcancel()
 	var f *smb2.File
@@ -208,6 +241,11 @@ func (s *Session) PartialFinish(ctx context.Context, share, p, id string, size i
 	if err != nil {
 		return Entry{}, err
 	}
+	release, err := hold(share + "\x00" + strings.ToLower(pp))
+	if err != nil {
+		return Entry{}, err
+	}
+	defer release()
 	var e Entry
 	err = s.fileStep(ctx, share, func(m *smb2.Share) error {
 		got, err := s.stat(m, pp)
@@ -220,6 +258,10 @@ func (s *Session) PartialFinish(ctx context.Context, share, p, id string, size i
 		if err := s.refuseExisting(m, sp, overwrite); err != nil {
 			return err
 		}
+		// go-smb2 renames with ReplaceIfExists: an existing target is
+		// replaced in the one call, never removed first, so there is no
+		// moment without it. That the target may be replaced at all is
+		// refuseExisting's check just before.
 		if err := m.Rename(pp, sp); err != nil {
 			return s.fail(err)
 		}
@@ -235,6 +277,11 @@ func (s *Session) PartialDiscard(ctx context.Context, share, p, id string) error
 	if err != nil {
 		return err
 	}
+	release, err := hold(share + "\x00" + strings.ToLower(pp))
+	if err != nil {
+		return err
+	}
+	defer release()
 	return s.fileStep(ctx, share, func(m *smb2.Share) error {
 		if err := m.Remove(pp); err != nil {
 			return s.fail(err)

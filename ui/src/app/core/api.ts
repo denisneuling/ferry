@@ -558,7 +558,14 @@ export class Api {
           tries = 0;
         } catch (e) {
           if (aborted || !(e instanceof ApiError)) throw e;
-          const again = e.status === 0 || e.code === 'upload_offset' || e.status === 502 || e.status === 503;
+          // Broken, out of step, or another tab's piece of the same upload
+          // being written: wait, ask where it stands, go on.
+          const again =
+            e.status === 0 ||
+            e.code === 'upload_offset' ||
+            e.code === 'busy' ||
+            e.status === 502 ||
+            e.status === 503;
           if (!again || ++tries > RETRIES) throw e;
           // Wait a moment, then ask where the upload has come to: the piece
           // may have arrived in part, or whole with its answer lost.
