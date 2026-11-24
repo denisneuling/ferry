@@ -452,13 +452,17 @@ paths:
     get:
       operationId: getDocumentText
       tags: [files]
-      summary: The plain text of a Word or OpenDocument text.
+      summary: The plain text of a Word or OpenDocument text, or of a presentation's slides.
       description: |
         The text of a `.docx` or an OpenDocument text (`.odt`), read out of
         its XML: paragraphs as lines, tabs as tabs, nothing else — no
         formatting, no pictures, no links, nothing of the document that
-        could run. At most 512 KB, `truncated` when there is more. A file
-        that is neither is `415` (`not_a_document`).
+        could run. A PowerPoint (`.pptx`) or OpenDocument presentation
+        (`.odp`) gives its slides' text in the order they are shown, an
+        empty line between slides; speaker notes, and PowerPoint slides
+        hidden from the slideshow, are left out. At most 512 KB, `truncated` when
+        there is more. A file that is none of these is `415`
+        (`not_a_document`).
       parameters:
         - $ref: "#/components/parameters/ShareName"
         - $ref: "#/components/parameters/EntryPath"

@@ -3,6 +3,7 @@ package docs
 import (
 	"archive/zip"
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/denisneuling/ferry/internal/zipread"
@@ -107,4 +108,51 @@ func FuzzText(f *testing.F) {
 		}
 		_ = zipread.ErrNotZip
 	})
+}
+
+func TestSlideText(t *testing.T) {
+	slide := func(lines ...string) string {
+		var b strings.Builder
+		b.WriteString(`<p:sld xmlns:p="p" xmlns:a="a"><p:cSld><p:spTree>`)
+		for _, l := range lines {
+			b.WriteString(`<p:sp><p:txBody><a:p><a:r><a:t>` + l + `</a:t></a:r></a:p></p:txBody></p:sp>`)
+		}
+		b.WriteString(`</p:spTree></p:cSld></p:sld>`)
+		return b.String()
+	}
+	z := zipOf(t, map[string]string{
+		"ppt/presentation.xml":             "<p/>",
+		"ppt/slides/slide10.xml":           slide("Zehn"),
+		"ppt/slides/slide2.xml":            slide("Zwei", "&lt;b&gt;fett&lt;/b&gt;"),
+		"ppt/slides/slide1.xml":            slide("Urlaub 2025"),
+		"ppt/slides/_rels/slide1.xml.rels": "<x/>",
+	})
+	got, more, err := Text(bytes.NewReader(z), int64(len(z)), 1<<20)
+	if err != nil || more || got != "Urlaub 2025\n\nZwei\n<b>fett</b>\n\nZehn\n" {
+		t.Fatalf("%q, %v, %v", got, more, err)
+	}
+	// Slides moved: presentation.xml's order counts, not the files'
+	// numbers; a hidden slide is left out.
+	z = zipOf(t, map[string]string{
+		"ppt/presentation.xml": `<p:presentation xmlns:p="p" xmlns:r="r"><p:sldIdLst>
+<p:sldId id="258" r:id="rId9"/><p:sldId id="256" r:id="rId7"/><p:sldId id="257" r:id="rId8"/></p:sldIdLst></p:presentation>`,
+		"ppt/_rels/presentation.xml.rels": `<Relationships><Relationship Id="rId7" Target="slides/slide1.xml"/>
+<Relationship Id="rId8" Target="slides/slide2.xml"/><Relationship Id="rId9" Target="/ppt/slides/slide3.xml"/></Relationships>`,
+		"ppt/slides/slide1.xml": slide("Eins"),
+		"ppt/slides/slide2.xml": strings.Replace(slide("versteckt"), "<p:sld ", `<p:sld show="0" `, 1),
+		"ppt/slides/slide3.xml": slide("Drei, jetzt vorn"),
+	})
+	got, _, err = Text(bytes.NewReader(z), int64(len(z)), 1<<20)
+	if err != nil || got != "Drei, jetzt vorn\n\nEins\n" {
+		t.Fatalf("moved: %q, %v", got, err)
+	}
+	odp := `<office:document-content><office:body><office:presentation>
+<draw:page><draw:frame><draw:text-box><text:p>Titel</text:p></draw:text-box></draw:frame><presentation:notes><text:p>geheime Notiz</text:p></presentation:notes></draw:page>
+<draw:page><draw:frame><draw:text-box><text:p>Folie zwei</text:p></draw:text-box></draw:frame></draw:page>
+</office:presentation></office:body></office:document-content>`
+	z = zipOf(t, map[string]string{"content.xml": odp})
+	got, _, err = Text(bytes.NewReader(z), int64(len(z)), 1<<20)
+	if err != nil || got != "Titel\n\nFolie zwei\n" {
+		t.Fatalf("odp: %q, %v", got, err)
+	}
 }

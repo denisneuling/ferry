@@ -162,8 +162,8 @@ export function previewKind(name: string): PreviewKind {
   if (browserVideo.has(ext)) return 'video';
   if (browserAudio.has(ext)) return 'audio';
   if (ext === 'pdf') return 'pdf';
-  // A Word or OpenDocument text: its plain text, read by the server.
-  if (ext === 'docx' || ext === 'odt') return 'document';
+  // A Word or OpenDocument text, or a presentation's slides: their plain text, read by the server.
+  if (ext === 'docx' || ext === 'odt' || ext === 'pptx' || ext === 'odp') return 'document';
   // CSV and TSV: a table of their first rows; a workbook's first sheet, read by the server.
   if (ext === 'csv' || ext === 'tsv' || isWorkbook(name)) return 'table';
   // A ZIP: what it holds, each entry to open or download.

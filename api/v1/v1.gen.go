@@ -2168,13 +2168,17 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/shares/{share}/space (the `GetSpace` operationId).
 	GetSpace(ctx context.Context, share ShareName, params *GetSpaceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetDocumentText The plain text of a Word or OpenDocument text.
+	// GetDocumentText The plain text of a Word or OpenDocument text, or of a presentation's slides.
 	//
 	// The text of a `.docx` or an OpenDocument text (`.odt`), read out of
 	// its XML: paragraphs as lines, tabs as tabs, nothing else — no
 	// formatting, no pictures, no links, nothing of the document that
-	// could run. At most 512 KB, `truncated` when there is more. A file
-	// that is neither is `415` (`not_a_document`).
+	// could run. A PowerPoint (`.pptx`) or OpenDocument presentation
+	// (`.odp`) gives its slides' text in the order they are shown, an
+	// empty line between slides; speaker notes, and PowerPoint slides
+	// hidden from the slideshow, are left out. At most 512 KB, `truncated` when
+	// there is more. A file that is none of these is `415`
+	// (`not_a_document`).
 	//
 	// Corresponds with GET /api/v1/shares/{share}/text (the `GetDocumentText` operationId).
 	GetDocumentText(ctx context.Context, share ShareName, params *GetDocumentTextParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2976,13 +2980,17 @@ func (c *Client) GetSpace(ctx context.Context, share ShareName, params *GetSpace
 	return c.Client.Do(req)
 }
 
-// GetDocumentText The plain text of a Word or OpenDocument text.
+// GetDocumentText The plain text of a Word or OpenDocument text, or of a presentation's slides.
 //
 // The text of a `.docx` or an OpenDocument text (`.odt`), read out of
 // its XML: paragraphs as lines, tabs as tabs, nothing else — no
 // formatting, no pictures, no links, nothing of the document that
-// could run. At most 512 KB, `truncated` when there is more. A file
-// that is neither is `415` (`not_a_document`).
+// could run. A PowerPoint (`.pptx`) or OpenDocument presentation
+// (`.odp`) gives its slides' text in the order they are shown, an
+// empty line between slides; speaker notes, and PowerPoint slides
+// hidden from the slideshow, are left out. At most 512 KB, `truncated` when
+// there is more. A file that is none of these is `415`
+// (`not_a_document`).
 //
 // Corresponds with GET /api/v1/shares/{share}/text (the `GetDocumentText` operationId).
 func (c *Client) GetDocumentText(ctx context.Context, share ShareName, params *GetDocumentTextParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -5884,13 +5892,17 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/shares/{share}/space (the `GetSpace` operationId).
 	GetSpaceWithResponse(ctx context.Context, share ShareName, params *GetSpaceParams, reqEditors ...RequestEditorFn) (*GetSpaceResponse, error)
 
-	// GetDocumentTextWithResponse The plain text of a Word or OpenDocument text.
+	// GetDocumentTextWithResponse The plain text of a Word or OpenDocument text, or of a presentation's slides.
 	//
 	// The text of a `.docx` or an OpenDocument text (`.odt`), read out of
 	// its XML: paragraphs as lines, tabs as tabs, nothing else — no
 	// formatting, no pictures, no links, nothing of the document that
-	// could run. At most 512 KB, `truncated` when there is more. A file
-	// that is neither is `415` (`not_a_document`).
+	// could run. A PowerPoint (`.pptx`) or OpenDocument presentation
+	// (`.odp`) gives its slides' text in the order they are shown, an
+	// empty line between slides; speaker notes, and PowerPoint slides
+	// hidden from the slideshow, are left out. At most 512 KB, `truncated` when
+	// there is more. A file that is none of these is `415`
+	// (`not_a_document`).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -9061,13 +9073,17 @@ func (c *ClientWithResponses) GetSpaceWithResponse(ctx context.Context, share Sh
 	return ParseGetSpaceResponse(rsp)
 }
 
-// GetDocumentTextWithResponse The plain text of a Word or OpenDocument text.
+// GetDocumentTextWithResponse The plain text of a Word or OpenDocument text, or of a presentation's slides.
 //
 // The text of a `.docx` or an OpenDocument text (`.odt`), read out of
 // its XML: paragraphs as lines, tabs as tabs, nothing else — no
 // formatting, no pictures, no links, nothing of the document that
-// could run. At most 512 KB, `truncated` when there is more. A file
-// that is neither is `415` (`not_a_document`).
+// could run. A PowerPoint (`.pptx`) or OpenDocument presentation
+// (`.odp`) gives its slides' text in the order they are shown, an
+// empty line between slides; speaker notes, and PowerPoint slides
+// hidden from the slideshow, are left out. At most 512 KB, `truncated` when
+// there is more. A file that is none of these is `415`
+// (`not_a_document`).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11424,7 +11440,7 @@ type ServerInterface interface {
 	// GetSpace The size and free space of the volume a folder is on.
 	// (GET /api/v1/shares/{share}/space)
 	GetSpace(w http.ResponseWriter, r *http.Request, share ShareName, params GetSpaceParams)
-	// GetDocumentText The plain text of a Word or OpenDocument text.
+	// GetDocumentText The plain text of a Word or OpenDocument text, or of a presentation's slides.
 	// (GET /api/v1/shares/{share}/text)
 	GetDocumentText(w http.ResponseWriter, r *http.Request, share ShareName, params GetDocumentTextParams)
 	// GetThumbnail A thumbnail of an image or a recording's cover, made on the fly.

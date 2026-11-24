@@ -192,33 +192,41 @@ func openPart(r io.ReaderAt, size int64, e zipread.Entry, limit int64) (io.Reade
 // relTarget looks a sheet's relationship id up in the workbook's
 // relationships; the target is only ever a name looked for in the archive.
 func relTarget(r io.ReaderAt, size int64, es []zipread.Entry, id string) (string, bool) {
-	e, ok := zipread.Find(es, "xl/_rels/workbook.xml.rels")
+	t, ok := relTargets(r, size, es, "xl/_rels/workbook.xml.rels", "xl")[id]
+	return t, ok
+}
+
+// relTargets reads an Office part's relationships: each id's target, as a
+// name in the archive — relative to dir, or from the root where it starts
+// with a slash. The targets are only ever looked for among the archive's
+// names: nothing is opened by them.
+func relTargets(r io.ReaderAt, size int64, es []zipread.Entry, rels, dir string) map[string]string {
+	e, ok := zipread.Find(es, rels)
 	if !ok {
-		return "", false
+		return nil
 	}
 	b, err := zipread.ReadAll(r, size, e, maxOPF)
 	if err != nil {
-		return "", false
+		return nil
 	}
-	var rels struct {
+	var doc struct {
 		Rel []struct {
 			ID     string `xml:"Id,attr"`
 			Target string `xml:"Target,attr"`
 		} `xml:"Relationship"`
 	}
-	if xml.Unmarshal(b, &rels) != nil {
-		return "", false
+	if xml.Unmarshal(b, &doc) != nil {
+		return nil
 	}
-	for _, x := range rels.Rel {
-		if x.ID != id {
-			continue
-		}
+	out := make(map[string]string, len(doc.Rel))
+	for _, x := range doc.Rel {
 		if strings.HasPrefix(x.Target, "/") {
-			return path.Clean(x.Target[1:]), true
+			out[x.ID] = path.Clean(x.Target[1:])
+		} else {
+			out[x.ID] = path.Clean(path.Join(dir, x.Target))
 		}
-		return path.Clean(path.Join("xl", x.Target)), true
 	}
-	return "", false
+	return out
 }
 
 // xlsxCells reads a worksheet's cells with a value, in order: their place,

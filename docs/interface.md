@@ -233,7 +233,9 @@ for it: OpenDocument files (`.odt`, `.ods`, `.odp`) nearly always, Office
 files (`.docx`, `.xlsx`, `.pptx`) when they were saved with one, an EPUB
 its cover; the rest an icon. A Word or OpenDocument text shows its plain
 text in the preview — the paragraphs, no formatting, nothing of the
-document that could run. A CSV or TSV file shows as a table of its first
+document that could run — and a PowerPoint or OpenDocument presentation
+the text of its slides in the order they are shown, without the speaker
+notes; a PowerPoint slide hidden from the slideshow is left out. A CSV or TSV file shows as a table of its first
 1000 rows — commas, the semicolons a German spreadsheet writes, or tabs —
 its cells as text. An Excel workbook (`.xlsx`) or an OpenDocument
 spreadsheet (`.ods`) shows its first sheet the same way, read by the server:
