@@ -5,6 +5,14 @@ Conventional Commits since the one before. Until 1.0, a minor version may
 change the API, the settings or the chart's values; such changes are listed
 under BREAKING CHANGES.
 
+## [0.11.0](https://github.com/denisneuling/ferry/compare/v0.10.0...v0.11.0) (2026-11-24)
+
+### Features
+
+* the first sheet of Excel and OpenDocument spreadsheets as a table ([0dc5b30](https://github.com/denisneuling/ferry/commit/0dc5b3032990066b2ca21c5661115c57afe0c177))
+* **ui:** subtitles next to a video play with it ([ec9cd27](https://github.com/denisneuling/ferry/commit/ec9cd27dce71dd6aac3fb9ad71b3b1327794fb09))
+* **ui:** zoom and move pictures in the preview ([0a29bda](https://github.com/denisneuling/ferry/commit/0a29bdae58f0e64831ad89dbd3ca51a3493d4317))
+
 ## [0.10.0](https://github.com/denisneuling/ferry/compare/v0.9.1...v0.10.0) (2026-11-23)
 
 ### Features
