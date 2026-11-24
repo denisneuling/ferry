@@ -14,6 +14,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Places } from '../core/places';
 import { FolderSize } from '../core/folder-size';
+import { BatchRename } from '../ui/batch-rename';
 import { Api, Entry } from '../core/api';
 import { Actions } from '../core/actions';
 import { Browser, SortKey } from '../core/browser';
@@ -104,6 +105,7 @@ export class Folder {
   private readonly router = inject(Router);
   private readonly locale = inject(LOCALE_ID);
   protected readonly sizes = inject(FolderSize);
+  private readonly batch = inject(BatchRename);
   protected readonly places = inject(Places);
   /** This folder as a place, for its star; none in a snapshot. */
   protected readonly here = computed(() => {
@@ -210,6 +212,18 @@ export class Folder {
   protected byTaken(): void {
     if (this.browser.sort() === 'taken') this.browser.setSort('name');
     else void this.browser.sortByTaken();
+  }
+
+  /** One entry renamed by its name; several by a pattern, each new name shown first. */
+  protected renameSelection(): void {
+    const sel = this.browser.selection();
+    const share = this.browser.share();
+    if (!share || !sel.length) return;
+    if (sel.length === 1) {
+      void this.actions.rename(sel[0]);
+      return;
+    }
+    this.batch.show({ share, dir: this.browser.path(), chosen: sel, folder: this.browser.entries() ?? [] });
   }
 
   /** Plays the folder's recordings, from the one given or the first. */
@@ -465,12 +479,11 @@ export class Folder {
         label: $localize`:@@act.versions:Previous versions`,
         run: () => this.showVersions(e),
       });
-    if (one)
-      items.push({
-        icon: 'pencil',
-        label: $localize`:@@act.rename:Rename`,
-        run: () => this.actions.rename(e),
-      });
+    items.push({
+      icon: 'pencil',
+      label: $localize`:@@act.rename:Rename`,
+      run: () => this.renameSelection(),
+    });
     items.push({ icon: 'move', label: $localize`:@@act.move:Move`, run: () => this.actions.move(sel) });
     items.push({ icon: 'copy', label: $localize`:@@act.copy:Copy to…`, run: () => this.actions.copy(sel) });
     items.push({ separator: true });
@@ -535,9 +548,9 @@ export class Folder {
       this.browser.selectAll();
     } else if (ev.key === 'Delete' && sel.length && !this.snapshot.at()) {
       void this.actions.remove(sel);
-    } else if (ev.key === 'F2' && sel.length === 1 && !this.snapshot.at()) {
+    } else if (ev.key === 'F2' && sel.length && !this.snapshot.at()) {
       ev.preventDefault();
-      void this.actions.rename(sel[0]);
+      this.renameSelection();
     } else if (ev.key === 'Backspace' || (ev.altKey && ev.key === 'ArrowUp')) {
       ev.preventDefault();
       this.up();

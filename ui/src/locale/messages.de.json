@@ -286,6 +286,20 @@
     "size.partial": "mindestens: nicht alles wurde gezählt",
     "size.skipped": "{$INTERPOLATION} Ordner für dich nicht offen",
     "size.stop": "Zählen beenden",
-    "size.close": "Schließen"
+    "size.close": "Schließen",
+    "batch.title": "{$INTERPOLATION} Einträge umbenennen",
+    "batch.stopped": "Das Umbenennen hat nach {$INTERPOLATION} von {$INTERPOLATION_1} Schritten aufgehört.",
+    "batch.failedAt": "„{$INTERPOLATION}“ ließ sich nicht umbenennen:",
+    "batch.stranded": "Diese haben jetzt einen vorläufigen Namen; benenne sie zurück:",
+    "batch.pattern": "Muster",
+    "batch.start": "Beginnt bei",
+    "batch.digits": "Stellen",
+    "batch.invalid": "kein möglicher Name",
+    "batch.twice": "doppelt vergeben",
+    "batch.taken": "gibt es schon",
+    "batch.more": "… und {$INTERPOLATION} weitere.",
+    "batch.running": "Benenne um… {$INTERPOLATION} von {$INTERPOLATION_1}",
+    "batch.done": "{$n} Einträge umbenannt.",
+    "batch.help": " {$INTERPOLATION}name{$INTERPOLATION_1} alter Name · {$INTERPOLATION}ext{$INTERPOLATION_1} Endung · {$INTERPOLATION}n{$INTERPOLATION_1} Zähler · {$INTERPOLATION}date{$INTERPOLATION_1} Tag der Änderung · {$INTERPOLATION}taken{$INTERPOLATION_1} Tag der Aufnahme "
   }
 }

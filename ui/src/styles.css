@@ -2387,3 +2387,70 @@ h1 .fav {
 h1 .fav {
   display: inline-grid;
 }
+
+/* Renaming several entries: the pattern, and every new name before anything happens. */
+.fx-batch {
+  width: min(640px, calc(100vw - 32px));
+}
+.fx-batch-fields {
+  display: grid;
+  grid-template-columns: 1fr 96px 80px;
+  gap: 10px;
+}
+.fx-batch-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.fx-batch-fields input {
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+}
+.fx-batch-help {
+  margin: 8px 0 12px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.fx-batch-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 40vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.fx-batch-list li {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.fx-batch-list li:last-child {
+  border-bottom: 0;
+}
+.fx-batch-list li.bad {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.fx-batch-list small {
+  margin-left: 6px;
+  color: var(--danger);
+}
+@media (max-width: 560px) {
+  .fx-batch-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .fx-batch-fields label:first-child {
+    grid-column: 1 / -1;
+  }
+}

@@ -9,12 +9,13 @@ import { DialogHost } from './ui/dialog';
 import { FolderPickerHost } from './ui/folder-picker';
 import { ToastHost } from './ui/toast';
 import { VersionsHost } from './ui/versions';
+import { BatchRenameHost } from './ui/batch-rename';
 
 /** The interface: the login, or the shell once a session exists; dialogs and toasts over both. */
 @Component({
   selector: 'f-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Login, Shell, DialogHost, FolderPickerHost, ToastHost, VersionsHost],
+  imports: [Login, Shell, DialogHost, FolderPickerHost, ToastHost, VersionsHost, BatchRenameHost],
   template: `@switch (session.me()) {
       @case (undefined) {}
       @case (null) {
@@ -27,6 +28,7 @@ import { VersionsHost } from './ui/versions';
     <f-dialogs />
     <f-folder-picker />
     <f-versions />
+    <f-batch-rename />
     <f-toasts />`,
 })
 export class App {

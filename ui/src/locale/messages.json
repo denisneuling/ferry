@@ -198,7 +198,22 @@
     "tr.skipped": "Skipped: a file of this name is already there.",
     "tr.queued": "Waiting · to “{$INTERPOLATION}”",
     "tr.of": "{$INTERPOLATION} of {$INTERPOLATION_1} · to “{$INTERPOLATION_2}”",
+    "batch.title": "Rename {$INTERPOLATION} entries",
+    "batch.stopped": " Renaming stopped after {$INTERPOLATION} of {$INTERPOLATION_1} steps. ",
+    "batch.failedAt": "“{$INTERPOLATION}” could not be renamed:",
+    "batch.stranded": " These now have a temporary name; rename them back: ",
+    "versions.close": " Close ",
+    "batch.pattern": "Pattern",
+    "batch.start": "Start at",
+    "batch.digits": "Digits",
+    "batch.help": " {$INTERPOLATION}name{$INTERPOLATION_1} old name · {$INTERPOLATION}ext{$INTERPOLATION_1} extension · {$INTERPOLATION}n{$INTERPOLATION_1} counter · {$INTERPOLATION}date{$INTERPOLATION_1} day modified · {$INTERPOLATION}taken{$INTERPOLATION_1} day a photo was taken ",
+    "batch.invalid": "not a possible name",
+    "batch.twice": "given twice",
+    "batch.taken": "exists already",
+    "batch.more": "… and {$INTERPOLATION} more.",
+    "batch.running": "Renaming… {$INTERPOLATION} of {$INTERPOLATION_1}",
     "dialog.cancel": " Cancel ",
+    "batch.done": "{$n} entries renamed.",
     "dialog.empty": "Enter a name.",
     "name.empty": "Enter a name.",
     "name.invalid": "A name cannot contain / or \\ and cannot be . or ..",
@@ -285,7 +300,6 @@
     "versions.browse": "Open as it was",
     "versions.open": "Open",
     "versions.download": "Download",
-    "versions.truncated": " Only the newest snapshots were looked through; there may be older versions. ",
-    "versions.close": "Close"
+    "versions.truncated": " Only the newest snapshots were looked through; there may be older versions. "
   }
 }

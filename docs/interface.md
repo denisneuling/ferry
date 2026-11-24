@@ -83,6 +83,21 @@ open to you are left out and said to be. A snapshot folder the server
 shows inside a share (`.snapshot`, `.zfs` with its snapshots visible) is
 a folder like any other and counted along; one it hides is not.
 
+## Renaming several
+
+**Rename** with several entries selected renames them by a pattern —
+`{name}` the old name without its extension, `{ext}` the extension, `{n}`
+or `{n:3}` a counter from where it should start, `{date}` the day it was
+last modified, `{taken}` the day a photo was taken — and shows every new
+name before anything is renamed. A name the server could not take, two
+entries meant to get the same name, or a name another entry of the folder
+has (case aside, as SMB compares names), and nothing is renamed at all.
+Each entry is renamed by its own move, as one rename is; names swapped
+among them go through a temporary name `.ferry-tmp-…` first. There is no
+transaction over many renames: when the server refuses one part-way, the
+rest is not tried, and the dialog lists which entries got their new
+names and any left under a temporary name, to rename back.
+
 ## Favourites and recently used
 
 The star next to a folder's title, in an entry's menu and in the preview
@@ -112,7 +127,7 @@ same folder, the copy is named "… (copy)".
 | Backspace, Alt+↑ | up one folder |
 | Ctrl+A, ⌘A | select all |
 | Delete | delete the selection, after asking |
-| F2 | rename the selected entry |
+| F2 | rename the selected entry, or several by a pattern |
 | `/` | search this folder |
 | Esc | clear the selection or the search, close the preview or a dialog |
 

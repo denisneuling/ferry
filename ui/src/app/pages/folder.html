@@ -205,11 +205,9 @@
       <button type="button" (click)="actions.download(browser.selection())">
         <f-icon name="download" [size]="17" /><span i18n="@@act.download">Download</span>
       </button>
-      @if (browser.selected().size === 1) {
-        <button type="button" (click)="actions.rename(browser.selection()[0])">
-          <f-icon name="pencil" [size]="17" /><span i18n="@@act.rename">Rename</span>
-        </button>
-      }
+      <button type="button" (click)="renameSelection()">
+        <f-icon name="pencil" [size]="17" /><span i18n="@@act.rename">Rename</span>
+      </button>
       <button type="button" (click)="actions.move(browser.selection())">
         <f-icon name="move" [size]="17" /><span i18n="@@act.move">Move</span>
       </button>
