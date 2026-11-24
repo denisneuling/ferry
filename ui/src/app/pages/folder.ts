@@ -522,6 +522,17 @@ export class Folder {
       label: $localize`:@@act.rename:Rename`,
       run: () => this.renameSelection(),
     });
+    if (one && e.type === 'file' && /\.zip$/i.test(e.name))
+      items.push({
+        icon: 'archive',
+        label: $localize`:@@act.unpack:Unpack here…`,
+        run: () => void this.actions.unpack(e),
+      });
+    items.push({
+      icon: 'archive',
+      label: $localize`:@@act.zipShare:Save as ZIP here…`,
+      run: () => void this.actions.zipToShare(sel),
+    });
     items.push({ icon: 'move', label: $localize`:@@act.move:Move`, run: () => this.actions.move(sel) });
     items.push({ icon: 'copy', label: $localize`:@@act.copy:Copy to…`, run: () => this.actions.copy(sel) });
     items.push({ separator: true });

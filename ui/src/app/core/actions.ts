@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Api, Entry, join, parent } from './api';
+import { Api, CopyProgress, CopyResult, Entry, join, parent } from './api';
 import { Browser } from './browser';
 import { describe } from './errors';
 import { Format } from './format';
@@ -124,6 +124,51 @@ export class Actions {
     }
   }
 
+  /** Unpacks a ZIP archive into a new folder beside it, named as the person says. */
+  async unpack(entry: Entry): Promise<void> {
+    const share = this.browser.share();
+    if (share === null) return;
+    const dir = this.browser.path();
+    const stem = entry.name.replace(/\.zip$/i, '');
+    const name = await this.dialogs.ask({
+      title: $localize`:@@unpack.title:Unpack “${entry.name}:name:”`,
+      field: $localize`:@@unpack.field:Into the new folder`,
+      value: stem,
+      ok: $localize`:@@unpack.ok:Unpack`,
+      check: checkName,
+    });
+    if (!name) return;
+    const to = join(dir, name);
+    if (await this.copyOne(share, to, entry.name, (on) => this.api.unpack(share, entry.path, to, on))) {
+      if (share === this.browser.share() && dir === this.browser.path()) await this.browser.reload();
+    }
+  }
+
+  /** Packs entries into a ZIP file on the share, beside them. */
+  async zipToShare(entries: Entry[]): Promise<void> {
+    const share = this.browser.share();
+    if (share === null || !entries.length) return;
+    const dir = this.browser.path();
+    const base =
+      entries.length === 1
+        ? entries[0].name.replace(/\.[^.]*$/, '') || entries[0].name
+        : this.browser.title();
+    const name = await this.dialogs.ask({
+      title: $localize`:@@zipShare.title:Save as a ZIP file here`,
+      field: $localize`:@@zipShare.field:Name`,
+      value: `${base}.zip`,
+      selectStem: true,
+      ok: $localize`:@@zipShare.ok:Save`,
+      check: checkName,
+    });
+    if (!name) return;
+    const to = join(dir, name);
+    const paths = entries.map((e) => e.path);
+    if (await this.copyOne(share, to, name, (on) => this.api.saveArchive(share, paths, to, on))) {
+      if (share === this.browser.share() && dir === this.browser.path()) await this.browser.reload();
+    }
+  }
+
   async rename(entry: Entry): Promise<void> {
     const share = this.browser.share();
     if (share === null) return;
@@ -210,7 +255,7 @@ export class Actions {
         e.name,
         dest === this.browser.path() ? $localize`:@@copy.suffix:copy` : null,
       );
-      await this.copyOne(share, e.path, to, null, e.name);
+      await this.copyOne(share, to, e.name, (on) => this.api.copy(share, e.path, to, {}, on));
     }
     await this.browser.reload();
   }
@@ -224,24 +269,27 @@ export class Actions {
     const dir = parent(path);
     const name = path.slice(path.lastIndexOf('/') + 1);
     const to = await this.freeName(share, dir, name, $localize`:@@restore.suffix:version ${when}:when:`);
-    if (await this.copyOne(share, path, to, at, name)) {
+    if (await this.copyOne(share, to, name, (on) => this.api.copy(share, path, to, { at }, on))) {
       if (share === this.browser.share() && dir === this.browser.path()) await this.browser.reload();
     }
   }
 
-  /** Copies one entry and says how it went; true when it was copied whole. */
+  /**
+   * Runs what the server does as a copy — a copy, an unpacking, an archive
+   * written to the share — with its progress in the panel, and says how it
+   * went; true when it ended whole.
+   */
   private async copyOne(
     share: string,
-    from: string,
     to: string,
-    at: string | null,
     name: string,
+    run: (onProgress: (p: CopyProgress) => void) => Promise<CopyResult>,
   ): Promise<boolean> {
     const dir = parent(to);
     const where = dir ? dir.slice(dir.lastIndexOf('/') + 1) : share;
     let job: CopyJob | null = null;
     try {
-      const r = await this.api.copy(share, from, to, { at }, (p) => {
+      const r = await run((p) => {
         job ??= this.transfers.trackCopy(share, dir, to.slice(to.lastIndexOf('/') + 1), where, p.totalBytes);
         job.progress(p.bytes);
       });

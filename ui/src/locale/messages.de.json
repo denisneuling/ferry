@@ -304,6 +304,21 @@
     "partials.title": "Unfertige Uploads entfernen?",
     "partials.text": "{$n} Uploads wurden hier vor mehr als einem Tag begonnen und nicht beendet. Entfernen gibt ihren Platz frei; danach lassen sie sich nicht mehr fortsetzen.",
     "partials.remove": "Entfernen",
-    "partials.notice": "{$INTERPOLATION} unfertige Uploads ({$INTERPOLATION_1}) wurden hier vor mehr als einem Tag begonnen."
+    "partials.notice": "{$INTERPOLATION} unfertige Uploads ({$INTERPOLATION_1}) wurden hier vor mehr als einem Tag begonnen.",
+    "unpack.title": "„{$name}“ entpacken",
+    "unpack.field": "In den neuen Ordner",
+    "unpack.ok": "Entpacken",
+    "zipShare.title": "Hier als ZIP-Datei speichern",
+    "zipShare.field": "Name",
+    "zipShare.ok": "Speichern",
+    "act.unpack": "Hier entpacken…",
+    "act.zipShare": "Hier als ZIP speichern…",
+    "err.archiveUnsafe": "Das Archiv hat einen Eintrag, dessen Name aus seinem Ordner führen würde. Es wurde nichts entpackt.",
+    "err.archiveForbidden": "Das Archiv hat einen Namen mit einem Zeichen, das der Server nicht nimmt (\\ : * ? \" < > |). Es wurde nichts entpackt.",
+    "err.archiveCollision": "Zwei Einträge des Archivs unterscheiden sich nur in Groß- und Kleinschreibung, was der Server für einen hält. Es wurde nichts entpackt.",
+    "err.archiveDeep": "Die Ordner des Archivs gehen tiefer, als ferry entpackt. Es wurde nichts entpackt.",
+    "err.notArchive": "Das ist kein ZIP-Archiv, das ferry entpacken kann, oder ein Eintrag ist verschlüsselt.",
+    "err.noSpace": "Für den Inhalt des Archivs ist nicht genug Platz frei.",
+    "err.intoItself": "Ein Ordner lässt sich nicht in sich selbst kopieren oder packen."
   }
 }

@@ -115,40 +115,8 @@ func (a *API) CreateArchive(w http.ResponseWriter, r *http.Request, share v1.Sha
 	if !decodeJSON(w, r, archiveRequestBytes, &req) {
 		return
 	}
-	if len(req.Paths) == 0 || len(req.Paths) > 10000 {
-		probInvalidRequest.write(w)
-		return
-	}
-	// Every entry in the same folder, each once: the archive holds them
-	// under their names in it.
-	paths := make([]string, 0, len(req.Paths))
-	seen := map[string]bool{}
-	base := ""
-	for i, raw := range req.Paths {
-		p, ok := cleanParam(w, &raw)
-		if !ok {
-			return
-		}
-		if p == "" {
-			probInvalidPath.write(w)
-			return
-		}
-		dir := parent(p)
-		if i == 0 {
-			base = dir
-		} else if dir != base {
-			probInvalidRequest.write(w)
-			return
-		}
-		if !seen[p] {
-			seen[p] = true
-			paths = append(paths, p)
-		}
-	}
-	if len(paths) > a.cfg.MaxArchive {
-		p := probTooLarge
-		p.limit = int64(a.cfg.MaxArchive)
-		p.write(w)
+	paths, base, ok := a.archivePaths(w, req.Paths)
+	if !ok {
 		return
 	}
 	s, ok := a.acquire(w, r)
@@ -179,6 +147,49 @@ func (a *API) CreateArchive(w http.ResponseWriter, r *http.Request, share v1.Sha
 	t := &archiveTicket{owner: s, share: share, base: base, name: name + ".zip", entries: entries, created: time.Now()}
 	id := a.archives.put(t)
 	writeJSON(w, http.StatusCreated, v1.ArchiveTicket{Ticket: id, Name: t.name, Entries: len(entries), Bytes: bytes})
+}
+
+// archivePaths checks what an archive is asked to hold: entries of one
+// folder, each once, within the bound. It returns them cleaned, and their
+// folder.
+func (a *API) archivePaths(w http.ResponseWriter, raw []string) ([]string, string, bool) {
+	if len(raw) == 0 || len(raw) > 10000 {
+		probInvalidRequest.write(w)
+		return nil, "", false
+	}
+	// Every entry in the same folder, each once: the archive holds them
+	// under their names in it.
+	paths := make([]string, 0, len(raw))
+	seen := map[string]bool{}
+	base := ""
+	for i := range raw {
+		p, ok := cleanParam(w, &raw[i])
+		if !ok {
+			return nil, "", false
+		}
+		if p == "" {
+			probInvalidPath.write(w)
+			return nil, "", false
+		}
+		dir := parent(p)
+		if i == 0 {
+			base = dir
+		} else if dir != base {
+			probInvalidRequest.write(w)
+			return nil, "", false
+		}
+		if !seen[p] {
+			seen[p] = true
+			paths = append(paths, p)
+		}
+	}
+	if len(paths) > a.cfg.MaxArchive {
+		p := probTooLarge
+		p.limit = int64(a.cfg.MaxArchive)
+		p.write(w)
+		return nil, "", false
+	}
+	return paths, base, true
 }
 
 func (a *API) GetArchive(w http.ResponseWriter, r *http.Request, share v1.ShareName, ticket string) {

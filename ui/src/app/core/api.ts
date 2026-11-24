@@ -263,13 +263,43 @@ export class Api {
     const body: Record<string, unknown> = { from, to };
     if (opts.overwrite) body['overwrite'] = true;
     if (opts.at) body['at'] = opts.at;
-    const res = await this.fetch(
-      'POST',
-      `${BASE}${shareBase(share)}/copy`,
-      body,
-      { Accept: 'application/x-ndjson' },
-      signal,
-    );
+    return this.copyStream(`${shareBase(share)}/copy`, body, onProgress, signal);
+  }
+
+  /** Unpacks a ZIP archive into a new folder on the share; its stream is a copy's. */
+  unpack(
+    share: string,
+    from: string,
+    to: string,
+    onProgress: (p: CopyProgress) => void,
+  ): Promise<CopyResult> {
+    const body: Record<string, unknown> = { from, to };
+    const at = this.snapshot.at();
+    if (at) body['at'] = at;
+    return this.copyStream(`${shareBase(share)}/unpack`, body, onProgress);
+  }
+
+  /** Packs entries of one folder into a ZIP file on the share; its stream is a copy's. */
+  saveArchive(
+    share: string,
+    paths: string[],
+    to: string,
+    onProgress: (p: CopyProgress) => void,
+  ): Promise<CopyResult> {
+    return this.copyStream(`${shareBase(share)}/archive-to-share`, { paths, to }, onProgress);
+  }
+
+  /**
+   * A request answered as a copy is: refused before it begins, or progress
+   * about every second and how it ended.
+   */
+  private async copyStream(
+    path: string,
+    body: Record<string, unknown>,
+    onProgress: (p: CopyProgress) => void,
+    signal?: AbortSignal,
+  ): Promise<CopyResult> {
+    const res = await this.fetch('POST', `${BASE}${path}`, body, { Accept: 'application/x-ndjson' }, signal);
     if (!res.body) throw new ApiError(0, 'network');
     const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
     let rest = '';

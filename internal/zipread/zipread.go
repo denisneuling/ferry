@@ -53,7 +53,10 @@ type Entry struct {
 	Packed   int64 // compressed size
 	Size     int64 // uncompressed size, as declared
 	Modified time.Time
-	header   int64 // where the entry's local header is
+	// Link: the archive was made on Unix and says the entry is a symbolic
+	// link — its data is the path it points to, not a file's content.
+	Link   bool
+	header int64 // where the entry's local header is
 }
 
 // Encrypted says whether the entry's data is encrypted.
@@ -136,6 +139,11 @@ func List(r io.ReaderAt, size int64, max int) ([]Entry, error) {
 			header: int64(le.Uint32(dir[42:46])),
 		}
 		e.Modified = dosTime(le.Uint16(dir[14:16]), le.Uint16(dir[12:14]))
+		// The external attributes hold a Unix mode in their high half when
+		// the archive was made on Unix (version made by, high byte 3).
+		if dir[5] == 3 {
+			e.Link = (le.Uint32(dir[38:42])>>16)&0o170000 == 0o120000
+		}
 		nameLen, extraLen, commentLen := int(le.Uint16(dir[28:30])), int(le.Uint16(dir[30:32])), int(le.Uint16(dir[32:34]))
 		if len(dir) < 46+nameLen+extraLen+commentLen {
 			return nil, ErrNotZip

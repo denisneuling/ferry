@@ -56,6 +56,20 @@ export function describe(err: unknown, doing?: Doing): string {
       return $localize`:@@err.tooManySessions:ferry is busy right now. Try again later.`;
     case 'network':
       return $localize`:@@err.network:ferry cannot be reached. Check the connection.`;
+    case 'archive_unsafe_name':
+      return $localize`:@@err.archiveUnsafe:The archive has an entry whose name would leave its folder. Nothing was unpacked.`;
+    case 'archive_forbidden_name':
+      return $localize`:@@err.archiveForbidden:The archive has a name with a character the server does not take (\ : * ? " < > |). Nothing was unpacked.`;
+    case 'archive_collision':
+      return $localize`:@@err.archiveCollision:Two entries of the archive differ only in upper and lower case, which the server takes for one. Nothing was unpacked.`;
+    case 'archive_too_deep':
+      return $localize`:@@err.archiveDeep:The archive's folders go deeper than ferry unpacks. Nothing was unpacked.`;
+    case 'not_an_archive':
+      return $localize`:@@err.notArchive:This is no ZIP archive ferry can unpack, or an entry is encrypted.`;
+    case 'no_space':
+      return $localize`:@@err.noSpace:There is not enough free space for what the archive holds.`;
+    case 'copy_into_itself':
+      return $localize`:@@err.intoItself:A folder cannot be copied or packed into itself.`;
     default:
       return $localize`:@@err.internal:Something went wrong.`;
   }

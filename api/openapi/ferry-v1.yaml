@@ -913,6 +913,45 @@ paths:
         "413": { $ref: "#/components/responses/TooLarge" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/archive-to-share:
+    post:
+      operationId: saveArchive
+      tags: [files]
+      summary: Pack files and folders into a ZIP file on the share.
+      description: |
+        Packs the entries — files, and folders with everything in them, all
+        from the same folder — into the ZIP file `to` on the same share, as
+        a download would pack them, but written to the share: to a
+        temporary name, renamed once complete. A `to` that exists is `409`;
+        one inside a folder being packed is `400` (`copy_into_itself`). The
+        same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+        `FERRY_MAX_UPLOAD` to the file written.
+
+        The answer is the same stream as a copy's: `{"progress": …}` about
+        every second and a last line, `{"end": …}` with the new file, or
+        `{"problem": …}`; a failure leaves nothing under the name `to`.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/FerryRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveArchiveRequest" }
+      responses:
+        "200":
+          description: The packing's progress, and how it ended.
+          content:
+            application/x-ndjson:
+              schema: { $ref: "#/components/schemas/CopyStreamLine" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/archive/{ticket}:
     get:
       operationId: getArchive
@@ -992,6 +1031,73 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "413": { $ref: "#/components/responses/TooLarge" }
         "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/unpack:
+    post:
+      operationId: unpackArchive
+      tags: [files]
+      summary: Unpack a ZIP archive into a new folder on the share.
+      description: |
+        Unpacks the ZIP archive `from` into the new folder `to` — as the
+        archive is now or, with `at`, as that snapshot holds it. Every
+        entry is checked first, and an archive that fails a check is
+        refused whole, before anything is written:
+
+        - a name that would leave the folder (`..`, absolute) or is not
+          text: `422` (`archive_unsafe_name`);
+        - a name with a character SMB refuses (`\ : * ? " < > |`, control
+          characters): `422` (`archive_forbidden_name`);
+        - two names that are one on the share — equal but for case or
+          Unicode normalisation, or a file where a folder is: `409`
+          (`archive_collision`);
+        - an entry encrypted or packed otherwise than Store or Deflate:
+          `415` (`not_an_archive`);
+        - more than 32 levels: `422` (`archive_too_deep`); more entries than
+          `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+          more bytes than the server reports free: `507` (`no_space`);
+        - a folder `to` that exists: `409`.
+
+        Symbolic links in the archive are passed over. Then the answer is
+        the same stream as a copy's: `{"progress": …}` about every second
+        and a last line, `{"end": …}` with the new folder, or
+        `{"problem": …}`. Each file is written to a temporary name and
+        renamed once complete; what was unpacked before a failure stays.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/FerryRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UnpackRequest" }
+      responses:
+        "200":
+          description: The unpacking's progress, and how it ended.
+          content:
+            application/x-ndjson:
+              schema: { $ref: "#/components/schemas/CopyStreamLine" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415":
+          description: An entry cannot be unpacked, or the file is no ZIP (`not_an_archive`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: An entry's name cannot be written to the share (`archive_unsafe_name`, `archive_forbidden_name`, `archive_too_deep`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+        "507":
+          description: The server reports less free space than the archive unpacks to (`no_space`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /api/v1/shares/{share}/move:
     post:
@@ -1477,6 +1583,18 @@ components:
           maxItems: 10000
           items: { type: string, maxLength: 4096 }
           description: The entries to archive, all in the same folder.
+    SaveArchiveRequest:
+      type: object
+      required: [paths, to]
+      additionalProperties: false
+      properties:
+        paths:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items: { type: string, maxLength: 4096 }
+          description: The entries to pack, all in the same folder.
+        to: { type: string, maxLength: 4096, description: "The ZIP file to write, in the same share." }
     ArchiveTicket:
       type: object
       required: [ticket, name, entries, bytes]
@@ -1503,6 +1621,14 @@ components:
             Copy `from` as the snapshot of this time holds it (`At`): a
             previous version restored as a copy. Only the source is read at
             the snapshot; the copy is written into the share as it is now.
+    UnpackRequest:
+      type: object
+      required: [from, to]
+      additionalProperties: false
+      properties:
+        from: { type: string, maxLength: 4096, description: "The archive's path." }
+        to: { type: string, maxLength: 4096, description: "The new folder's path, in the same share." }
+        at: { type: string, maxLength: 24, description: "Unpack the archive as this snapshot holds it." }
     CopyProgress:
       type: object
       required: [files, bytes, totalFiles, totalBytes]

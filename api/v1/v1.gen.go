@@ -248,6 +248,21 @@ func (e CreateArchiveParamsXFerryRequest) Valid() bool {
 	}
 }
 
+// Defines values for SaveArchiveParamsXFerryRequest.
+const (
+	SaveArchiveParamsXFerryRequestN1 SaveArchiveParamsXFerryRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the SaveArchiveParamsXFerryRequest enum.
+func (e SaveArchiveParamsXFerryRequest) Valid() bool {
+	switch e {
+	case SaveArchiveParamsXFerryRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetContentParamsDisposition.
 const (
 	GetContentParamsDispositionAttachment GetContentParamsDisposition = "attachment"
@@ -356,6 +371,21 @@ func (e GetThumbnailParamsSize) Valid() bool {
 	case GetThumbnailParamsSizeN320:
 		return true
 	case GetThumbnailParamsSizeN640:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UnpackArchiveParamsXFerryRequest.
+const (
+	UnpackArchiveParamsXFerryRequestN1 UnpackArchiveParamsXFerryRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the UnpackArchiveParamsXFerryRequest enum.
+func (e UnpackArchiveParamsXFerryRequest) Valid() bool {
+	switch e {
+	case UnpackArchiveParamsXFerryRequestN1:
 		return true
 	default:
 		return false
@@ -739,6 +769,15 @@ type Problem struct {
 	Type string `json:"type"`
 }
 
+// SaveArchiveRequest defines model for SaveArchiveRequest.
+type SaveArchiveRequest struct {
+	// Paths The entries to pack, all in the same folder.
+	Paths []string `json:"paths"`
+
+	// To The ZIP file to write, in the same share.
+	To string `json:"to"`
+}
+
 // SearchEnd defines model for SearchEnd.
 type SearchEnd struct {
 	End struct {
@@ -801,6 +840,18 @@ type Space struct {
 
 	// Total The volume's size in bytes, as the server reports it.
 	Total int64 `json:"total"`
+}
+
+// UnpackRequest defines model for UnpackRequest.
+type UnpackRequest struct {
+	// At Unpack the archive as this snapshot holds it.
+	At *string `json:"at,omitempty"`
+
+	// From The archive's path.
+	From string `json:"from"`
+
+	// To The new folder's path, in the same share.
+	To string `json:"to"`
 }
 
 // UploadBegun defines model for UploadBegun.
@@ -969,6 +1020,15 @@ type CreateArchiveParams struct {
 
 // CreateArchiveParamsXFerryRequest defines parameters for CreateArchive.
 type CreateArchiveParamsXFerryRequest string
+
+// SaveArchiveParams defines parameters for SaveArchive.
+type SaveArchiveParams struct {
+	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
+	XFerryRequest SaveArchiveParamsXFerryRequest `json:"X-Ferry-Request"`
+}
+
+// SaveArchiveParamsXFerryRequest defines parameters for SaveArchive.
+type SaveArchiveParamsXFerryRequest string
 
 // GetContentParams defines parameters for GetContent.
 type GetContentParams struct {
@@ -1173,6 +1233,15 @@ type GetThumbnailParams struct {
 // GetThumbnailParamsSize defines parameters for GetThumbnail.
 type GetThumbnailParamsSize int
 
+// UnpackArchiveParams defines parameters for UnpackArchive.
+type UnpackArchiveParams struct {
+	// XFerryRequest Must be `1`. Together with the SameSite cookie, the CSRF protection.
+	XFerryRequest UnpackArchiveParamsXFerryRequest `json:"X-Ferry-Request"`
+}
+
+// UnpackArchiveParamsXFerryRequest defines parameters for UnpackArchive.
+type UnpackArchiveParamsXFerryRequest string
+
 // BeginUploadParams defines parameters for BeginUpload.
 type BeginUploadParams struct {
 	// Path Slash-separated, relative to the share's root; empty for the root.
@@ -1298,11 +1367,17 @@ type LoginJSONRequestBody = LoginRequest
 // CreateArchiveJSONRequestBody defines body for CreateArchive for application/json ContentType.
 type CreateArchiveJSONRequestBody = ArchiveRequest
 
+// SaveArchiveJSONRequestBody defines body for SaveArchive for application/json ContentType.
+type SaveArchiveJSONRequestBody = SaveArchiveRequest
+
 // CopyEntryJSONRequestBody defines body for CopyEntry for application/json ContentType.
 type CopyEntryJSONRequestBody = CopyRequest
 
 // MoveEntryJSONRequestBody defines body for MoveEntry for application/json ContentType.
 type MoveEntryJSONRequestBody = MoveRequest
+
+// UnpackArchiveJSONRequestBody defines body for UnpackArchive for application/json ContentType.
+type UnpackArchiveJSONRequestBody = UnpackRequest
 
 // AsCopyProgressLine returns the union data inside the CopyStreamLine as a CopyProgressLine
 func (t CopyStreamLine) AsCopyProgressLine() (CopyProgressLine, error) {
@@ -1815,6 +1890,44 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
 	CreateArchive(ctx context.Context, share ShareName, params *CreateArchiveParams, body CreateArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SaveArchiveWithBody Pack files and folders into a ZIP file on the share.
+	//
+	// Packs the entries — files, and folders with everything in them, all
+	// from the same folder — into the ZIP file `to` on the same share, as
+	// a download would pack them, but written to the share: to a
+	// temporary name, renamed once complete. A `to` that exists is `409`;
+	// one inside a folder being packed is `400` (`copy_into_itself`). The
+	// same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+	// `FERRY_MAX_UPLOAD` to the file written.
+	//
+	// The answer is the same stream as a copy's: `{"progress": …}` about
+	// every second and a last line, `{"end": …}` with the new file, or
+	// `{"problem": …}`; a failure leaves nothing under the name `to`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/archive-to-share (the `SaveArchive` operationId).
+	SaveArchiveWithBody(ctx context.Context, share ShareName, params *SaveArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SaveArchive Pack files and folders into a ZIP file on the share.
+	//
+	// Packs the entries — files, and folders with everything in them, all
+	// from the same folder — into the ZIP file `to` on the same share, as
+	// a download would pack them, but written to the share: to a
+	// temporary name, renamed once complete. A `to` that exists is `409`;
+	// one inside a folder being packed is `400` (`copy_into_itself`). The
+	// same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+	// `FERRY_MAX_UPLOAD` to the file written.
+	//
+	// The answer is the same stream as a copy's: `{"progress": …}` about
+	// every second and a last line, `{"end": …}` with the new file, or
+	// `{"problem": …}`; a failure leaves nothing under the name `to`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/archive-to-share (the `SaveArchive` operationId).
+	SaveArchive(ctx context.Context, share ShareName, params *SaveArchiveParams, body SaveArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetArchive Download a prepared ZIP.
 	//
 	// The ZIP of what `POST …/archive` listed, written as it is read from
@@ -2075,6 +2188,70 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnpackArchiveWithBody Unpack a ZIP archive into a new folder on the share.
+	//
+	// Unpacks the ZIP archive `from` into the new folder `to` — as the
+	// archive is now or, with `at`, as that snapshot holds it. Every
+	// entry is checked first, and an archive that fails a check is
+	// refused whole, before anything is written:
+	//
+	// - a name that would leave the folder (`..`, absolute) or is not
+	//   text: `422` (`archive_unsafe_name`);
+	// - a name with a character SMB refuses (`\ : * ? " < > |`, control
+	//   characters): `422` (`archive_forbidden_name`);
+	// - two names that are one on the share — equal but for case or
+	//   Unicode normalisation, or a file where a folder is: `409`
+	//   (`archive_collision`);
+	// - an entry encrypted or packed otherwise than Store or Deflate:
+	//   `415` (`not_an_archive`);
+	// - more than 32 levels: `422` (`archive_too_deep`); more entries than
+	//   `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+	//   more bytes than the server reports free: `507` (`no_space`);
+	// - a folder `to` that exists: `409`.
+	//
+	// Symbolic links in the archive are passed over. Then the answer is
+	// the same stream as a copy's: `{"progress": …}` about every second
+	// and a last line, `{"end": …}` with the new folder, or
+	// `{"problem": …}`. Each file is written to a temporary name and
+	// renamed once complete; what was unpacked before a failure stays.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/unpack (the `UnpackArchive` operationId).
+	UnpackArchiveWithBody(ctx context.Context, share ShareName, params *UnpackArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnpackArchive Unpack a ZIP archive into a new folder on the share.
+	//
+	// Unpacks the ZIP archive `from` into the new folder `to` — as the
+	// archive is now or, with `at`, as that snapshot holds it. Every
+	// entry is checked first, and an archive that fails a check is
+	// refused whole, before anything is written:
+	//
+	// - a name that would leave the folder (`..`, absolute) or is not
+	//   text: `422` (`archive_unsafe_name`);
+	// - a name with a character SMB refuses (`\ : * ? " < > |`, control
+	//   characters): `422` (`archive_forbidden_name`);
+	// - two names that are one on the share — equal but for case or
+	//   Unicode normalisation, or a file where a folder is: `409`
+	//   (`archive_collision`);
+	// - an entry encrypted or packed otherwise than Store or Deflate:
+	//   `415` (`not_an_archive`);
+	// - more than 32 levels: `422` (`archive_too_deep`); more entries than
+	//   `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+	//   more bytes than the server reports free: `507` (`no_space`);
+	// - a folder `to` that exists: `409`.
+	//
+	// Symbolic links in the archive are passed over. Then the answer is
+	// the same stream as a copy's: `{"progress": …}` about every second
+	// and a last line, `{"end": …}` with the new folder, or
+	// `{"problem": …}`. Each file is written to a temporary name and
+	// renamed once complete; what was unpacked before a failure stays.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/shares/{share}/unpack (the `UnpackArchive` operationId).
+	UnpackArchive(ctx context.Context, share ShareName, params *UnpackArchiveParams, body UnpackArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// BeginUpload Begin an upload in pieces.
 	//
@@ -2349,6 +2526,64 @@ func (c *Client) CreateArchiveWithBody(ctx context.Context, share ShareName, par
 // Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
 func (c *Client) CreateArchive(ctx context.Context, share ShareName, params *CreateArchiveParams, body CreateArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateArchiveRequest(c.Server, share, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SaveArchiveWithBody Pack files and folders into a ZIP file on the share.
+//
+// Packs the entries — files, and folders with everything in them, all
+// from the same folder — into the ZIP file `to` on the same share, as
+// a download would pack them, but written to the share: to a
+// temporary name, renamed once complete. A `to` that exists is `409`;
+// one inside a folder being packed is `400` (`copy_into_itself`). The
+// same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+// `FERRY_MAX_UPLOAD` to the file written.
+//
+// The answer is the same stream as a copy's: `{"progress": …}` about
+// every second and a last line, `{"end": …}` with the new file, or
+// `{"problem": …}`; a failure leaves nothing under the name `to`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/shares/{share}/archive-to-share (the `SaveArchive` operationId).
+func (c *Client) SaveArchiveWithBody(ctx context.Context, share ShareName, params *SaveArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSaveArchiveRequestWithBody(c.Server, share, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SaveArchive Pack files and folders into a ZIP file on the share.
+//
+// Packs the entries — files, and folders with everything in them, all
+// from the same folder — into the ZIP file `to` on the same share, as
+// a download would pack them, but written to the share: to a
+// temporary name, renamed once complete. A `to` that exists is `409`;
+// one inside a folder being packed is `400` (`copy_into_itself`). The
+// same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+// `FERRY_MAX_UPLOAD` to the file written.
+//
+// The answer is the same stream as a copy's: `{"progress": …}` about
+// every second and a last line, `{"end": …}` with the new file, or
+// `{"problem": …}`; a failure leaves nothing under the name `to`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/shares/{share}/archive-to-share (the `SaveArchive` operationId).
+func (c *Client) SaveArchive(ctx context.Context, share ShareName, params *SaveArchiveParams, body SaveArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSaveArchiveRequest(c.Server, share, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2780,6 +3015,90 @@ func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetT
 	return c.Client.Do(req)
 }
 
+// UnpackArchiveWithBody Unpack a ZIP archive into a new folder on the share.
+//
+// Unpacks the ZIP archive `from` into the new folder `to` — as the
+// archive is now or, with `at`, as that snapshot holds it. Every
+// entry is checked first, and an archive that fails a check is
+// refused whole, before anything is written:
+//
+//   - a name that would leave the folder (`..`, absolute) or is not
+//     text: `422` (`archive_unsafe_name`);
+//   - a name with a character SMB refuses (`\ : * ? " < > |`, control
+//     characters): `422` (`archive_forbidden_name`);
+//   - two names that are one on the share — equal but for case or
+//     Unicode normalisation, or a file where a folder is: `409`
+//     (`archive_collision`);
+//   - an entry encrypted or packed otherwise than Store or Deflate:
+//     `415` (`not_an_archive`);
+//   - more than 32 levels: `422` (`archive_too_deep`); more entries than
+//     `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+//     more bytes than the server reports free: `507` (`no_space`);
+//   - a folder `to` that exists: `409`.
+//
+// Symbolic links in the archive are passed over. Then the answer is
+// the same stream as a copy's: `{"progress": …}` about every second
+// and a last line, `{"end": …}` with the new folder, or
+// `{"problem": …}`. Each file is written to a temporary name and
+// renamed once complete; what was unpacked before a failure stays.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/shares/{share}/unpack (the `UnpackArchive` operationId).
+func (c *Client) UnpackArchiveWithBody(ctx context.Context, share ShareName, params *UnpackArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnpackArchiveRequestWithBody(c.Server, share, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnpackArchive Unpack a ZIP archive into a new folder on the share.
+//
+// Unpacks the ZIP archive `from` into the new folder `to` — as the
+// archive is now or, with `at`, as that snapshot holds it. Every
+// entry is checked first, and an archive that fails a check is
+// refused whole, before anything is written:
+//
+//   - a name that would leave the folder (`..`, absolute) or is not
+//     text: `422` (`archive_unsafe_name`);
+//   - a name with a character SMB refuses (`\ : * ? " < > |`, control
+//     characters): `422` (`archive_forbidden_name`);
+//   - two names that are one on the share — equal but for case or
+//     Unicode normalisation, or a file where a folder is: `409`
+//     (`archive_collision`);
+//   - an entry encrypted or packed otherwise than Store or Deflate:
+//     `415` (`not_an_archive`);
+//   - more than 32 levels: `422` (`archive_too_deep`); more entries than
+//     `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+//     more bytes than the server reports free: `507` (`no_space`);
+//   - a folder `to` that exists: `409`.
+//
+// Symbolic links in the archive are passed over. Then the answer is
+// the same stream as a copy's: `{"progress": …}` about every second
+// and a last line, `{"end": …}` with the new folder, or
+// `{"problem": …}`. Each file is written to a temporary name and
+// renamed once complete; what was unpacked before a failure stays.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/shares/{share}/unpack (the `UnpackArchive` operationId).
+func (c *Client) UnpackArchive(ctx context.Context, share ShareName, params *UnpackArchiveParams, body UnpackArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnpackArchiveRequest(c.Server, share, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // BeginUpload Begin an upload in pieces.
 //
 // An upload that can go on after a broken connection or a reload: its
@@ -3189,6 +3508,66 @@ func NewCreateArchiveRequestWithBody(server string, share ShareName, params *Cre
 	}
 
 	operationPath := "/api/v1/shares/" + pathParam0 + "/archive"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Ferry-Request", params.XFerryRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Ferry-Request", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewSaveArchiveRequest calls the generic SaveArchive builder with application/json body
+func NewSaveArchiveRequest(server string, share ShareName, params *SaveArchiveParams, body SaveArchiveJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := runtime.JSONMarshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSaveArchiveRequestWithBody(server, share, params, "application/json", bodyReader)
+}
+
+// NewSaveArchiveRequestWithBody constructs an http.Request for the SaveArchive method, with any body, and a specified content type
+func NewSaveArchiveRequestWithBody(server string, share ShareName, params *SaveArchiveParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/archive-to-share"
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -4269,6 +4648,66 @@ func NewGetThumbnailRequest(server string, share ShareName, params *GetThumbnail
 	return req, nil
 }
 
+// NewUnpackArchiveRequest calls the generic UnpackArchive builder with application/json body
+func NewUnpackArchiveRequest(server string, share ShareName, params *UnpackArchiveParams, body UnpackArchiveJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := runtime.JSONMarshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUnpackArchiveRequestWithBody(server, share, params, "application/json", bodyReader)
+}
+
+// NewUnpackArchiveRequestWithBody constructs an http.Request for the UnpackArchive method, with any body, and a specified content type
+func NewUnpackArchiveRequestWithBody(server string, share ShareName, params *UnpackArchiveParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/unpack"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "X-Ferry-Request", params.XFerryRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("X-Ferry-Request", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewBeginUploadRequest constructs an http.Request for the BeginUpload method
 func NewBeginUploadRequest(server string, share ShareName, params *BeginUploadParams) (*http.Request, error) {
 	var err error
@@ -5133,6 +5572,44 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/shares/{share}/archive (the `CreateArchive` operationId).
 	CreateArchiveWithResponse(ctx context.Context, share ShareName, params *CreateArchiveParams, body CreateArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateArchiveResponse, error)
 
+	// SaveArchiveWithBodyWithResponse Pack files and folders into a ZIP file on the share.
+	//
+	// Packs the entries — files, and folders with everything in them, all
+	// from the same folder — into the ZIP file `to` on the same share, as
+	// a download would pack them, but written to the share: to a
+	// temporary name, renamed once complete. A `to` that exists is `409`;
+	// one inside a folder being packed is `400` (`copy_into_itself`). The
+	// same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+	// `FERRY_MAX_UPLOAD` to the file written.
+	//
+	// The answer is the same stream as a copy's: `{"progress": …}` about
+	// every second and a last line, `{"end": …}` with the new file, or
+	// `{"problem": …}`; a failure leaves nothing under the name `to`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/archive-to-share (the `SaveArchive` operationId).
+	SaveArchiveWithBodyWithResponse(ctx context.Context, share ShareName, params *SaveArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SaveArchiveResponse, error)
+
+	// SaveArchiveWithResponse Pack files and folders into a ZIP file on the share.
+	//
+	// Packs the entries — files, and folders with everything in them, all
+	// from the same folder — into the ZIP file `to` on the same share, as
+	// a download would pack them, but written to the share: to a
+	// temporary name, renamed once complete. A `to` that exists is `409`;
+	// one inside a folder being packed is `400` (`copy_into_itself`). The
+	// same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+	// `FERRY_MAX_UPLOAD` to the file written.
+	//
+	// The answer is the same stream as a copy's: `{"progress": …}` about
+	// every second and a last line, `{"end": …}` with the new file, or
+	// `{"problem": …}`; a failure leaves nothing under the name `to`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/archive-to-share (the `SaveArchive` operationId).
+	SaveArchiveWithResponse(ctx context.Context, share ShareName, params *SaveArchiveParams, body SaveArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*SaveArchiveResponse, error)
+
 	// GetArchiveWithResponse Download a prepared ZIP.
 	//
 	// The ZIP of what `POST …/archive` listed, written as it is read from
@@ -5415,6 +5892,70 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnailWithResponse(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*GetThumbnailResponse, error)
+
+	// UnpackArchiveWithBodyWithResponse Unpack a ZIP archive into a new folder on the share.
+	//
+	// Unpacks the ZIP archive `from` into the new folder `to` — as the
+	// archive is now or, with `at`, as that snapshot holds it. Every
+	// entry is checked first, and an archive that fails a check is
+	// refused whole, before anything is written:
+	//
+	// - a name that would leave the folder (`..`, absolute) or is not
+	//   text: `422` (`archive_unsafe_name`);
+	// - a name with a character SMB refuses (`\ : * ? " < > |`, control
+	//   characters): `422` (`archive_forbidden_name`);
+	// - two names that are one on the share — equal but for case or
+	//   Unicode normalisation, or a file where a folder is: `409`
+	//   (`archive_collision`);
+	// - an entry encrypted or packed otherwise than Store or Deflate:
+	//   `415` (`not_an_archive`);
+	// - more than 32 levels: `422` (`archive_too_deep`); more entries than
+	//   `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+	//   more bytes than the server reports free: `507` (`no_space`);
+	// - a folder `to` that exists: `409`.
+	//
+	// Symbolic links in the archive are passed over. Then the answer is
+	// the same stream as a copy's: `{"progress": …}` about every second
+	// and a last line, `{"end": …}` with the new folder, or
+	// `{"problem": …}`. Each file is written to a temporary name and
+	// renamed once complete; what was unpacked before a failure stays.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/unpack (the `UnpackArchive` operationId).
+	UnpackArchiveWithBodyWithResponse(ctx context.Context, share ShareName, params *UnpackArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UnpackArchiveResponse, error)
+
+	// UnpackArchiveWithResponse Unpack a ZIP archive into a new folder on the share.
+	//
+	// Unpacks the ZIP archive `from` into the new folder `to` — as the
+	// archive is now or, with `at`, as that snapshot holds it. Every
+	// entry is checked first, and an archive that fails a check is
+	// refused whole, before anything is written:
+	//
+	// - a name that would leave the folder (`..`, absolute) or is not
+	//   text: `422` (`archive_unsafe_name`);
+	// - a name with a character SMB refuses (`\ : * ? " < > |`, control
+	//   characters): `422` (`archive_forbidden_name`);
+	// - two names that are one on the share — equal but for case or
+	//   Unicode normalisation, or a file where a folder is: `409`
+	//   (`archive_collision`);
+	// - an entry encrypted or packed otherwise than Store or Deflate:
+	//   `415` (`not_an_archive`);
+	// - more than 32 levels: `422` (`archive_too_deep`); more entries than
+	//   `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+	//   more bytes than the server reports free: `507` (`no_space`);
+	// - a folder `to` that exists: `409`.
+	//
+	// Symbolic links in the archive are passed over. Then the answer is
+	// the same stream as a copy's: `{"progress": …}` about every second
+	// and a last line, `{"end": …}` with the new folder, or
+	// `{"problem": …}`. Each file is written to a temporary name and
+	// renamed once complete; what was unpacked before a failure stays.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/shares/{share}/unpack (the `UnpackArchive` operationId).
+	UnpackArchiveWithResponse(ctx context.Context, share ShareName, params *UnpackArchiveParams, body UnpackArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*UnpackArchiveResponse, error)
 
 	// BeginUploadWithResponse Begin an upload in pieces.
 	//
@@ -5916,6 +6457,89 @@ func (r CreateArchiveResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateArchiveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SaveArchiveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SaveArchiveResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SaveArchiveResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SaveArchiveResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SaveArchiveResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r SaveArchiveResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r SaveArchiveResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r SaveArchiveResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r SaveArchiveResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SaveArchiveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SaveArchiveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SaveArchiveResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -7098,6 +7722,110 @@ func (r GetThumbnailResponse) ContentType() string {
 	return ""
 }
 
+type UnpackArchiveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Problem
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+	// ApplicationproblemJSON507 the response for an HTTP 507 `application/problem+json` response
+	ApplicationproblemJSON507 *Problem
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON422() *Problem {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetApplicationproblemJSON507 returns the response for an HTTP 507 `application/problem+json` response
+func (r UnpackArchiveResponse) GetApplicationproblemJSON507() *Problem {
+	return r.ApplicationproblemJSON507
+}
+
+// GetBody returns the raw response body bytes
+func (r UnpackArchiveResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnpackArchiveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnpackArchiveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnpackArchiveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type BeginUploadResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7923,6 +8651,56 @@ func (c *ClientWithResponses) CreateArchiveWithResponse(ctx context.Context, sha
 	return ParseCreateArchiveResponse(rsp)
 }
 
+// SaveArchiveWithBodyWithResponse Pack files and folders into a ZIP file on the share.
+//
+// Packs the entries — files, and folders with everything in them, all
+// from the same folder — into the ZIP file `to` on the same share, as
+// a download would pack them, but written to the share: to a
+// temporary name, renamed once complete. A `to` that exists is `409`;
+// one inside a folder being packed is `400` (`copy_into_itself`). The
+// same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+// `FERRY_MAX_UPLOAD` to the file written.
+//
+// The answer is the same stream as a copy's: `{"progress": …}` about
+// every second and a last line, `{"end": …}` with the new file, or
+// `{"problem": …}`; a failure leaves nothing under the name `to`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/archive-to-share (the `SaveArchive` operationId).
+func (c *ClientWithResponses) SaveArchiveWithBodyWithResponse(ctx context.Context, share ShareName, params *SaveArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SaveArchiveResponse, error) {
+	rsp, err := c.SaveArchiveWithBody(ctx, share, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSaveArchiveResponse(rsp)
+}
+
+// SaveArchiveWithResponse Pack files and folders into a ZIP file on the share.
+//
+// Packs the entries — files, and folders with everything in them, all
+// from the same folder — into the ZIP file `to` on the same share, as
+// a download would pack them, but written to the share: to a
+// temporary name, renamed once complete. A `to` that exists is `409`;
+// one inside a folder being packed is `400` (`copy_into_itself`). The
+// same bounds as a download apply (`FERRY_MAX_ARCHIVE`), and
+// `FERRY_MAX_UPLOAD` to the file written.
+//
+// The answer is the same stream as a copy's: `{"progress": …}` about
+// every second and a last line, `{"end": …}` with the new file, or
+// `{"problem": …}`; a failure leaves nothing under the name `to`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/archive-to-share (the `SaveArchive` operationId).
+func (c *ClientWithResponses) SaveArchiveWithResponse(ctx context.Context, share ShareName, params *SaveArchiveParams, body SaveArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*SaveArchiveResponse, error) {
+	rsp, err := c.SaveArchive(ctx, share, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSaveArchiveResponse(rsp)
+}
+
 // GetArchiveWithResponse Download a prepared ZIP.
 //
 // The ZIP of what `POST …/archive` listed, written as it is read from
@@ -8300,6 +9078,82 @@ func (c *ClientWithResponses) GetThumbnailWithResponse(ctx context.Context, shar
 		return nil, err
 	}
 	return ParseGetThumbnailResponse(rsp)
+}
+
+// UnpackArchiveWithBodyWithResponse Unpack a ZIP archive into a new folder on the share.
+//
+// Unpacks the ZIP archive `from` into the new folder `to` — as the
+// archive is now or, with `at`, as that snapshot holds it. Every
+// entry is checked first, and an archive that fails a check is
+// refused whole, before anything is written:
+//
+//   - a name that would leave the folder (`..`, absolute) or is not
+//     text: `422` (`archive_unsafe_name`);
+//   - a name with a character SMB refuses (`\ : * ? " < > |`, control
+//     characters): `422` (`archive_forbidden_name`);
+//   - two names that are one on the share — equal but for case or
+//     Unicode normalisation, or a file where a folder is: `409`
+//     (`archive_collision`);
+//   - an entry encrypted or packed otherwise than Store or Deflate:
+//     `415` (`not_an_archive`);
+//   - more than 32 levels: `422` (`archive_too_deep`); more entries than
+//     `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+//     more bytes than the server reports free: `507` (`no_space`);
+//   - a folder `to` that exists: `409`.
+//
+// Symbolic links in the archive are passed over. Then the answer is
+// the same stream as a copy's: `{"progress": …}` about every second
+// and a last line, `{"end": …}` with the new folder, or
+// `{"problem": …}`. Each file is written to a temporary name and
+// renamed once complete; what was unpacked before a failure stays.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/unpack (the `UnpackArchive` operationId).
+func (c *ClientWithResponses) UnpackArchiveWithBodyWithResponse(ctx context.Context, share ShareName, params *UnpackArchiveParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UnpackArchiveResponse, error) {
+	rsp, err := c.UnpackArchiveWithBody(ctx, share, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnpackArchiveResponse(rsp)
+}
+
+// UnpackArchiveWithResponse Unpack a ZIP archive into a new folder on the share.
+//
+// Unpacks the ZIP archive `from` into the new folder `to` — as the
+// archive is now or, with `at`, as that snapshot holds it. Every
+// entry is checked first, and an archive that fails a check is
+// refused whole, before anything is written:
+//
+//   - a name that would leave the folder (`..`, absolute) or is not
+//     text: `422` (`archive_unsafe_name`);
+//   - a name with a character SMB refuses (`\ : * ? " < > |`, control
+//     characters): `422` (`archive_forbidden_name`);
+//   - two names that are one on the share — equal but for case or
+//     Unicode normalisation, or a file where a folder is: `409`
+//     (`archive_collision`);
+//   - an entry encrypted or packed otherwise than Store or Deflate:
+//     `415` (`not_an_archive`);
+//   - more than 32 levels: `422` (`archive_too_deep`); more entries than
+//     `FERRY_MAX_ARCHIVE` or more bytes than `FERRY_MAX_UPLOAD`: `413`;
+//     more bytes than the server reports free: `507` (`no_space`);
+//   - a folder `to` that exists: `409`.
+//
+// Symbolic links in the archive are passed over. Then the answer is
+// the same stream as a copy's: `{"progress": …}` about every second
+// and a last line, `{"end": …}` with the new folder, or
+// `{"problem": …}`. Each file is written to a temporary name and
+// renamed once complete; what was unpacked before a failure stays.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/shares/{share}/unpack (the `UnpackArchive` operationId).
+func (c *ClientWithResponses) UnpackArchiveWithResponse(ctx context.Context, share ShareName, params *UnpackArchiveParams, body UnpackArchiveJSONRequestBody, reqEditors ...RequestEditorFn) (*UnpackArchiveResponse, error) {
+	rsp, err := c.UnpackArchive(ctx, share, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnpackArchiveResponse(rsp)
 }
 
 // BeginUploadWithResponse Begin an upload in pieces.
@@ -8735,6 +9589,74 @@ func ParseCreateArchiveResponse(rsp *http.Response) (*CreateArchiveResponse, err
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSaveArchiveResponse parses an HTTP response from a SaveArchiveWithResponse call
+func ParseSaveArchiveResponse(rsp *http.Response) (*SaveArchiveResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SaveArchiveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest BadRequest
 		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
@@ -9776,6 +10698,95 @@ func ParseGetThumbnailResponse(rsp *http.Response) (*GetThumbnailResponse, error
 	return response, nil
 }
 
+// ParseUnpackArchiveResponse parses an HTTP response from a UnpackArchiveWithResponse call
+func ParseUnpackArchiveResponse(rsp *http.Response) (*UnpackArchiveResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnpackArchiveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 507:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON507 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseBeginUploadResponse parses an HTTP response from a BeginUploadWithResponse call
 func ParseBeginUploadResponse(rsp *http.Response) (*BeginUploadResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10345,6 +11356,9 @@ type ServerInterface interface {
 	// CreateArchive Prepare a ZIP of files and folders, for downloading.
 	// (POST /api/v1/shares/{share}/archive)
 	CreateArchive(w http.ResponseWriter, r *http.Request, share ShareName, params CreateArchiveParams)
+	// SaveArchive Pack files and folders into a ZIP file on the share.
+	// (POST /api/v1/shares/{share}/archive-to-share)
+	SaveArchive(w http.ResponseWriter, r *http.Request, share ShareName, params SaveArchiveParams)
 	// GetArchive Download a prepared ZIP.
 	// (GET /api/v1/shares/{share}/archive/{ticket})
 	GetArchive(w http.ResponseWriter, r *http.Request, share ShareName, ticket string)
@@ -10387,6 +11401,9 @@ type ServerInterface interface {
 	// GetThumbnail A thumbnail of an image or a recording's cover, made on the fly.
 	// (GET /api/v1/shares/{share}/thumbnail)
 	GetThumbnail(w http.ResponseWriter, r *http.Request, share ShareName, params GetThumbnailParams)
+	// UnpackArchive Unpack a ZIP archive into a new folder on the share.
+	// (POST /api/v1/shares/{share}/unpack)
+	UnpackArchive(w http.ResponseWriter, r *http.Request, share ShareName, params UnpackArchiveParams)
 	// BeginUpload Begin an upload in pieces.
 	// (POST /api/v1/shares/{share}/uploads)
 	BeginUpload(w http.ResponseWriter, r *http.Request, share ShareName, params BeginUploadParams)
@@ -10602,6 +11619,60 @@ func (siw *ServerInterfaceWrapper) CreateArchive(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateArchive(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveArchive operation middleware
+func (siw *ServerInterfaceWrapper) SaveArchive(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SaveArchiveParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Ferry-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Ferry-Request")]; found {
+		var XFerryRequest SaveArchiveParamsXFerryRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Ferry-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Ferry-Request", valueList[0], &XFerryRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Ferry-Request", Err: err})
+			return
+		}
+
+		params.XFerryRequest = XFerryRequest
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveArchive(w, r, share, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11492,6 +12563,60 @@ func (siw *ServerInterfaceWrapper) GetThumbnail(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// UnpackArchive operation middleware
+func (siw *ServerInterfaceWrapper) UnpackArchive(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UnpackArchiveParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Ferry-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Ferry-Request")]; found {
+		var XFerryRequest UnpackArchiveParamsXFerryRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Ferry-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Ferry-Request", valueList[0], &XFerryRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Ferry-Request", Err: err})
+			return
+		}
+
+		params.XFerryRequest = XFerryRequest
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Ferry-Request is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Ferry-Request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnpackArchive(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BeginUpload operation middleware
 func (siw *ServerInterfaceWrapper) BeginUpload(w http.ResponseWriter, r *http.Request) {
 
@@ -12269,8 +13394,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/uploads/{id}/finish", wrapper.FinishUpload)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/archive", wrapper.CreateArchive)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/archive-to-share", wrapper.SaveArchive)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/archive/{ticket}", wrapper.GetArchive)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/copy", wrapper.CopyEntry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/unpack", wrapper.UnpackArchive)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/move", wrapper.MoveEntry)
 
 	return m

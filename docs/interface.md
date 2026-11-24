@@ -319,6 +319,25 @@ missing. A ZIP download cannot resume, and its size is not known before
 it ends — each file's checksum is written after the file — so the browser
 shows how much has come, not how much is left.
 
+## ZIP files on the share
+
+**Save as ZIP here…** in the menu packs the selection into a ZIP file in
+the same folder, as a download would pack it, but written to the share —
+to a temporary name, renamed once complete, with its progress in the
+transfers panel. A name that exists is not replaced.
+
+**Unpack here…** on a ZIP file unpacks it into a new folder beside it.
+Every entry is checked before anything is written, and an archive that
+fails a check is refused whole — nothing is renamed or left out silently:
+a name that would leave the folder (`..`, absolute), one with a character
+an SMB server refuses (`\ : * ? " < > |`, control characters), two names
+the server takes for one (equal but for upper and lower case, or written
+in two Unicode forms), an entry encrypted or packed otherwise than Store
+or Deflate, more than 32 levels, more entries than `FERRY_MAX_ARCHIVE` or
+more than the server reports free. Symbolic links in an archive are passed
+over. Each file is written as an upload is; what was unpacked before a
+failure stays.
+
 Deleting asks first and names how many. A selection larger than the
 deployment's delete bound (`FERRY_MAX_DELETE`) is refused before anything is
 deleted, as a folder with more in it is.
