@@ -335,8 +335,11 @@ the server takes for one (equal but for upper and lower case, or written
 in two Unicode forms), an entry encrypted or packed otherwise than Store
 or Deflate, more than 32 levels, more entries than `FERRY_MAX_ARCHIVE` or
 more than the server reports free. Symbolic links in an archive are passed
-over. Each file is written as an upload is; what was unpacked before a
-failure stays.
+over. Names are read as the archive wrote them — UTF-8, or the old DOS
+code page where it says neither — and a backslash is a folder separator in
+an archive made on Windows, as older Windows tools wrote them. Each file is
+written as an upload is; what was unpacked before a failure stays, and the
+message says so.
 
 Deleting asks first and names how many. A selection larger than the
 deployment's delete bound (`FERRY_MAX_DELETE`) is refused before anything is

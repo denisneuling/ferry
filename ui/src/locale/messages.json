@@ -14,6 +14,7 @@
     "unpack.title": "Unpack “{$name}”",
     "unpack.field": "Into the new folder",
     "unpack.ok": "Unpack",
+    "unpack.stays": "The folder “{$name}” stays with what was unpacked.",
     "zipShare.title": "Save as a ZIP file here",
     "zipShare.field": "Name",
     "zipShare.ok": "Save",

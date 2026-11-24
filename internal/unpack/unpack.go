@@ -76,7 +76,7 @@ func Make(entries []zipread.Entry, lim Limits) (Plan, error) {
 			p.Links++
 			continue
 		}
-		parts, err := clean(e.Name)
+		parts, err := clean(windowsSeparators(e))
 		if err != nil {
 			return Plan{}, err
 		}
@@ -148,6 +148,19 @@ func Make(entries []zipread.Entry, lim Limits) (Plan, error) {
 		return p.Folders[i] < p.Folders[j]
 	})
 	return p, nil
+}
+
+// windowsSeparators is an entry's name with backslashes read as folder
+// separators where they are meant as such: in an archive made on Windows
+// (older Windows tools and PowerShell wrote them so), or in a name with no
+// slash at all. Elsewhere a backslash is a character of the name, which
+// clean refuses. Either way clean then checks every part, so a backslash
+// cannot carry a .. past it.
+func windowsSeparators(e zipread.Entry) string {
+	if e.MadeBy == 0 || !strings.Contains(e.Name, "/") {
+		return strings.ReplaceAll(e.Name, `\`, "/")
+	}
+	return e.Name
 }
 
 // clean splits an entry's name into its parts, refusing what could leave

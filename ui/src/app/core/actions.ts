@@ -139,7 +139,10 @@ export class Actions {
     });
     if (!name) return;
     const to = join(dir, name);
-    if (await this.copyOne(share, to, entry.name, (on) => this.api.unpack(share, entry.path, to, on))) {
+    const stays = $localize`:@@unpack.stays:The folder “${name}:name:” stays with what was unpacked.`;
+    if (
+      await this.copyOne(share, to, entry.name, (on) => this.api.unpack(share, entry.path, to, on), stays)
+    ) {
       if (share === this.browser.share() && dir === this.browser.path()) await this.browser.reload();
     }
   }
@@ -284,6 +287,7 @@ export class Actions {
     to: string,
     name: string,
     run: (onProgress: (p: CopyProgress) => void) => Promise<CopyResult>,
+    stays?: string,
   ): Promise<boolean> {
     const dir = parent(to);
     const where = dir ? dir.slice(dir.lastIndexOf('/') + 1) : share;
@@ -306,7 +310,9 @@ export class Actions {
         return true;
       }
       const p = r.progress;
-      const why = $localize`:@@copy.partly:${name}:name: stopped after ${this.format.count(p.files)}:done: of ${this.format.count(p.totalFiles)}:total: items: ${describe(r.error)}:why:`;
+      let why = $localize`:@@copy.partly:${name}:name: stopped after ${this.format.count(p.files)}:done: of ${this.format.count(p.totalFiles)}:total: items: ${describe(r.error)}:why:`;
+      // What was made before stays: nothing is deleted to undo it.
+      if (stays) why += ' ' + stays;
       job.finish(why);
       this.toasts.error(why);
     } catch (err) {

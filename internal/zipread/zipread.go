@@ -55,7 +55,10 @@ type Entry struct {
 	Modified time.Time
 	// Link: the archive was made on Unix and says the entry is a symbolic
 	// link — its data is the path it points to, not a file's content.
-	Link   bool
+	Link bool
+	// MadeBy is the system the archive was made on, as its "version made
+	// by" says: 0 MS-DOS and Windows, 3 Unix, 19 macOS.
+	MadeBy uint8
 	header int64 // where the entry's local header is
 }
 
@@ -141,6 +144,7 @@ func List(r io.ReaderAt, size int64, max int) ([]Entry, error) {
 		e.Modified = dosTime(le.Uint16(dir[14:16]), le.Uint16(dir[12:14]))
 		// The external attributes hold a Unix mode in their high half when
 		// the archive was made on Unix (version made by, high byte 3).
+		e.MadeBy = dir[5]
 		if dir[5] == 3 {
 			e.Link = (le.Uint32(dir[38:42])>>16)&0o170000 == 0o120000
 		}

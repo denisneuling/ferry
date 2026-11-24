@@ -30,6 +30,18 @@ func TestMake(t *testing.T) {
 	}
 }
 
+// Archives from Windows that write backslashes as separators unpack; on
+// Unix, with slashes, a backslash is part of a name and refused.
+func TestWindowsSeparators(t *testing.T) {
+	p, err := Make([]zipread.Entry{f(`dir\sub\a.txt`, 1), {Name: `notes\b.txt`, Method: 8, MadeBy: 3}}, lim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Files[0].Path != "dir/sub/a.txt" || p.Files[1].Path != "notes/b.txt" || strings.Join(p.Folders, "|") != "dir|notes|dir/sub" {
+		t.Fatalf("%+v", p)
+	}
+}
+
 func TestRefused(t *testing.T) {
 	for name, c := range map[string]struct {
 		entries []zipread.Entry
@@ -39,7 +51,8 @@ func TestRefused(t *testing.T) {
 		"up inside":       {[]zipread.Entry{f("a/../../b", 1)}, ErrUnsafeName},
 		"absolute":        {[]zipread.Entry{f("/etc/passwd", 1)}, ErrUnsafeName},
 		"drive":           {[]zipread.Entry{f("C:/x", 1)}, ErrForbiddenName},
-		"backslash":       {[]zipread.Entry{f(`a\..\b`, 1)}, ErrForbiddenName},
+		"backslash up":    {[]zipread.Entry{f(`a\..\..\x`, 1)}, ErrUnsafeName},
+		"unix backslash":  {[]zipread.Entry{{Name: `a/b\c`, Method: 8, MadeBy: 3}}, ErrForbiddenName},
 		"star":            {[]zipread.Entry{f("a*.txt", 1)}, ErrForbiddenName},
 		"control":         {[]zipread.Entry{f("a\x01", 1)}, ErrForbiddenName},
 		"not text":        {[]zipread.Entry{f("a\xff", 1)}, ErrUnsafeName},
