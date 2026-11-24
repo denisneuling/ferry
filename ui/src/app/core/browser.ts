@@ -87,7 +87,11 @@ export class Browser {
     const dir = this.desc() ? -1 : 1;
     const taken = this.taken();
     // A picture's capture time where it is known, its modification otherwise:
-    // both ISO 8601, so they compare as text to the second.
+    // both ISO 8601, so they compare as text to the second. A camera's time
+    // is its clock's, mostly without a zone, and a modification is UTC: a
+    // picture without one sorts among those with one off by the zone's
+    // hours. Without the camera's offset there is nothing better to go by.
+    // The capture times compare among themselves as the clock showed them.
     const when = (e: Entry) => (taken.get(e.name) ?? e.modified).slice(0, 19);
     const cmp = (a: Entry, b: Entry): number => {
       if (key === 'size' && a.size !== b.size) return (a.size - b.size) * dir;
