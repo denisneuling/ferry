@@ -20,6 +20,123 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for BookNodeTag.
+const (
+	BookNodeTagBlockquote BookNodeTag = "blockquote"
+	BookNodeTagBr         BookNodeTag = "br"
+	BookNodeTagCode       BookNodeTag = "code"
+	BookNodeTagDd         BookNodeTag = "dd"
+	BookNodeTagDiv        BookNodeTag = "div"
+	BookNodeTagDl         BookNodeTag = "dl"
+	BookNodeTagDt         BookNodeTag = "dt"
+	BookNodeTagEm         BookNodeTag = "em"
+	BookNodeTagFigcaption BookNodeTag = "figcaption"
+	BookNodeTagFigure     BookNodeTag = "figure"
+	BookNodeTagH1         BookNodeTag = "h1"
+	BookNodeTagH2         BookNodeTag = "h2"
+	BookNodeTagH3         BookNodeTag = "h3"
+	BookNodeTagH4         BookNodeTag = "h4"
+	BookNodeTagH5         BookNodeTag = "h5"
+	BookNodeTagH6         BookNodeTag = "h6"
+	BookNodeTagHr         BookNodeTag = "hr"
+	BookNodeTagImg        BookNodeTag = "img"
+	BookNodeTagLi         BookNodeTag = "li"
+	BookNodeTagOl         BookNodeTag = "ol"
+	BookNodeTagP          BookNodeTag = "p"
+	BookNodeTagPre        BookNodeTag = "pre"
+	BookNodeTagS          BookNodeTag = "s"
+	BookNodeTagSmall      BookNodeTag = "small"
+	BookNodeTagStrong     BookNodeTag = "strong"
+	BookNodeTagSub        BookNodeTag = "sub"
+	BookNodeTagSup        BookNodeTag = "sup"
+	BookNodeTagTable      BookNodeTag = "table"
+	BookNodeTagTbody      BookNodeTag = "tbody"
+	BookNodeTagTd         BookNodeTag = "td"
+	BookNodeTagTh         BookNodeTag = "th"
+	BookNodeTagThead      BookNodeTag = "thead"
+	BookNodeTagTr         BookNodeTag = "tr"
+	BookNodeTagU          BookNodeTag = "u"
+	BookNodeTagUl         BookNodeTag = "ul"
+)
+
+// Valid indicates whether the value is a known member of the BookNodeTag enum.
+func (e BookNodeTag) Valid() bool {
+	switch e {
+	case BookNodeTagBlockquote:
+		return true
+	case BookNodeTagBr:
+		return true
+	case BookNodeTagCode:
+		return true
+	case BookNodeTagDd:
+		return true
+	case BookNodeTagDiv:
+		return true
+	case BookNodeTagDl:
+		return true
+	case BookNodeTagDt:
+		return true
+	case BookNodeTagEm:
+		return true
+	case BookNodeTagFigcaption:
+		return true
+	case BookNodeTagFigure:
+		return true
+	case BookNodeTagH1:
+		return true
+	case BookNodeTagH2:
+		return true
+	case BookNodeTagH3:
+		return true
+	case BookNodeTagH4:
+		return true
+	case BookNodeTagH5:
+		return true
+	case BookNodeTagH6:
+		return true
+	case BookNodeTagHr:
+		return true
+	case BookNodeTagImg:
+		return true
+	case BookNodeTagLi:
+		return true
+	case BookNodeTagOl:
+		return true
+	case BookNodeTagP:
+		return true
+	case BookNodeTagPre:
+		return true
+	case BookNodeTagS:
+		return true
+	case BookNodeTagSmall:
+		return true
+	case BookNodeTagStrong:
+		return true
+	case BookNodeTagSub:
+		return true
+	case BookNodeTagSup:
+		return true
+	case BookNodeTagTable:
+		return true
+	case BookNodeTagTbody:
+		return true
+	case BookNodeTagTd:
+		return true
+	case BookNodeTagTh:
+		return true
+	case BookNodeTagThead:
+		return true
+	case BookNodeTagTr:
+		return true
+	case BookNodeTagU:
+		return true
+	case BookNodeTagUl:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EntryType.
 const (
 	EntryTypeFile   EntryType = "file"
@@ -490,6 +607,41 @@ type ArchiveTicket struct {
 	// Ticket For `GET …/archive/{ticket}`: once, within a minute, by this session.
 	Ticket string `json:"ticket"`
 }
+
+// Book defines model for Book.
+type Book struct {
+	Chapters []struct {
+		// Entry The chapter's entry in the archive.
+		Entry string `json:"entry"`
+
+		// Title Its title from the table of contents, as text; may be empty.
+		Title string `json:"title"`
+	} `json:"chapters"`
+
+	// Title The book's title, as text; may be empty.
+	Title string `json:"title"`
+}
+
+// BookChapter defines model for BookChapter.
+type BookChapter struct {
+	Nodes     []BookNode `json:"nodes"`
+	Truncated bool       `json:"truncated"`
+}
+
+// BookNode An element of a few known ones (`tag`) with its children, or text (`text`, no tag).
+type BookNode struct {
+	// Alt An img's description, as text.
+	Alt      *string     `json:"alt,omitempty"`
+	Children *[]BookNode `json:"children,omitempty"`
+
+	// Src An img's picture: an entry of the archive.
+	Src  *string      `json:"src,omitempty"`
+	Tag  *BookNodeTag `json:"tag,omitempty"`
+	Text *string      `json:"text,omitempty"`
+}
+
+// BookNodeTag defines model for BookNode.Tag.
+type BookNodeTag string
 
 // CopyEnd defines model for CopyEnd.
 type CopyEnd struct {
@@ -1035,6 +1187,39 @@ type SaveArchiveParams struct {
 
 // SaveArchiveParamsXFerryRequest defines parameters for SaveArchive.
 type SaveArchiveParamsXFerryRequest string
+
+// GetBookParams defines parameters for GetBook.
+type GetBookParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+}
+
+// GetBookChapterParams defines parameters for GetBookChapter.
+type GetBookChapterParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+
+	// Entry The chapter's entry, as `getBook` named it.
+	Entry string `form:"entry" json:"entry"`
+}
 
 // GetContentParams defines parameters for GetContent.
 type GetContentParams struct {
@@ -1949,6 +2134,32 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/shares/{share}/archive/{ticket} (the `GetArchive` operationId).
 	GetArchive(ctx context.Context, share ShareName, ticket string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetBook An EPUB book's title and chapters, in reading order.
+	//
+	// Reads the book's package (`META-INF/container.xml`, its OPF): the
+	// spine's chapters, at most 2000, with their titles from the table of
+	// contents where it gives them — as text. A book whose content is
+	// encrypted (DRM) is `415` (`book_encrypted`); fonts obfuscated as
+	// EPUB allows do not count. A file that is no EPUB is `415`
+	// (`not_a_document`).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/book (the `GetBook` operationId).
+	GetBook(ctx context.Context, share ShareName, params *GetBookParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBookChapter One chapter of an EPUB book, as a tree of text.
+	//
+	// The chapter `entry` — one of `getBook`'s — read out of its XHTML into
+	// a tree of a few elements (paragraphs, headings, emphasis, lists,
+	// quotes, tables, figures and pictures) and text. Nothing of the
+	// chapter is passed on as markup: no scripts, styles, forms, frames,
+	// links (their text stays) or attributes. A picture is only the name
+	// of an entry of the same archive, checked to be there and to be a
+	// picture, to be shown through `getZipEntry`. At most 4 MB of XHTML,
+	// 50000 nodes and 64 levels; `truncated` when cut short.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/book/chapter (the `GetBookChapter` operationId).
+	GetBookChapter(ctx context.Context, share ShareName, params *GetBookChapterParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetContent Download a file, streamed, with Range.
 	//
 	// Answers with the file's bytes. One byte range (`Range: bytes=a-b`) is
@@ -2621,6 +2832,52 @@ func (c *Client) SaveArchive(ctx context.Context, share ShareName, params *SaveA
 // Corresponds with GET /api/v1/shares/{share}/archive/{ticket} (the `GetArchive` operationId).
 func (c *Client) GetArchive(ctx context.Context, share ShareName, ticket string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetArchiveRequest(c.Server, share, ticket)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBook An EPUB book's title and chapters, in reading order.
+//
+// Reads the book's package (`META-INF/container.xml`, its OPF): the
+// spine's chapters, at most 2000, with their titles from the table of
+// contents where it gives them — as text. A book whose content is
+// encrypted (DRM) is `415` (`book_encrypted`); fonts obfuscated as
+// EPUB allows do not count. A file that is no EPUB is `415`
+// (`not_a_document`).
+//
+// Corresponds with GET /api/v1/shares/{share}/book (the `GetBook` operationId).
+func (c *Client) GetBook(ctx context.Context, share ShareName, params *GetBookParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBookRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBookChapter One chapter of an EPUB book, as a tree of text.
+//
+// The chapter `entry` — one of `getBook`'s — read out of its XHTML into
+// a tree of a few elements (paragraphs, headings, emphasis, lists,
+// quotes, tables, figures and pictures) and text. Nothing of the
+// chapter is passed on as markup: no scripts, styles, forms, frames,
+// links (their text stays) or attributes. A picture is only the name
+// of an entry of the same archive, checked to be there and to be a
+// picture, to be shown through `getZipEntry`. At most 4 MB of XHTML,
+// 50000 nodes and 64 levels; `truncated` when cut short.
+//
+// Corresponds with GET /api/v1/shares/{share}/book/chapter (the `GetBookChapter` operationId).
+func (c *Client) GetBookChapter(ctx context.Context, share ShareName, params *GetBookChapterParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBookChapterRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3652,6 +3909,160 @@ func NewGetArchiveRequest(server string, share ShareName, ticket string) (*http.
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBookRequest constructs an http.Request for the GetBook method
+func NewGetBookRequest(server string, share ShareName, params *GetBookParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/book"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBookChapterRequest constructs an http.Request for the GetBookChapter method
+func NewGetBookChapterRequest(server string, share ShareName, params *GetBookChapterParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/book/chapter"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "entry", params.Entry, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -5657,6 +6068,36 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/shares/{share}/archive/{ticket} (the `GetArchive` operationId).
 	GetArchiveWithResponse(ctx context.Context, share ShareName, ticket string, reqEditors ...RequestEditorFn) (*GetArchiveResponse, error)
 
+	// GetBookWithResponse An EPUB book's title and chapters, in reading order.
+	//
+	// Reads the book's package (`META-INF/container.xml`, its OPF): the
+	// spine's chapters, at most 2000, with their titles from the table of
+	// contents where it gives them — as text. A book whose content is
+	// encrypted (DRM) is `415` (`book_encrypted`); fonts obfuscated as
+	// EPUB allows do not count. A file that is no EPUB is `415`
+	// (`not_a_document`).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/book (the `GetBook` operationId).
+	GetBookWithResponse(ctx context.Context, share ShareName, params *GetBookParams, reqEditors ...RequestEditorFn) (*GetBookResponse, error)
+
+	// GetBookChapterWithResponse One chapter of an EPUB book, as a tree of text.
+	//
+	// The chapter `entry` — one of `getBook`'s — read out of its XHTML into
+	// a tree of a few elements (paragraphs, headings, emphasis, lists,
+	// quotes, tables, figures and pictures) and text. Nothing of the
+	// chapter is passed on as markup: no scripts, styles, forms, frames,
+	// links (their text stays) or attributes. A picture is only the name
+	// of an entry of the same archive, checked to be there and to be a
+	// picture, to be shown through `getZipEntry`. At most 4 MB of XHTML,
+	// 50000 nodes and 64 levels; `truncated` when cut short.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/book/chapter (the `GetBookChapter` operationId).
+	GetBookChapterWithResponse(ctx context.Context, share ShareName, params *GetBookChapterParams, reqEditors ...RequestEditorFn) (*GetBookChapterResponse, error)
+
 	// GetContentWithResponse Download a file, streamed, with Range.
 	//
 	// Answers with the file's bytes. One byte range (`Range: bytes=a-b`) is
@@ -6634,6 +7075,186 @@ func (r GetArchiveResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetArchiveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Book
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBookResponse) GetJSON200() *Book {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetBookResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetBookResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetBookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetBookResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r GetBookResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r GetBookResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetBookResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBookChapterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BookChapter
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *TooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *Problem
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBookChapterResponse) GetJSON200() *BookChapter {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetBookChapterResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetBookChapterResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetBookChapterResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetBookChapterResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r GetBookChapterResponse) GetApplicationproblemJSON413() *TooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r GetBookChapterResponse) GetApplicationproblemJSON415() *Problem {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetBookChapterResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBookChapterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBookChapterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBookChapterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBookChapterResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8760,6 +9381,48 @@ func (c *ClientWithResponses) GetArchiveWithResponse(ctx context.Context, share 
 	return ParseGetArchiveResponse(rsp)
 }
 
+// GetBookWithResponse An EPUB book's title and chapters, in reading order.
+//
+// Reads the book's package (`META-INF/container.xml`, its OPF): the
+// spine's chapters, at most 2000, with their titles from the table of
+// contents where it gives them — as text. A book whose content is
+// encrypted (DRM) is `415` (`book_encrypted`); fonts obfuscated as
+// EPUB allows do not count. A file that is no EPUB is `415`
+// (`not_a_document`).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/book (the `GetBook` operationId).
+func (c *ClientWithResponses) GetBookWithResponse(ctx context.Context, share ShareName, params *GetBookParams, reqEditors ...RequestEditorFn) (*GetBookResponse, error) {
+	rsp, err := c.GetBook(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBookResponse(rsp)
+}
+
+// GetBookChapterWithResponse One chapter of an EPUB book, as a tree of text.
+//
+// The chapter `entry` — one of `getBook`'s — read out of its XHTML into
+// a tree of a few elements (paragraphs, headings, emphasis, lists,
+// quotes, tables, figures and pictures) and text. Nothing of the
+// chapter is passed on as markup: no scripts, styles, forms, frames,
+// links (their text stays) or attributes. A picture is only the name
+// of an entry of the same archive, checked to be there and to be a
+// picture, to be shown through `getZipEntry`. At most 4 MB of XHTML,
+// 50000 nodes and 64 levels; `truncated` when cut short.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/book/chapter (the `GetBookChapter` operationId).
+func (c *ClientWithResponses) GetBookChapterWithResponse(ctx context.Context, share ShareName, params *GetBookChapterParams, reqEditors ...RequestEditorFn) (*GetBookChapterResponse, error) {
+	rsp, err := c.GetBookChapter(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBookChapterResponse(rsp)
+}
+
 // GetContentWithResponse Download a file, streamed, with Range.
 //
 // Answers with the file's bytes. One byte range (`Range: bytes=a-b`) is
@@ -9797,6 +10460,156 @@ func ParseGetArchiveResponse(rsp *http.Response) (*GetArchiveResponse, error) {
 			headers.ContentDisposition = &value
 		}
 		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetBookResponse parses an HTTP response from a GetBookWithResponse call
+func ParseGetBookResponse(rsp *http.Response) (*GetBookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Book
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBookChapterResponse parses an HTTP response from a GetBookChapterWithResponse call
+func ParseGetBookChapterResponse(rsp *http.Response) (*GetBookChapterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBookChapterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BookChapter
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest TooLarge
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest Problem
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
 	}
 
 	return response, nil
@@ -11407,6 +12220,12 @@ type ServerInterface interface {
 	// GetArchive Download a prepared ZIP.
 	// (GET /api/v1/shares/{share}/archive/{ticket})
 	GetArchive(w http.ResponseWriter, r *http.Request, share ShareName, ticket string)
+	// GetBook An EPUB book's title and chapters, in reading order.
+	// (GET /api/v1/shares/{share}/book)
+	GetBook(w http.ResponseWriter, r *http.Request, share ShareName, params GetBookParams)
+	// GetBookChapter One chapter of an EPUB book, as a tree of text.
+	// (GET /api/v1/shares/{share}/book/chapter)
+	GetBookChapter(w http.ResponseWriter, r *http.Request, share ShareName, params GetBookChapterParams)
 	// GetContent Download a file, streamed, with Range.
 	// (GET /api/v1/shares/{share}/content)
 	GetContent(w http.ResponseWriter, r *http.Request, share ShareName, params GetContentParams)
@@ -11753,6 +12572,129 @@ func (siw *ServerInterfaceWrapper) GetArchive(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetArchive(w, r, share, ticket)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBook operation middleware
+func (siw *ServerInterfaceWrapper) GetBook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetBookParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBook(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBookChapter operation middleware
+func (siw *ServerInterfaceWrapper) GetBookChapter(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetBookChapterParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "entry" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "entry", r.URL.Query(), &params.Entry, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "entry"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entry", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBookChapter(w, r, share, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13440,6 +14382,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/thumbnail", wrapper.GetThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/text", wrapper.GetDocumentText)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/sheet", wrapper.GetSheet)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/book", wrapper.GetBook)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/book/chapter", wrapper.GetBookChapter)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/zip", wrapper.ListZip)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/zip/entry", wrapper.GetZipEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/versions", wrapper.ListVersions)

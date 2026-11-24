@@ -2478,3 +2478,69 @@ h1 .fav {
   font-weight: 600;
   border-bottom-color: #fbfaf7;
 }
+
+/* An EPUB read in the preview: a chapter at a time, as text. */
+.bookview {
+  white-space: normal;
+}
+.book-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: -14px 0 14px;
+  position: sticky;
+  top: -34px;
+  background: #fbfaf7;
+  padding: 8px 0;
+}
+.book-bar select {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  padding: 5px 8px;
+  border: 1px solid #d3cabc;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d2a2c;
+}
+.book-title {
+  margin: 0 0 8px;
+  color: #8a938f;
+  font-size: 13px;
+}
+.book-text {
+  font: 17px/1.65 var(--serif);
+}
+.book-text img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+}
+.book-text h1,
+.book-text h2,
+.book-text h3 {
+  font-weight: 500;
+  line-height: 1.25;
+}
+.book-text blockquote {
+  border-left: 3px solid #d3cabc;
+  margin-left: 0;
+  padding-left: 1em;
+  color: #55625f;
+}
+.book-text table {
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+.book-text th,
+.book-text td {
+  border: 1px solid #e4ddd2;
+  padding: 4px 10px;
+}
+.lb-stage .book-text img {
+  max-height: none;
+  box-shadow: none;
+  border-radius: 0;
+}

@@ -245,6 +245,13 @@ Excel's dates and times are written as 2026-11-24 or 14:30:00 where the
 cell is formatted as one; an OpenDocument cell shows the text it displays.
 A workbook of several sheets shows them as tabs above the table, each read
 when it is chosen.
+An EPUB book is read in the preview, chapter by chapter, with the
+chapters from its table of contents to choose from. The server reads each
+chapter out of its XHTML into paragraphs, headings, emphasis, lists,
+quotes, tables and pictures, and the page builds them as text: nothing of
+the book runs or loads anything — no scripts, styles, links or fonts —
+and a picture comes from the book's own archive, as a picture only. A book
+with DRM says so and is not shown.
 A ZIP archive shows what it holds: each file
 with its size, to open in a new tab or to download on its own, unpacked
 as it is sent — nothing is unpacked onto the share. Entries that are

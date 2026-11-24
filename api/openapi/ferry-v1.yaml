@@ -530,6 +530,81 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/book:
+    get:
+      operationId: getBook
+      tags: [files]
+      summary: An EPUB book's title and chapters, in reading order.
+      description: |
+        Reads the book's package (`META-INF/container.xml`, its OPF): the
+        spine's chapters, at most 2000, with their titles from the table of
+        contents where it gives them — as text. A book whose content is
+        encrypted (DRM) is `415` (`book_encrypted`); fonts obfuscated as
+        EPUB allows do not count. A file that is no EPUB is `415`
+        (`not_a_document`).
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: The book.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415":
+          description: No EPUB ferry reads (`not_a_document`), or one with DRM (`book_encrypted`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
+  /api/v1/shares/{share}/book/chapter:
+    get:
+      operationId: getBookChapter
+      tags: [files]
+      summary: One chapter of an EPUB book, as a tree of text.
+      description: |
+        The chapter `entry` — one of `getBook`'s — read out of its XHTML into
+        a tree of a few elements (paragraphs, headings, emphasis, lists,
+        quotes, tables, figures and pictures) and text. Nothing of the
+        chapter is passed on as markup: no scripts, styles, forms, frames,
+        links (their text stays) or attributes. A picture is only the name
+        of an entry of the same archive, checked to be there and to be a
+        picture, to be shown through `getZipEntry`. At most 4 MB of XHTML,
+        50000 nodes and 64 levels; `truncated` when cut short.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/At"
+        - name: entry
+          in: query
+          required: true
+          description: The chapter's entry, as `getBook` named it.
+          schema: { type: string, maxLength: 4096 }
+      responses:
+        "200":
+          description: The chapter.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookChapter" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "415":
+          description: No EPUB, an encrypted one, or no chapter of it (`not_a_document`, `book_encrypted`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/zip:
     get:
       operationId: listZip
@@ -1435,6 +1510,40 @@ components:
       required: [size]
       properties:
         size: { type: integer, format: int64, description: "The bytes written so far." }
+    Book:
+      type: object
+      required: [title, chapters]
+      properties:
+        title: { type: string, description: "The book's title, as text; may be empty." }
+        chapters:
+          type: array
+          items:
+            type: object
+            required: [entry, title]
+            properties:
+              entry: { type: string, description: "The chapter's entry in the archive." }
+              title: { type: string, description: "Its title from the table of contents, as text; may be empty." }
+    BookChapter:
+      type: object
+      required: [nodes, truncated]
+      properties:
+        nodes:
+          type: array
+          items: { $ref: "#/components/schemas/BookNode" }
+        truncated: { type: boolean }
+    BookNode:
+      type: object
+      description: An element of a few known ones (`tag`) with its children, or text (`text`, no tag).
+      properties:
+        tag:
+          type: string
+          enum: [p, h1, h2, h3, h4, h5, h6, em, strong, u, s, sub, sup, small, blockquote, ul, ol, li, br, hr, pre, code, table, thead, tbody, tr, th, td, figure, figcaption, img, dl, dt, dd, div]
+        text: { type: string }
+        children:
+          type: array
+          items: { $ref: "#/components/schemas/BookNode" }
+        src: { type: string, description: "An img's picture: an entry of the archive." }
+        alt: { type: string, description: "An img's description, as text." }
     DocumentText:
       type: object
       required: [text, truncated]

@@ -320,6 +320,11 @@
     "err.notArchive": "Das ist kein ZIP-Archiv, das ferry entpacken kann, oder ein Eintrag ist verschlüsselt.",
     "err.noSpace": "Für den Inhalt des Archivs ist nicht genug Platz frei.",
     "err.intoItself": "Ein Ordner lässt sich nicht in sich selbst kopieren oder packen.",
-    "unpack.stays": "Der Ordner „{$name}“ bleibt mit dem, was entpackt wurde."
+    "unpack.stays": "Der Ordner „{$name}“ bleibt mit dem, was entpackt wurde.",
+    "book.prev": " Zurück ",
+    "book.next": " Weiter ",
+    "book.chapter": "Kapitel",
+    "book.chapterN": "Kapitel {$n}",
+    "book.truncated": "… Der Rest dieses Kapitels wird nicht gezeigt."
   }
 }

@@ -26,6 +26,7 @@ import { Places } from '../core/places';
 import { Versions } from '../ui/versions';
 import { TextEditor } from '../ui/text-editor';
 import { TextView } from '../ui/text-view';
+import { BookView } from '../ui/book-view';
 import { Zoom } from '../ui/zoom';
 import { MAX_EDIT_BYTES } from '../core/text-file';
 import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../core/subtitles';
@@ -39,7 +40,7 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
 @Component({
   selector: 'f-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, FileDetails, TextEditor, TextView, Zoom],
+  imports: [Icon, FileDetails, TextEditor, TextView, BookView, Zoom],
   host: { '(document:keydown)': 'key($event)' },
   template: `@if (entry(); as e) {
     <div
@@ -235,6 +236,13 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
                 }
               }
             </div>
+          }
+          @case ('book') {
+            @if (browser.share(); as share) {
+              <div class="textview bookview">
+                <f-book-view [share]="share" [path]="e.path" />
+              </div>
+            }
           }
           @case ('archive') {
             <div class="textview zipview" [class.loading]="zipEntries() === null">

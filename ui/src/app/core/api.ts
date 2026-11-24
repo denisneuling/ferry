@@ -17,6 +17,9 @@ export type VersionList = components['schemas']['VersionList'];
 export type SearchEnd = components['schemas']['SearchEnd']['end'];
 export type Usage = components['schemas']['Usage'];
 export type Sheet = components['schemas']['Sheet'];
+export type Book = components['schemas']['Book'];
+export type BookChapter = components['schemas']['BookChapter'];
+export type BookNode = components['schemas']['BookNode'];
 export type CopyProgress = components['schemas']['CopyProgress'];
 export type ZipEntry = components['schemas']['ZipEntry'];
 
@@ -358,6 +361,19 @@ export class Api {
     return this.json(
       'GET',
       `${shareBase(share)}/sheet?path=${q(path)}${index ? `&sheet=${index}` : ''}${this.at()}`,
+    );
+  }
+
+  /** An EPUB's title and chapters, read by the server. */
+  book(share: string, path: string): Promise<Book> {
+    return this.json('GET', `${shareBase(share)}/book?path=${q(path)}${this.at()}`);
+  }
+
+  /** One chapter of an EPUB, as a tree of text. */
+  bookChapter(share: string, path: string, entry: string): Promise<BookChapter> {
+    return this.json(
+      'GET',
+      `${shareBase(share)}/book/chapter?path=${q(path)}&entry=${encodeURIComponent(entry)}${this.at()}`,
     );
   }
 

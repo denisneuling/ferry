@@ -25,10 +25,10 @@ describe('kinds', () => {
     expect(hasThumbnail('clip.mkv')).toBe(false);
     expect(previewKind('Brief.docx')).toBe('document');
     expect(previewKind('Brief.odt')).toBe('document');
-    expect(previewKind('book.epub')).toBe('none');
     expect(previewKind('slides.pptx')).toBe('document');
     expect(previewKind('Vortrag.odp')).toBe('document');
     expect(previewKind('alt.ppt')).toBe('none');
+    expect(previewKind('book.epub')).toBe('book');
     expect(previewKind('Haushalt.XLSX')).toBe('table');
     expect(previewKind('Haushalt.ods')).toBe('table');
     expect(previewKind('alt.xls')).toBe('none');
