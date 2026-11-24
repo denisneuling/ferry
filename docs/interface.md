@@ -79,7 +79,9 @@ session and ferry counts the files and their sizes, the count showing in a
 card as it grows. Only on request, one at a time, and stopped with the
 card's ✕; it ends after 20000 folders, 200000 entries, 32 levels or a
 minute, then saying it is at least that much. Folders the server does not
-open to you are left out and said to be.
+open to you are left out and said to be. A snapshot folder the server
+shows inside a share (`.snapshot`, `.zfs` with its snapshots visible) is
+a folder like any other and counted along; one it hides is not.
 
 ## Favourites and recently used
 
