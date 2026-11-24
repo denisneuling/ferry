@@ -164,6 +164,30 @@ func (e SearchEndEndReason) Valid() bool {
 	}
 }
 
+// Defines values for UsageReason.
+const (
+	UsageReasonDepth   UsageReason = "depth"
+	UsageReasonEntries UsageReason = "entries"
+	UsageReasonFolders UsageReason = "folders"
+	UsageReasonTime    UsageReason = "time"
+)
+
+// Valid indicates whether the value is a known member of the UsageReason enum.
+func (e UsageReason) Valid() bool {
+	switch e {
+	case UsageReasonDepth:
+		return true
+	case UsageReasonEntries:
+		return true
+	case UsageReasonFolders:
+		return true
+	case UsageReasonTime:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FerryRequest.
 const (
 	FerryRequestN1 FerryRequest = "1"
@@ -719,6 +743,45 @@ type Space struct {
 	Total int64 `json:"total"`
 }
 
+// Usage defines model for Usage.
+type Usage struct {
+	// Bytes The files' sizes added up, as the server lists them.
+	Bytes int64 `json:"bytes"`
+
+	// Files Files counted.
+	Files int `json:"files"`
+
+	// Folders Folders counted below the folder.
+	Folders int `json:"folders"`
+
+	// Reason The bound it stopped at, when truncated.
+	Reason *UsageReason `json:"reason,omitempty"`
+
+	// Skipped Folders the server refused, or too large to count.
+	Skipped int `json:"skipped"`
+
+	// Truncated It stopped at a bound before counting everything.
+	Truncated bool `json:"truncated"`
+}
+
+// UsageReason The bound it stopped at, when truncated.
+type UsageReason string
+
+// UsageEnd defines model for UsageEnd.
+type UsageEnd struct {
+	End Usage `json:"end"`
+}
+
+// UsageProgress defines model for UsageProgress.
+type UsageProgress struct {
+	Progress Usage `json:"progress"`
+}
+
+// UsageStreamLine One line of a folder size's answer.
+type UsageStreamLine struct {
+	union json.RawMessage
+}
+
 // Version defines model for Version.
 type Version struct {
 	// At The snapshot's time, to pass as `at`; UTC.
@@ -1035,6 +1098,21 @@ type GetThumbnailParams struct {
 // GetThumbnailParamsSize defines parameters for GetThumbnail.
 type GetThumbnailParamsSize int
 
+// GetUsageParams defines parameters for GetUsage.
+type GetUsageParams struct {
+	// Path Slash-separated, relative to the share's root; empty for the root.
+	Path *EntryPath `form:"path,omitempty" json:"path,omitempty"`
+
+	// At A snapshot's time as `listVersions` gives it, `@GMT-YYYY.MM.DD-HH.MM.SS`
+	// in UTC and exactly so: the path is read as that snapshot holds it,
+	// never written. Asked for under the person's own session, so the
+	// server decides as for the path now. A time that is no snapshot of
+	// the path is `404`; a request that would change something and
+	// carries `at` is `400` (`version_read_only`). A time is never part of
+	// the path.
+	At *At `form:"at,omitempty" json:"at,omitempty"`
+}
+
 // ListVersionsParams defines parameters for ListVersions.
 type ListVersionsParams struct {
 	// Path Slash-separated, relative to the share's root; empty for the root.
@@ -1348,6 +1426,94 @@ func (t SearchStreamLine) MarshalJSON() ([]byte, error) {
 }
 
 func (t *SearchStreamLine) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsUsageProgress returns the union data inside the UsageStreamLine as a UsageProgress
+func (t UsageStreamLine) AsUsageProgress() (UsageProgress, error) {
+	var body UsageProgress
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUsageProgress overwrites any union data inside the UsageStreamLine as the provided UsageProgress
+func (t *UsageStreamLine) FromUsageProgress(v UsageProgress) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeUsageProgress performs a merge with any union data inside the UsageStreamLine, using the provided UsageProgress
+func (t *UsageStreamLine) MergeUsageProgress(v UsageProgress) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsUsageEnd returns the union data inside the UsageStreamLine as a UsageEnd
+func (t UsageStreamLine) AsUsageEnd() (UsageEnd, error) {
+	var body UsageEnd
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUsageEnd overwrites any union data inside the UsageStreamLine as the provided UsageEnd
+func (t *UsageStreamLine) FromUsageEnd(v UsageEnd) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeUsageEnd performs a merge with any union data inside the UsageStreamLine, using the provided UsageEnd
+func (t *UsageStreamLine) MergeUsageEnd(v UsageEnd) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEntryStreamProblem returns the union data inside the UsageStreamLine as a EntryStreamProblem
+func (t UsageStreamLine) AsEntryStreamProblem() (EntryStreamProblem, error) {
+	var body EntryStreamProblem
+	err := runtime.JSONUnmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEntryStreamProblem overwrites any union data inside the UsageStreamLine as the provided EntryStreamProblem
+func (t *UsageStreamLine) FromEntryStreamProblem(v EntryStreamProblem) error {
+	b, err := runtime.JSONMarshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEntryStreamProblem performs a merge with any union data inside the UsageStreamLine, using the provided EntryStreamProblem
+func (t *UsageStreamLine) MergeEntryStreamProblem(v EntryStreamProblem) error {
+	b, err := runtime.JSONMarshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t UsageStreamLine) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *UsageStreamLine) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -1771,6 +1937,29 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUsage Add up what a folder holds.
+	//
+	// Counts the files below the folder `path` and adds up their sizes, as
+	// the server lists them — now or, with `at`, as that snapshot holds
+	// them. There is no index and nothing is kept: the folders are listed
+	// one by one, breadth first, with the person's session; a folder the
+	// server refuses below `path` is skipped and counted; `path` refused is
+	// the error. One per session: a new one ends the one running.
+	//
+	// The answer is `application/x-ndjson`: `{"progress": Usage}` about
+	// once a second while it counts, then a last line, `{"end": Usage}`, or
+	// `{"problem": Problem}` when it failed part-way. A stream without
+	// either last line was cut off. Errors before the first line are
+	// ordinary problem responses.
+	//
+	// It stops after 20000 folders, 200000 entries, 32 levels below `path`
+	// or 60 seconds, saying which in `reason` with `truncated: true`; what
+	// was counted until then is the answer. A client that goes away stops
+	// it before the next folder.
+	//
+	// Corresponds with GET /api/v1/shares/{share}/usage (the `GetUsage` operationId).
+	GetUsage(ctx context.Context, share ShareName, params *GetUsageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListVersions The previous versions of a file or a folder.
 	//
@@ -2396,6 +2585,39 @@ func (c *Client) GetDocumentText(ctx context.Context, share ShareName, params *G
 // Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 func (c *Client) GetThumbnail(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetThumbnailRequest(c.Server, share, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetUsage Add up what a folder holds.
+//
+// Counts the files below the folder `path` and adds up their sizes, as
+// the server lists them — now or, with `at`, as that snapshot holds
+// them. There is no index and nothing is kept: the folders are listed
+// one by one, breadth first, with the person's session; a folder the
+// server refuses below `path` is skipped and counted; `path` refused is
+// the error. One per session: a new one ends the one running.
+//
+// The answer is `application/x-ndjson`: `{"progress": Usage}` about
+// once a second while it counts, then a last line, `{"end": Usage}`, or
+// `{"problem": Problem}` when it failed part-way. A stream without
+// either last line was cut off. Errors before the first line are
+// ordinary problem responses.
+//
+// It stops after 20000 folders, 200000 entries, 32 levels below `path`
+// or 60 seconds, saying which in `reason` with `truncated: true`; what
+// was counted until then is the answer. A client that goes away stops
+// it before the next folder.
+//
+// Corresponds with GET /api/v1/shares/{share}/usage (the `GetUsage` operationId).
+func (c *Client) GetUsage(ctx context.Context, share ShareName, params *GetUsageParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUsageRequest(c.Server, share, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3765,6 +3987,79 @@ func NewGetThumbnailRequest(server string, share ShareName, params *GetThumbnail
 	return req, nil
 }
 
+// NewGetUsageRequest constructs an http.Request for the GetUsage method
+func NewGetUsageRequest(server string, share ShareName, params *GetUsageParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "share", share, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := "/api/v1/shares/" + pathParam0 + "/usage"
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListVersionsRequest constructs an http.Request for the ListVersions method
 func NewListVersionsRequest(server string, share ShareName, params *ListVersionsParams) (*http.Request, error) {
 	var err error
@@ -4411,6 +4706,31 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/shares/{share}/thumbnail (the `GetThumbnail` operationId).
 	GetThumbnailWithResponse(ctx context.Context, share ShareName, params *GetThumbnailParams, reqEditors ...RequestEditorFn) (*GetThumbnailResponse, error)
+
+	// GetUsageWithResponse Add up what a folder holds.
+	//
+	// Counts the files below the folder `path` and adds up their sizes, as
+	// the server lists them — now or, with `at`, as that snapshot holds
+	// them. There is no index and nothing is kept: the folders are listed
+	// one by one, breadth first, with the person's session; a folder the
+	// server refuses below `path` is skipped and counted; `path` refused is
+	// the error. One per session: a new one ends the one running.
+	//
+	// The answer is `application/x-ndjson`: `{"progress": Usage}` about
+	// once a second while it counts, then a last line, `{"end": Usage}`, or
+	// `{"problem": Problem}` when it failed part-way. A stream without
+	// either last line was cut off. Errors before the first line are
+	// ordinary problem responses.
+	//
+	// It stops after 20000 folders, 200000 entries, 32 levels below `path`
+	// or 60 seconds, saying which in `reason` with `truncated: true`; what
+	// was counted until then is the answer. A client that goes away stops
+	// it before the next folder.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/shares/{share}/usage (the `GetUsage` operationId).
+	GetUsageWithResponse(ctx context.Context, share ShareName, params *GetUsageParams, reqEditors ...RequestEditorFn) (*GetUsageResponse, error)
 
 	// ListVersionsWithResponse The previous versions of a file or a folder.
 	//
@@ -6014,6 +6334,75 @@ func (r GetThumbnailResponse) ContentType() string {
 	return ""
 }
 
+type GetUsageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON502 the response for an HTTP 502 `application/problem+json` response
+	ApplicationproblemJSON502 *BadGateway
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetUsageResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetUsageResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetUsageResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetUsageResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON502 returns the response for an HTTP 502 `application/problem+json` response
+func (r GetUsageResponse) GetApplicationproblemJSON502() *BadGateway {
+	return r.ApplicationproblemJSON502
+}
+
+// GetBody returns the raw response body bytes
+func (r GetUsageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUsageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUsageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetUsageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListVersionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -6781,6 +7170,37 @@ func (c *ClientWithResponses) GetThumbnailWithResponse(ctx context.Context, shar
 		return nil, err
 	}
 	return ParseGetThumbnailResponse(rsp)
+}
+
+// GetUsageWithResponse Add up what a folder holds.
+//
+// Counts the files below the folder `path` and adds up their sizes, as
+// the server lists them — now or, with `at`, as that snapshot holds
+// them. There is no index and nothing is kept: the folders are listed
+// one by one, breadth first, with the person's session; a folder the
+// server refuses below `path` is skipped and counted; `path` refused is
+// the error. One per session: a new one ends the one running.
+//
+// The answer is `application/x-ndjson`: `{"progress": Usage}` about
+// once a second while it counts, then a last line, `{"end": Usage}`, or
+// `{"problem": Problem}` when it failed part-way. A stream without
+// either last line was cut off. Errors before the first line are
+// ordinary problem responses.
+//
+// It stops after 20000 folders, 200000 entries, 32 levels below `path`
+// or 60 seconds, saying which in `reason` with `truncated: true`; what
+// was counted until then is the answer. A client that goes away stops
+// it before the next folder.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/shares/{share}/usage (the `GetUsage` operationId).
+func (c *ClientWithResponses) GetUsageWithResponse(ctx context.Context, share ShareName, params *GetUsageParams, reqEditors ...RequestEditorFn) (*GetUsageResponse, error) {
+	rsp, err := c.GetUsage(ctx, share, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUsageResponse(rsp)
 }
 
 // ListVersionsWithResponse The previous versions of a file or a folder.
@@ -8141,6 +8561,60 @@ func ParseGetThumbnailResponse(rsp *http.Response) (*GetThumbnailResponse, error
 	return response, nil
 }
 
+// ParseGetUsageResponse parses an HTTP response from a GetUsageWithResponse call
+func ParseGetUsageResponse(rsp *http.Response) (*GetUsageResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUsageResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := runtime.JSONUnmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListVersionsResponse parses an HTTP response from a ListVersionsWithResponse call
 func ParseListVersionsResponse(rsp *http.Response) (*ListVersionsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -8407,6 +8881,9 @@ type ServerInterface interface {
 	// GetThumbnail A thumbnail of an image or a recording's cover, made on the fly.
 	// (GET /api/v1/shares/{share}/thumbnail)
 	GetThumbnail(w http.ResponseWriter, r *http.Request, share ShareName, params GetThumbnailParams)
+	// GetUsage Add up what a folder holds.
+	// (GET /api/v1/shares/{share}/usage)
+	GetUsage(w http.ResponseWriter, r *http.Request, share ShareName, params GetUsageParams)
 	// ListVersions The previous versions of a file or a folder.
 	// (GET /api/v1/shares/{share}/versions)
 	ListVersions(w http.ResponseWriter, r *http.Request, share ShareName, params ListVersionsParams)
@@ -9494,6 +9971,61 @@ func (siw *ServerInterfaceWrapper) GetThumbnail(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// GetUsage operation middleware
+func (siw *ServerInterfaceWrapper) GetUsage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "share" -------------
+	var share ShareName
+
+	err = runtime.BindStyledParameterWithOptions("simple", "share", r.PathValue("share"), &share, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "share", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetUsageParams
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUsage(w, r, share, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListVersions operation middleware
 func (siw *ServerInterfaceWrapper) ListVersions(w http.ResponseWriter, r *http.Request) {
 
@@ -9810,6 +10342,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/zip/entry", wrapper.GetZipEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/versions", wrapper.ListVersions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/search", wrapper.Search)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/usage", wrapper.GetUsage)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/folders", wrapper.CreateFolder)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/shares/{share}/archive", wrapper.CreateArchive)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/shares/{share}/archive/{ticket}", wrapper.GetArchive)

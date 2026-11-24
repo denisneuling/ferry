@@ -13,6 +13,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Places } from '../core/places';
+import { FolderSize } from '../core/folder-size';
 import { Api, Entry } from '../core/api';
 import { Actions } from '../core/actions';
 import { Browser, SortKey } from '../core/browser';
@@ -102,6 +103,7 @@ export class Folder {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly locale = inject(LOCALE_ID);
+  protected readonly sizes = inject(FolderSize);
   protected readonly places = inject(Places);
   /** This folder as a place, for its star; none in a snapshot. */
   protected readonly here = computed(() => {
@@ -425,6 +427,13 @@ export class Folder {
         run: () => this.places.toggleFavourite(place),
       });
     }
+    const here = this.browser.share();
+    if (one && here && e.type === 'folder')
+      items.push({
+        icon: 'folder',
+        label: $localize`:@@size.run:Folder size`,
+        run: () => void this.sizes.run(here, e.path, e.name),
+      });
     if (this.snapshot.at()) {
       // A previous version is read-only, and a ZIP is not made of one:
       // a single file downloads, and that is all.

@@ -61,7 +61,9 @@ type API struct {
 	// failures are files that made no thumbnail a moment ago (failures.go).
 	failures *failures
 	// searches holds the one search each session may have running.
-	searches  *searches
+	searches *searches
+	// usages holds the one folder size each session may have counting.
+	usages    *searches
 	thumbUsed atomic.Int64
 	metrics   *metrics.Metrics
 	// archives holds the ZIP downloads listed and not yet fetched.
@@ -122,6 +124,7 @@ func New(cfg config.Config, sessions *session.Table, login LoginFunc, log *slog.
 		thumbMemory: semaphore.NewWeighted(max(1, cfg.ThumbnailMemory)),
 		failures:    newFailures(),
 		searches:    newSearches(),
+		usages:      newSearches(),
 	}
 	o := preview.Options{
 		PDF: cfg.PreviewPDF, CodeDir: cfg.WASMDir, CacheDir: cfg.WASMCacheDir, Budget: a.budget, BudgetSize: cfg.ThumbnailMemory,

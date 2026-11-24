@@ -682,6 +682,45 @@ paths:
         "413": { $ref: "#/components/responses/TooLarge" }
         "502": { $ref: "#/components/responses/BadGateway" }
 
+  /api/v1/shares/{share}/usage:
+    get:
+      operationId: getUsage
+      tags: [files]
+      summary: Add up what a folder holds.
+      description: |
+        Counts the files below the folder `path` and adds up their sizes, as
+        the server lists them — now or, with `at`, as that snapshot holds
+        them. There is no index and nothing is kept: the folders are listed
+        one by one, breadth first, with the person's session; a folder the
+        server refuses below `path` is skipped and counted; `path` refused is
+        the error. One per session: a new one ends the one running.
+
+        The answer is `application/x-ndjson`: `{"progress": Usage}` about
+        once a second while it counts, then a last line, `{"end": Usage}`, or
+        `{"problem": Problem}` when it failed part-way. A stream without
+        either last line was cut off. Errors before the first line are
+        ordinary problem responses.
+
+        It stops after 20000 folders, 200000 entries, 32 levels below `path`
+        or 60 seconds, saying which in `reason` with `truncated: true`; what
+        was counted until then is the answer. A client that goes away stops
+        it before the next folder.
+      parameters:
+        - $ref: "#/components/parameters/ShareName"
+        - $ref: "#/components/parameters/EntryPath"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: The count as it grows, and where it ended.
+          content:
+            application/x-ndjson:
+              schema: { $ref: "#/components/schemas/UsageStreamLine" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
+
   /api/v1/shares/{share}/folders:
     post:
       operationId: createFolder
@@ -1232,6 +1271,35 @@ components:
               type: string
               enum: [hits, folders, depth, time]
               description: The bound it stopped at, when truncated.
+    Usage:
+      type: object
+      required: [files, folders, bytes, skipped, truncated]
+      properties:
+        files: { type: integer, description: "Files counted." }
+        folders: { type: integer, description: "Folders counted below the folder." }
+        bytes: { type: integer, format: int64, description: "The files' sizes added up, as the server lists them." }
+        skipped: { type: integer, description: "Folders the server refused, or too large to count." }
+        truncated: { type: boolean, description: "It stopped at a bound before counting everything." }
+        reason:
+          type: string
+          enum: [folders, entries, depth, time]
+          description: The bound it stopped at, when truncated.
+    UsageProgress:
+      type: object
+      required: [progress]
+      properties:
+        progress: { $ref: "#/components/schemas/Usage" }
+    UsageEnd:
+      type: object
+      required: [end]
+      properties:
+        end: { $ref: "#/components/schemas/Usage" }
+    UsageStreamLine:
+      description: One line of a folder size's answer.
+      oneOf:
+        - $ref: "#/components/schemas/UsageProgress"
+        - $ref: "#/components/schemas/UsageEnd"
+        - $ref: "#/components/schemas/EntryStreamProblem"
     EntryStreamEnd:
       type: object
       required: [end]

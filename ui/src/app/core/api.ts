@@ -15,6 +15,7 @@ export type Problem = components['schemas']['Problem'];
 export type Version = components['schemas']['Version'];
 export type VersionList = components['schemas']['VersionList'];
 export type SearchEnd = components['schemas']['SearchEnd']['end'];
+export type Usage = components['schemas']['Usage'];
 export type CopyProgress = components['schemas']['CopyProgress'];
 export type ZipEntry = components['schemas']['ZipEntry'];
 
@@ -154,6 +155,51 @@ export class Api {
    * A problem in the stream's last line, or a stream cut off before it, is
    * an ApiError, as for a listing.
    */
+  /**
+   * Adds up what a folder holds, the server counting folder by folder:
+   * onProgress gets the count about once a second, the promise the last.
+   */
+  async usage(
+    share: string,
+    path: string,
+    onProgress: (u: Usage) => void,
+    signal?: AbortSignal,
+  ): Promise<Usage> {
+    const res = await this.fetch(
+      'GET',
+      `${BASE}${shareBase(share)}/usage?path=${encodeURIComponent(path)}${this.at()}`,
+      undefined,
+      { Accept: 'application/x-ndjson' },
+      signal,
+    );
+    if (!res.body) throw new ApiError(0, 'network');
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let rest = '';
+    for (;;) {
+      let chunk: ReadableStreamReadResult<string>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        throw new ApiError(0, 'network');
+      }
+      if (chunk.done) throw new ApiError(0, 'network');
+      const lines = (rest + chunk.value).split('\n');
+      rest = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line) continue;
+        const v = JSON.parse(line) as { progress?: Usage; end?: Usage; problem?: Problem };
+        if (v.progress) onProgress(v.progress);
+        else if (v.end) {
+          void reader.cancel();
+          return v.end;
+        } else if (v.problem) {
+          void reader.cancel();
+          throw this.problemOf(v.problem.status, v.problem);
+        }
+      }
+    }
+  }
+
   async search(
     share: string,
     path: string,

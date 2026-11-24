@@ -71,6 +71,16 @@ and sign out.
   entries than the deployment shows (`FERRY_MAX_LISTING`, 200000 by default)
   says how many that is.
 
+## Folder sizes
+
+**Folder size** under a folder's title, and in a folder's menu, adds up
+what it holds: the server lists the folders below one by one with your
+session and ferry counts the files and their sizes, the count showing in a
+card as it grows. Only on request, one at a time, and stopped with the
+card's ✕; it ends after 20000 folders, 200000 entries, 32 levels or a
+minute, then saying it is at least that much. Folders the server does not
+open to you are left out and said to be.
+
 ## Favourites and recently used
 
 The star next to a folder's title, in an entry's menu and in the preview

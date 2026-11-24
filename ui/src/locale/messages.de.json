@@ -279,6 +279,13 @@
     "pv.fullscreen": "Vollbild (f)",
     "taken.title": "Die Bilder nach Aufnahmedatum sortieren",
     "taken.sort": "Nach Aufnahmedatum",
-    "meta.gpsShow": "Anzeigen"
+    "meta.gpsShow": "Anzeigen",
+    "size.run": "Ordnergröße",
+    "size.counts": "{$INTERPOLATION} Dateien in {$INTERPOLATION_1} Ordnern",
+    "size.counting": "zählt…",
+    "size.partial": "mindestens: nicht alles wurde gezählt",
+    "size.skipped": "{$INTERPOLATION} Ordner für dich nicht offen",
+    "size.stop": "Zählen beenden",
+    "size.close": "Schließen"
   }
 }

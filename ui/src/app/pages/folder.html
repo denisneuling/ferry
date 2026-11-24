@@ -56,6 +56,15 @@
         }
         @if (browser.share(); as share) {
           · <f-space [share]="share" [path]="browser.path()" />
+          ·
+          <button
+            type="button"
+            class="linkish"
+            (click)="sizes.run(share, browser.path(), browser.title())"
+            i18n="@@size.run"
+          >
+            Folder size
+          </button>
         }
         @if (browser.filter() && !finder.query()) {
           · <ng-container i18n="@@matching">{{ browser.visible().length }} matching</ng-container>
