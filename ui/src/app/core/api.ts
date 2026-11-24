@@ -16,6 +16,7 @@ export type Version = components['schemas']['Version'];
 export type VersionList = components['schemas']['VersionList'];
 export type SearchEnd = components['schemas']['SearchEnd']['end'];
 export type Usage = components['schemas']['Usage'];
+export type Sheet = components['schemas']['Sheet'];
 export type CopyProgress = components['schemas']['CopyProgress'];
 export type ZipEntry = components['schemas']['ZipEntry'];
 
@@ -353,8 +354,11 @@ export class Api {
   }
 
   /** The first sheet of a workbook, its cells as text, read by the server. */
-  sheet(share: string, path: string): Promise<{ name: string; rows: string[][]; truncated: boolean }> {
-    return this.json('GET', `${shareBase(share)}/sheet?path=${q(path)}${this.at()}`);
+  sheet(share: string, path: string, index = 0): Promise<Sheet> {
+    return this.json(
+      'GET',
+      `${shareBase(share)}/sheet?path=${q(path)}${index ? `&sheet=${index}` : ''}${this.at()}`,
+    );
   }
 
   /** The size and free space of the volume a folder is on, as the server reports them. */

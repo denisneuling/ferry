@@ -495,11 +495,18 @@ paths:
         numbers are written as ISO 8601 when their cell's format is a date
         or a time; other numbers as stored. At most the first 1000 rows and
         100 columns, 1 KB a cell; `truncated` when there is more. A file that
-        is neither is `415` (`not_a_document`).
+        is neither is `415` (`not_a_document`). `sheet` picks another sheet
+        than the first, by its place; `names` lists them all (at most 256).
+        A place beyond the last is `415` too.
       parameters:
         - $ref: "#/components/parameters/ShareName"
         - $ref: "#/components/parameters/EntryPath"
         - $ref: "#/components/parameters/At"
+        - name: sheet
+          in: query
+          required: false
+          description: The sheet's place, from 0.
+          schema: { type: integer, minimum: 0, maximum: 255, default: 0 }
       responses:
         "200":
           description: The sheet.
@@ -1399,9 +1406,14 @@ components:
           items: { $ref: "#/components/schemas/ZipEntry" }
     Sheet:
       type: object
-      required: [name, rows, truncated]
+      required: [name, names, index, rows, truncated]
       properties:
         name: { type: string, description: "The sheet's name, as the file gives it; may be empty." }
+        names:
+          type: array
+          items: { type: string }
+          description: The names of the workbook's sheets, in order.
+        index: { type: integer, description: "The place of the sheet given." }
         rows:
           type: array
           description: Rows from the first, each up to its last cell with a value; an empty row is an empty array. Cells are text, to be shown as text.

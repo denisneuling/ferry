@@ -76,6 +76,12 @@ func TestSheets(t *testing.T) {
 	if s.Name != "Haushalt" || len(s.Rows) != 1 || len(s.Rows[0]) != 2 || s.Rows[0][1] != "<b>850</b>" || s.Truncated {
 		t.Fatalf("sheet: %+v", s)
 	}
+	if len(s.Names) != 1 || s.Names[0] != "Haushalt" || s.Index != 0 {
+		t.Fatalf("names: %+v", s)
+	}
+	if res := h.do(t, "GET", "/api/v1/shares/alex/sheet?sheet=1&path="+q(name), nil, nil, c); res.StatusCode != 415 {
+		t.Fatalf("a second sheet that is not there: %d", res.StatusCode)
+	}
 	if res := h.do(t, "GET", "/api/v1/shares/alex/sheet?path=hello.txt", nil, nil, c); res.StatusCode != 415 {
 		t.Fatalf("a text file's sheet: %d", res.StatusCode)
 	}

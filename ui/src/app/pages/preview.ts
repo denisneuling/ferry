@@ -11,7 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { Api, Entry, ZipEntry } from '../core/api';
+import { Api, Entry, Sheet, ZipEntry } from '../core/api';
 import { parseTable } from '../core/csv';
 import { Actions } from '../core/actions';
 import { Browser } from '../core/browser';
@@ -202,7 +202,21 @@ import { MAX_SUBTITLE_BYTES, decodeSubtitle, subtitlesFor, toWebVTT } from '../c
               @if (text() === null) {
                 <ng-container i18n="@@loading">Loading…</ng-container>
               } @else if (table(); as tb) {
-                @if (sheetName(); as n) {
+                @if (sheetNames().length > 1) {
+                  <div class="sheet-tabs" role="tablist">
+                    @for (n of sheetNames(); track $index) {
+                      <button
+                        type="button"
+                        role="tab"
+                        [class.on]="$index === sheetIndex()"
+                        [attr.aria-selected]="$index === sheetIndex()"
+                        (click)="showSheet($index)"
+                      >
+                        {{ n || '–' }}
+                      </button>
+                    }
+                  </div>
+                } @else if (sheetName(); as n) {
                   <p class="sheet-name">{{ n }}</p>
                 }
                 <table class="csv">
@@ -435,8 +449,27 @@ export class Preview {
   });
   protected readonly text = signal<string | null>(null);
   /** A workbook's first sheet, as the server read it. */
-  private readonly sheet = signal<{ name: string; rows: string[][]; truncated: boolean } | null>(null);
+  private readonly sheet = signal<Sheet | null>(null);
   protected readonly sheetName = computed(() => this.sheet()?.name ?? '');
+  protected readonly sheetNames = computed(() => this.sheet()?.names ?? []);
+  protected readonly sheetIndex = computed(() => this.sheet()?.index ?? 0);
+
+  /** Another sheet of the workbook shown, read by the server. */
+  protected showSheet(i: number): void {
+    const e = this.entry();
+    const share = this.browser.share();
+    if (!e || !share || i === this.sheetIndex()) return;
+    this.text.set(null);
+    this.api.sheet(share, e.path, i).then(
+      (sh) => {
+        if (this.entry() === e) {
+          this.sheet.set(sh);
+          this.text.set('');
+        }
+      },
+      (err) => this.entry() === e && this.text.set(describe(err)),
+    );
+  }
   /** A CSV's or TSV's first rows, or a workbook's, as cells: text, shown as text. */
   protected readonly table = computed(() => {
     const t = this.text();

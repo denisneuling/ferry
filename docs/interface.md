@@ -241,6 +241,8 @@ the first 1000 rows and 100 columns, each cell as it was when the file was
 last saved — a formula's stored result, never the formula worked out again.
 Excel's dates and times are written as 2026-11-24 or 14:30:00 where the
 cell is formatted as one; an OpenDocument cell shows the text it displays.
+A workbook of several sheets shows them as tabs above the table, each read
+when it is chosen.
 A ZIP archive shows what it holds: each file
 with its size, to open in a new tab or to download on its own, unpacked
 as it is sent — nothing is unpacked onto the share. Entries that are

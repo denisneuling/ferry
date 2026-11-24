@@ -34,7 +34,11 @@ func (a *API) GetSheet(w http.ResponseWriter, r *http.Request, share v1.ShareNam
 	}
 	defer again()
 	defer func() { _ = f.Close() }()
-	s, err := docs.ReadSheet(f, f.Size, docs.DefaultSheetLimits)
+	index := 0
+	if params.Sheet != nil {
+		index = *params.Sheet
+	}
+	s, err := docs.ReadSheet(f, f.Size, docs.DefaultSheetLimits, index)
 	switch {
 	case errors.Is(err, zipread.ErrTooLarge):
 		probTooLarge.write(w)
@@ -49,6 +53,9 @@ func (a *API) GetSheet(w http.ResponseWriter, r *http.Request, share v1.ShareNam
 		if s.Rows == nil {
 			s.Rows = [][]string{}
 		}
-		writeJSON(w, http.StatusOK, v1.Sheet{Name: s.Name, Rows: s.Rows, Truncated: s.Truncated})
+		if s.Names == nil {
+			s.Names = []string{}
+		}
+		writeJSON(w, http.StatusOK, v1.Sheet{Name: s.Name, Names: s.Names, Index: s.Index, Rows: s.Rows, Truncated: s.Truncated})
 	}
 }

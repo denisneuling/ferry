@@ -2454,3 +2454,27 @@ h1 .fav {
     grid-column: 1 / -1;
   }
 }
+
+/* A workbook's sheets, as tabs above the table. */
+.sheet-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+.sheet-tabs button {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 10px;
+  border: 1px solid #e4ddd2;
+  border-radius: 6px 6px 0 0;
+  background: #efeae2;
+  color: #55625f;
+  cursor: pointer;
+}
+.sheet-tabs button.on {
+  background: #fbfaf7;
+  color: #1d2a2c;
+  font-weight: 600;
+  border-bottom-color: #fbfaf7;
+}

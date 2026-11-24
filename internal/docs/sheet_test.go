@@ -36,7 +36,7 @@ func TestReadSheetXLSX(t *testing.T) {
 		"xl/sharedStrings.xml":       sharedXML,
 		"xl/styles.xml":              stylesXML,
 	})
-	s, err := ReadSheet(bytes.NewReader(z), int64(len(z)), DefaultSheetLimits)
+	s, err := ReadSheet(bytes.NewReader(z), int64(len(z)), DefaultSheetLimits, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestReadSheetODS(t *testing.T) {
 	z := zipOf(t, map[string]string{"content.xml": ods})
 	lim := DefaultSheetLimits
 	lim.Rows = 1048575 // the empty run must cost a count, not a layout
-	s, err := ReadSheet(bytes.NewReader(z), int64(len(z)), lim)
+	s, err := ReadSheet(bytes.NewReader(z), int64(len(z)), lim, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,9 +77,45 @@ func TestReadSheetODS(t *testing.T) {
 		t.Errorf("last row: %q", got)
 	}
 	// With the default bounds the rows past 1000 are cut off, and said to be.
-	s, _ = ReadSheet(bytes.NewReader(z), int64(len(z)), DefaultSheetLimits)
+	s, _ = ReadSheet(bytes.NewReader(z), int64(len(z)), DefaultSheetLimits, 0)
 	if len(s.Rows) != 1 || !s.Truncated {
 		t.Errorf("bounded: %d rows truncated=%v", len(s.Rows), s.Truncated)
+	}
+}
+
+// Any sheet by its place, and the names of all of them.
+func TestReadSheetIndex(t *testing.T) {
+	x := zipOf(t, map[string]string{
+		"xl/workbook.xml":            workbook,
+		"xl/_rels/workbook.xml.rels": workbookRels,
+		"xl/worksheets/first.xml":    sheetXML,
+		"xl/worksheets/sheet2.xml":   `<worksheet><sheetData><row><c t="str"><v>zweites Blatt</v></c></row></sheetData></worksheet>`,
+		"xl/sharedStrings.xml":       sharedXML,
+	})
+	s, err := ReadSheet(bytes.NewReader(x), int64(len(x)), DefaultSheetLimits, 1)
+	if err != nil || s.Name != "Zwei" || s.Index != 1 || !reflect.DeepEqual(s.Names, []string{"Haushalt", "Zwei"}) || s.Rows[0][0] != "zweites Blatt" {
+		t.Fatalf("xlsx sheet 2: %+v, %v", s, err)
+	}
+	if _, err := ReadSheet(bytes.NewReader(x), int64(len(x)), DefaultSheetLimits, 2); err != ErrNone {
+		t.Fatalf("xlsx sheet 3: %v", err)
+	}
+	ods := `<office:document-content><office:body><office:spreadsheet>
+<table:table table:name="Eins"><table:table-row table:number-rows-repeated="5000"><table:table-cell><text:p>a</text:p></table:table-cell></table:table-row></table:table>
+<table:table table:name="Zwei"><table:table-row><table:table-cell><text:p>b</text:p><table:table table:name="innen"/></table:table-cell></table:table-row></table:table>
+<table:table table:name="Drei"/>
+</office:spreadsheet></office:body></office:document-content>`
+	o := zipOf(t, map[string]string{"content.xml": ods})
+	// The first sheet is cut at the row bound, and the names after it are still told.
+	s, err = ReadSheet(bytes.NewReader(o), int64(len(o)), DefaultSheetLimits, 0)
+	if err != nil || !s.Truncated || len(s.Rows) != 1000 || !reflect.DeepEqual(s.Names, []string{"Eins", "Zwei", "Drei"}) {
+		t.Fatalf("ods sheet 1: %d rows %v %q %v", len(s.Rows), s.Truncated, s.Names, err)
+	}
+	s, err = ReadSheet(bytes.NewReader(o), int64(len(o)), DefaultSheetLimits, 1)
+	if err != nil || s.Name != "Zwei" || !reflect.DeepEqual(s.Rows, [][]string{{"b"}}) || s.Truncated {
+		t.Fatalf("ods sheet 2: %+v, %v", s, err)
+	}
+	if _, err := ReadSheet(bytes.NewReader(o), int64(len(o)), DefaultSheetLimits, 3); err != ErrNone {
+		t.Fatalf("ods sheet 4: %v", err)
 	}
 }
 
@@ -91,7 +127,7 @@ func TestReadSheetRepeatedValues(t *testing.T) {
 </table:table></office:spreadsheet></office:body></office:document-content>`
 	z := zipOf(t, map[string]string{"content.xml": ods})
 	lim := SheetLimits{Rows: 50, Cols: 10, Cells: 200, Cell: 16}
-	s, err := ReadSheet(bytes.NewReader(z), int64(len(z)), lim)
+	s, err := ReadSheet(bytes.NewReader(z), int64(len(z)), lim, 0)
 	if err != nil || !s.Truncated || len(s.Rows) != 20 || len(s.Rows[0]) != 10 {
 		t.Fatalf("%d rows, err %v, truncated %v", len(s.Rows), err, s.Truncated)
 	}
@@ -105,7 +141,7 @@ func TestReadSheetNone(t *testing.T) {
 		"sheet missing": {"xl/workbook.xml": workbook},
 	} {
 		z := zipOf(t, files)
-		if _, err := ReadSheet(bytes.NewReader(z), int64(len(z)), DefaultSheetLimits); err != ErrNone {
+		if _, err := ReadSheet(bytes.NewReader(z), int64(len(z)), DefaultSheetLimits, 0); err != ErrNone {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -199,11 +235,16 @@ func FuzzSheet(f *testing.F) {
 			"xl/sharedStrings.xml":     shared,
 			"xl/styles.xml":            styles,
 		})
-		if s, err := ReadSheet(bytes.NewReader(x), int64(len(x)), lim); err == nil {
+		if s, err := ReadSheet(bytes.NewReader(x), int64(len(x)), lim, 0); err == nil {
 			check(s)
 		}
 		o := zipOf(t, map[string]string{"content.xml": ods})
-		if s, err := ReadSheet(bytes.NewReader(o), int64(len(o)), lim); err == nil {
+		for _, i := range []int{0, 1} {
+			if s, err := ReadSheet(bytes.NewReader(o), int64(len(o)), lim, i); err == nil {
+				check(s)
+			}
+		}
+		if s, err := ReadSheet(bytes.NewReader(o), int64(len(o)), lim, 0); err == nil {
 			check(s)
 		}
 	})

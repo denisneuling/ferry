@@ -825,8 +825,14 @@ type ShareList struct {
 
 // Sheet defines model for Sheet.
 type Sheet struct {
+	// Index The place of the sheet given.
+	Index int `json:"index"`
+
 	// Name The sheet's name, as the file gives it; may be empty.
 	Name string `json:"name"`
+
+	// Names The names of the workbook's sheets, in order.
+	Names []string `json:"names"`
 
 	// Rows Rows from the first, each up to its last cell with a value; an empty row is an empty array. Cells are text, to be shown as text.
 	Rows      [][]string `json:"rows"`
@@ -1181,6 +1187,9 @@ type GetSheetParams struct {
 	// carries `at` is `400` (`version_read_only`). A time is never part of
 	// the path.
 	At *At `form:"at,omitempty" json:"at,omitempty"`
+
+	// Sheet The sheet's place, from 0.
+	Sheet *int `form:"sheet,omitempty" json:"sheet,omitempty"`
 }
 
 // GetSpaceParams defines parameters for GetSpace.
@@ -2140,7 +2149,9 @@ type ClientInterface interface {
 	// numbers are written as ISO 8601 when their cell's format is a date
 	// or a time; other numbers as stored. At most the first 1000 rows and
 	// 100 columns, 1 KB a cell; `truncated` when there is more. A file that
-	// is neither is `415` (`not_a_document`).
+	// is neither is `415` (`not_a_document`). `sheet` picks another sheet
+	// than the first, by its place; `names` lists them all (at most 256).
+	// A place beyond the last is `415` too.
 	//
 	// Corresponds with GET /api/v1/shares/{share}/sheet (the `GetSheet` operationId).
 	GetSheet(ctx context.Context, share ShareName, params *GetSheetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2926,7 +2937,9 @@ func (c *Client) Search(ctx context.Context, share ShareName, params *SearchPara
 // numbers are written as ISO 8601 when their cell's format is a date
 // or a time; other numbers as stored. At most the first 1000 rows and
 // 100 columns, 1 KB a cell; `truncated` when there is more. A file that
-// is neither is `415` (`not_a_document`).
+// is neither is `415` (`not_a_document`). `sheet` picks another sheet
+// than the first, by its place; `names` lists them all (at most 256).
+// A place beyond the last is `415` too.
 //
 // Corresponds with GET /api/v1/shares/{share}/sheet (the `GetSheet` operationId).
 func (c *Client) GetSheet(ctx context.Context, share ShareName, params *GetSheetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -4403,6 +4416,18 @@ func NewGetSheetRequest(server string, share ShareName, params *GetSheetParams) 
 
 		}
 
+		if params.Sheet != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "sheet", *params.Sheet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -5836,7 +5861,9 @@ type ClientWithResponsesInterface interface {
 	// numbers are written as ISO 8601 when their cell's format is a date
 	// or a time; other numbers as stored. At most the first 1000 rows and
 	// 100 columns, 1 KB a cell; `truncated` when there is more. A file that
-	// is neither is `415` (`not_a_document`).
+	// is neither is `415` (`not_a_document`). `sheet` picks another sheet
+	// than the first, by its place; `names` lists them all (at most 256).
+	// A place beyond the last is `415` too.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -8999,7 +9026,9 @@ func (c *ClientWithResponses) SearchWithResponse(ctx context.Context, share Shar
 // numbers are written as ISO 8601 when their cell's format is a date
 // or a time; other numbers as stored. At most the first 1000 rows and
 // 100 columns, 1 KB a cell; `truncated` when there is more. A file that
-// is neither is `415` (`not_a_document`).
+// is neither is `415` (`not_a_document`). `sheet` picks another sheet
+// than the first, by its place; `names` lists them all (at most 256).
+// A place beyond the last is `415` too.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -12370,6 +12399,19 @@ func (siw *ServerInterfaceWrapper) GetSheet(w http.ResponseWriter, r *http.Reque
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sheet" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sheet", r.URL.Query(), &params.Sheet, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sheet"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sheet", Err: err})
 		}
 		return
 	}

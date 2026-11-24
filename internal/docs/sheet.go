@@ -32,11 +32,19 @@ const (
 	maxStyles    = 4 << 20   // xl/styles.xml
 	maxStyleXfs  = 65536     // cell formats read from it
 	maxSharedNum = 1 << 22   // shared strings counted through
+	maxSheets    = 256       // sheet names told
+	// After the sheet read, an OpenDocument file is read on only for the
+	// names of the sheets after it, and only so far.
+	maxNameTokens = 2 << 20
 )
 
 // Sheet is the first sheet of a workbook, as text.
 type Sheet struct {
 	Name string
+	// Names of the workbook's sheets, in order, at most maxSheets; Index is
+	// the one read.
+	Names []string
+	Index int
 	// Rows from the first, each up to its last cell with a value; a row
 	// with none is empty. Rows after the last with a value are left out.
 	Rows [][]string
@@ -54,27 +62,30 @@ type cell struct {
 // ReadSheet returns the first sheet of an Excel workbook (.xlsx) or an
 // OpenDocument spreadsheet (.ods): what each cell shows as it was last
 // saved — a formula's stored result, never the formula worked out anew.
-func ReadSheet(r io.ReaderAt, size int64, lim SheetLimits) (Sheet, error) {
+func ReadSheet(r io.ReaderAt, size int64, lim SheetLimits, index int) (Sheet, error) {
+	if index < 0 || index >= maxSheets {
+		return Sheet{}, ErrNone
+	}
 	es, err := zipread.List(r, size, maxEntries)
 	if err != nil {
 		return Sheet{}, err
 	}
 	if _, ok := zipread.Find(es, "xl/workbook.xml"); ok {
-		return readXLSX(r, size, es, lim)
+		return readXLSX(r, size, es, lim, index)
 	}
 	if e, ok := zipread.Find(es, "content.xml"); ok {
 		rd, err := openPart(r, size, e, maxSheetXML)
 		if err != nil {
 			return Sheet{}, err
 		}
-		return readODS(rd, lim)
+		return readODS(rd, lim, index)
 	}
 	return Sheet{}, ErrNone
 }
 
 // readXLSX follows the workbook to its first sheet, reads that sheet's
 // cells, then the shared strings they use and the date formats they wear.
-func readXLSX(r io.ReaderAt, size int64, es []zipread.Entry, lim SheetLimits) (Sheet, error) {
+func readXLSX(r io.ReaderAt, size int64, es []zipread.Entry, lim SheetLimits, index int) (Sheet, error) {
 	wb, _ := zipread.Find(es, "xl/workbook.xml")
 	b, err := zipread.ReadAll(r, size, wb, maxOPF)
 	if err != nil {
@@ -93,8 +104,21 @@ func readXLSX(r io.ReaderAt, size int64, es []zipread.Entry, lim SheetLimits) (S
 	if xml.Unmarshal(b, &book) != nil || len(book.Sheets) == 0 {
 		return Sheet{}, ErrNone
 	}
-	first := book.Sheets[0]
-	target := "xl/worksheets/sheet1.xml"
+	if index >= len(book.Sheets) {
+		return Sheet{}, ErrNone
+	}
+	var names []string
+	for i, sh := range book.Sheets {
+		if i == maxSheets {
+			break
+		}
+		names = append(names, sh.Name)
+	}
+	first := book.Sheets[index]
+	target := ""
+	if index == 0 {
+		target = "xl/worksheets/sheet1.xml" // the usual place, where no relationship says
+	}
 	for _, a := range first.Attrs {
 		if a.Name.Local == "id" {
 			if t, ok := relTarget(r, size, es, a.Value); ok {
@@ -103,7 +127,7 @@ func readXLSX(r io.ReaderAt, size int64, es []zipread.Entry, lim SheetLimits) (S
 		}
 	}
 	e, ok := zipread.Find(es, target)
-	if !ok {
+	if target == "" || !ok {
 		return Sheet{}, ErrNone
 	}
 	rd, err := openPart(r, size, e, maxSheetXML)
@@ -149,7 +173,9 @@ func readXLSX(r io.ReaderAt, size int64, es []zipread.Entry, lim SheetLimits) (S
 			}
 		}
 	}
-	return layout(first.Name, cells, more, lim), nil
+	sh := layout(first.Name, cells, more, lim)
+	sh.Names, sh.Index = names, index
+	return sh, nil
 }
 
 // openPart opens a part that is read as a stream and only as far as
@@ -534,14 +560,18 @@ func serialDate(v string, k dateKind, base1904 bool) (string, bool) {
 // shows (its paragraphs), with repeated rows and columns laid out only as
 // far as the bounds and only when a cell with a value follows them — a
 // table that repeats an empty row a million times costs one count.
-func readODS(r io.Reader, lim SheetLimits) (Sheet, error) {
+func readODS(r io.Reader, lim SheetLimits, index int) (Sheet, error) {
 	d := xml.NewDecoder(r)
 	d.Strict = false
 	var s Sheet
 	var cells []cell
 	inSheet := false // inside office:spreadsheet, not a text's table
-	tables := 0      // the first table, and tables inside it
-	depth := 0       // inside the first table: how many tables deep
+	top := -1        // the sheet, counted from 0, the reader is in or after
+	depth := 0       // inside a sheet: how many tables deep
+	wanted := false  // inside the sheet asked for
+	done := false    // past it: only the other sheets' names are read on
+	capped := false  // a bound reached: no more cells taken
+	after := 0       // tokens read since it ended
 	row, col := 0, 0
 	rowRepeat := 1
 	var rowCells []cell
@@ -550,13 +580,18 @@ func readODS(r io.Reader, lim SheetLimits) (Sheet, error) {
 	var text strings.Builder
 	full := func() bool { return len(cells) >= lim.Cells }
 	for {
+		if done {
+			if after++; after > maxNameTokens || len(s.Names) >= maxSheets {
+				break
+			}
+		}
 		tok, err := d.Token()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			if len(cells) > 0 {
-				s.Truncated = true
+			if done || len(cells) > 0 {
+				s.Truncated = s.Truncated || !done
 				break
 			}
 			return Sheet{}, err
@@ -574,14 +609,18 @@ func readODS(r io.Reader, lim SheetLimits) (Sheet, error) {
 				if !inSheet {
 					break
 				}
-				tables++
-				if tables > 1 {
-					return layout(s.Name, cells, s.Truncated, lim), nil
-				}
+				top++
 				depth = 1
-				s.Name = attr(t, "name")
+				name := attr(t, "name")
+				if len(s.Names) < maxSheets {
+					s.Names = append(s.Names, name)
+				}
+				if top == index {
+					wanted = true
+					s.Name = name
+				}
 			case "table-row":
-				if depth != 1 {
+				if !wanted || depth != 1 {
 					break
 				}
 				rowRepeat = 1
@@ -591,7 +630,7 @@ func readODS(r io.Reader, lim SheetLimits) (Sheet, error) {
 				col = 0
 				rowCells = rowCells[:0]
 			case "table-cell", "covered-table-cell":
-				if depth != 1 {
+				if !wanted || depth != 1 {
 					break
 				}
 				inCell = true
@@ -632,12 +671,15 @@ func readODS(r io.Reader, lim SheetLimits) (Sheet, error) {
 					break
 				}
 				if depth == 1 {
-					return layout(s.Name, cells, s.Truncated, lim), nil
+					depth = 0
+					if wanted {
+						wanted, done = false, true
+					}
 				}
 			case "annotation":
 				inNote--
 			case "table-cell", "covered-table-cell":
-				if depth != 1 || !inCell {
+				if !wanted || depth != 1 || !inCell {
 					break
 				}
 				inCell = false
@@ -649,7 +691,7 @@ func readODS(r io.Reader, lim SheetLimits) (Sheet, error) {
 				if v == "" {
 					break
 				}
-				for c := first; c <= col; c++ {
+				for c := first; c <= col && !capped; c++ {
 					if c > lim.Cols {
 						s.Truncated = true
 						break
@@ -657,22 +699,24 @@ func readODS(r io.Reader, lim SheetLimits) (Sheet, error) {
 					rowCells = append(rowCells, cell{col: c, text: v, shared: -1})
 				}
 			case "table-row":
-				if depth != 1 {
+				if !wanted || depth != 1 {
 					break
 				}
 				first := row + 1
 				row += rowRepeat
-				if len(rowCells) == 0 {
+				if len(rowCells) == 0 || capped {
 					break
 				}
+			rows:
 				for rr := first; rr <= row; rr++ {
 					if rr > lim.Rows {
-						s.Truncated = true
-						return layout(s.Name, cells, true, lim), nil
+						s.Truncated, capped = true, true
+						break
 					}
 					for _, c := range rowCells {
 						if full() {
-							return layout(s.Name, cells, true, lim), nil
+							s.Truncated, capped = true, true
+							break rows
 						}
 						c.row = rr
 						cells = append(cells, c)
@@ -685,10 +729,12 @@ func readODS(r io.Reader, lim SheetLimits) (Sheet, error) {
 			}
 		}
 	}
-	if s.Name == "" && cells == nil {
+	if index >= len(s.Names) && index > top {
 		return Sheet{}, ErrNone
 	}
-	return layout(s.Name, cells, s.Truncated, lim), nil
+	out := layout(s.Name, cells, s.Truncated, lim)
+	out.Names, out.Index = s.Names, index
+	return out, nil
 }
 
 // layout puts cells in rows: as many rows as up to the last with a value,
