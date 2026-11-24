@@ -2384,3 +2384,6 @@ h1 .fav {
 .lightbox:fullscreen {
   background: #000;
 }
+h1 .fav {
+  display: inline-grid;
+}
